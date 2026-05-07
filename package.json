@@ -1,0 +1,21 @@
+{
+  "name": "explore",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@10.31.0",
+  "scripts": {
+    "dev": "pnpm --filter @explore/desktop dev",
+    "build": "pnpm --filter @explore/desktop build",
+    "preview": "pnpm --filter @explore/desktop preview",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["electron", "esbuild"]
+  }
+}

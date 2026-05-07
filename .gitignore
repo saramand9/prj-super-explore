@@ -1,0 +1,11 @@
+node_modules
+dist
+out
+*.exe
+*.dmg
+*.AppImage
+.env
+.env.local
+.turbo
+.cache
+.claude

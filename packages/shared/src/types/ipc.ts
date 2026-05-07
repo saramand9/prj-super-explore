@@ -1,0 +1,191 @@
+/**
+ * IPC 协议定义
+ *
+ * 请求-响应模式：渲染进程 invoke → 主进程 handle
+ * 事件推送模式：主进程 → 渲染进程 on
+ */
+
+import type { FileEntry, FileOpResult, FileStat, SortConfig } from './file';
+import type { Bookmark } from './config';
+import type { PluginInfo, PluginManifest } from './plugin';
+
+// ── 请求-响应 channels ──────────────────────────
+
+export interface IpcChannels {
+  // File operations
+  'file:readDir': {
+    req: { path: string; sort?: SortConfig; showHidden?: boolean };
+    res: FileEntry[];
+  };
+  'file:stat': {
+    req: { path: string };
+    res: FileStat | null;
+  };
+  'file:copy': {
+    req: { sources: string[]; destDir: string };
+    res: FileOpResult;
+  };
+  'file:move': {
+    req: { sources: string[]; destDir: string };
+    res: FileOpResult;
+  };
+  'file:delete': {
+    req: { paths: string[]; permanent?: boolean };
+    res: FileOpResult;
+  };
+  'file:mkdir': {
+    req: { parentPath: string; name: string };
+    res: { success: boolean; path?: string; error?: string };
+  };
+  'file:rename': {
+    req: { path: string; newName: string };
+    res: { success: boolean; newPath?: string; error?: string };
+  };
+  'file:exists': {
+    req: { path: string };
+    res: boolean;
+  };
+  'file:open': {
+    req: { path: string };
+    res: void;
+  };
+  'file:openInExplorer': {
+    req: { path: string };
+    res: void;
+  };
+
+  // File watching
+  'file:watch': {
+    req: { path: string };
+    res: string; // watcherId
+  };
+  'file:unwatch': {
+    req: { watcherId: string };
+    res: void;
+  };
+
+  // Search
+  'search:fulltext': {
+    req: { dir: string; query: string; filePattern?: string; maxResults?: number };
+    res: FulltextMatch[];
+  };
+  'search:cancel': {
+    req: { searchId: string };
+    res: void;
+  };
+
+  // Index (filename index for quick launcher)
+  'index:query': {
+    req: { pattern: string; maxResults?: number; includePaths?: string[] };
+    res: IndexResult[];
+  };
+  'index:rebuild': {
+    req: { paths: string[] };
+    res: { itemCount: number };
+  };
+  'index:status': {
+    req: void;
+    res: { ready: boolean; itemCount: number; indexing: boolean };
+  };
+
+  // Bookmarks
+  'bookmark:list': {
+    req: void;
+    res: Bookmark[];
+  };
+  'bookmark:add': {
+    req: Bookmark;
+    res: void;
+  };
+  'bookmark:remove': {
+    req: { id: string };
+    res: void;
+  };
+  'bookmark:update': {
+    req: { id: string; updates: Partial<Bookmark> };
+    res: void;
+  };
+
+  // Pinned tabs persistence
+  'tabs:load': {
+    req: void;
+    res: { left: { path: string; label: string }[]; right: { path: string; label: string }[] };
+  };
+  'tabs:save': {
+    req: { side: 'left' | 'right'; tabs: { path: string; label: string }[] };
+    res: void;
+  };
+
+  // Plugins
+  'plugin:getRegistered': {
+    req: void;
+    res: PluginInfo[];
+  };
+  'plugin:loadManifest': {
+    req: { pluginPath: string };
+    res: PluginManifest | null;
+  };
+
+  // Window
+  'window:toggleLauncher': {
+    req: void;
+    res: void;
+  };
+
+  // Dialogs
+  'dialog:openFolder': {
+    req: { defaultPath?: string };
+    res: string | null;
+  };
+
+  // App
+  'app:getVersion': {
+    req: void;
+    res: string;
+  };
+  'app:getPlatform': {
+    req: void;
+    res: NodeJS.Platform;
+  };
+  'app:getHomeDir': {
+    req: void;
+    res: string;
+  };
+}
+
+// ── 事件推送 channels (main → renderer) ─────────
+
+export interface IpcEvents {
+  'fs:changed': {
+    watcherId: string;
+    events: Array<{ type: 'add' | 'remove' | 'change'; path: string }>;
+  };
+  'index:progress': {
+    done: number;
+    total: number;
+  };
+  'index:ready': {
+    itemCount: number;
+  };
+  'launcher:show': void;
+  'launcher:hide': void;
+}
+
+// ── 内联子类型 ──────────────────────────────────
+
+export interface FulltextMatch {
+  filePath: string;
+  fileName: string;
+  lineNumber: number;
+  lineContent: string;
+  columnStart: number;
+  columnEnd: number;
+  matchText: string;
+}
+
+export interface IndexResult {
+  path: string;
+  name: string;
+  isDirectory: boolean;
+  extension: string;
+}

@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "./out",
+    "noEmit": true,
+    "baseUrl": ".",
+    "types": ["vite/client"],
+    "paths": {
+      "@explore/shared": ["../../packages/shared/src"],
+      "@explore/shared/*": ["../../packages/shared/src/*"],
+      "@/*": ["./src/renderer/*"]
+    }
+  },
+  "include": ["src/renderer/**/*", "src/main/**/*"]
+}
