@@ -69,7 +69,6 @@ export const FileRow = memo(function FileRow({
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
       role="row"
-      tabIndex={0}
     >
       <span className="w-5 text-center flex-shrink-0">{icon}</span>
       <span className="flex-1 truncate ml-1" title={entry.name}>

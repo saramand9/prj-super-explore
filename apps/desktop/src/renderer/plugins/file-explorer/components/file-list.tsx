@@ -129,6 +129,7 @@ export function FileList({ side }: FileListProps) {
             const next = Math.min(focusIdx + 1, entries.length - 1);
             selectSingle(side, entries[next].path);
             setFocusIdx(next);
+            (document.activeElement as HTMLElement)?.blur();
           }
           break;
         case 'ArrowUp':
@@ -137,6 +138,7 @@ export function FileList({ side }: FileListProps) {
             const next = Math.max(focusIdx - 1, 0);
             selectSingle(side, entries[next].path);
             setFocusIdx(next);
+            (document.activeElement as HTMLElement)?.blur();
           }
           break;
 
