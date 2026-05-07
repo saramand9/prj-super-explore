@@ -345,6 +345,29 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
   },
 }));
 
+/** 拼音混合匹配：输入可跨越词边界，每个词可匹配前缀或跳过 */
+function matchPinyinMixed(input: string, words: string[]): boolean {
+  const memo = new Map<string, boolean>();
+  function dfs(i: number, w: number): boolean {
+    if (i >= input.length) return true;
+    if (w >= words.length) return false;
+    const key = `${i},${w}`;
+    if (memo.has(key)) return memo.get(key)!;
+    const maxMatch = Math.min(words[w].length, input.length - i);
+    for (let n = maxMatch; n >= 0; n--) {
+      if (words[w].slice(0, n) === input.slice(i, i + n)) {
+        if (dfs(i + n, w + 1)) {
+          memo.set(key, true);
+          return true;
+        }
+      }
+    }
+    memo.set(key, false);
+    return false;
+  }
+  return dfs(0, 0);
+}
+
 /** 获取指定面板筛选后的文件列表 */
 export function useFilteredEntries(side: 'left' | 'right') {
   const panel = useFileStore((s) => s[side]);
@@ -354,7 +377,9 @@ export function useFilteredEntries(side: 'left' | 'right') {
     if (e.name.toLowerCase().includes(lower)) return true;
     const full = pinyin(e.name, { toneType: 'none' }).replace(/\s+/g, '').toLowerCase();
     if (full.includes(lower)) return true;
-    const first = pinyin(e.name, { pattern: 'first', toneType: 'none' }).replace(/\s+/g, '').toLowerCase();
-    return first.includes(lower);
+    const initials = pinyin(e.name, { pattern: 'first', toneType: 'none' }).replace(/\s+/g, '').toLowerCase();
+    if (initials.includes(lower)) return true;
+    const words = pinyin(e.name, { toneType: 'none', type: 'array' }).map((w: string) => w.toLowerCase());
+    return matchPinyinMixed(lower, words);
   });
 }
