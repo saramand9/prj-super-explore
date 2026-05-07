@@ -47,6 +47,7 @@ interface FileExplorerState {
   addTab: (side: 'left' | 'right', path: string) => void;
   forkTab: (side: 'left' | 'right', tabId: string) => void;
   activateTab: (side: 'left' | 'right', tabId: string) => void;
+  renameTab: (side: 'left' | 'right', tabId: string, label: string) => void;
 }
 
 let tabSeq = 0;
@@ -303,6 +304,14 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
         },
       };
     }),
+
+  renameTab: (side, tabId, label) =>
+    set((s) => ({
+      [side]: {
+        ...s[side],
+        tabs: s[side].tabs.map((t) => (t.id === tabId ? { ...t, label } : t)),
+      },
+    })),
 
   loadPinnedTabs: async () => {
     try {

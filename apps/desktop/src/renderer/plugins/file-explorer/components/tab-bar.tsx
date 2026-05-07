@@ -15,6 +15,7 @@ export function TabBar({ side }: TabBarProps) {
   const unpinTab = useFileStore((s) => s.unpinTab);
   const closeTab = useFileStore((s) => s.closeTab);
   const forkTab = useFileStore((s) => s.forkTab);
+  const renameTab = useFileStore((s) => s.renameTab);
   const persistPinnedTabs = useFileStore((s) => s.persistPinnedTabs);
 
   const [contextMenu, setContextMenu] = useState<{ tab: Tab; x: number; y: number } | null>(null);
@@ -86,6 +87,16 @@ export function TabBar({ side }: TabBarProps) {
     }
     setContextMenu(null);
   }, [contextMenu, side, forkTab]);
+
+  const handleRename = useCallback(() => {
+    if (contextMenu) {
+      const name = prompt('New name:', contextMenu.tab.label);
+      if (name?.trim()) {
+        renameTab(side, contextMenu.tab.id, name.trim());
+      }
+    }
+    setContextMenu(null);
+  }, [contextMenu, side, renameTab]);
 
   if (tabs.length === 0) return null;
 
@@ -189,6 +200,12 @@ export function TabBar({ side }: TabBarProps) {
               📌 Pin tab
             </button>
           )}
+          <button
+            className="w-full text-left px-3 py-1.5 hover:bg-accent/20 text-text-secondary hover:text-text-primary"
+            onClick={handleRename}
+          >
+            ✏️ Rename tab
+          </button>
           <button
             className="w-full text-left px-3 py-1.5 hover:bg-accent/20 text-text-secondary hover:text-text-primary"
             onClick={handleFork}
