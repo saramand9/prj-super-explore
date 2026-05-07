@@ -218,7 +218,7 @@ function PanelSlot({
 
   return (
     <div
-      className={`h-full flex flex-col ${isActive ? 'ring-1 ring-accent/30' : ''}`}
+      className="h-full flex flex-col"
       onClick={onClick}
     >
       {/* Tab Bar */}
@@ -227,7 +227,7 @@ function PanelSlot({
       {/* Panel Header */}
       <div
         className={`flex-shrink-0 h-9 flex items-center px-2 text-sm border-b border-border relative gap-1.5 ${
-          isActive ? 'bg-accent/20' : 'bg-surface-light'
+          isActive ? 'bg-accent/30' : 'bg-surface-light'
         }`}
       >
         {/* Side indicator */}
@@ -271,7 +271,7 @@ function PanelSlot({
           </button>
 
           {isActive && (
-            <span className="text-[10px] text-accent/70">ACTIVE</span>
+            <span className="text-xs text-accent font-medium">◉ 活跃</span>
           )}
         </div>
 
@@ -313,7 +313,7 @@ function PanelSlot({
       {/* Panel Content */}
       <div className="flex-1 overflow-hidden bg-surface relative">
         {renderPanel()}
-        {!isActive && <div className="absolute inset-0 bg-black/15 pointer-events-none" />}
+        {!isActive && <div className="absolute inset-0 bg-black/30 pointer-events-none" />}
       </div>
     </div>
   );
