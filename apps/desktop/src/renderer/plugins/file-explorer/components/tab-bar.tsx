@@ -161,7 +161,8 @@ export function TabBar({ side }: TabBarProps) {
         ) : (
           <span className="truncate max-w-[120px]">{tab.label}</span>
         )}
-        <span
+        {!tab.pinned && (
+          <span
           className="text-text-muted/0 group-hover:text-text-muted hover:text-accent cursor-pointer text-[10px] flex-shrink-0"
           onClick={(e) => {
             e.stopPropagation();
@@ -181,6 +182,7 @@ export function TabBar({ side }: TabBarProps) {
         >
           ✕
         </span>
+        )}
       </div>
     );
   };
@@ -237,12 +239,14 @@ export function TabBar({ side }: TabBarProps) {
           >
             📋 Clone tab
           </button>
+          {!contextMenu.tab.pinned && (
           <button
             className="w-full text-left px-3 py-1.5 hover:bg-accent/20 text-text-secondary hover:text-text-primary"
             onClick={handleClose}
           >
             ✕ Close tab
           </button>
+          )}
         </div>
       )}
     </div>
