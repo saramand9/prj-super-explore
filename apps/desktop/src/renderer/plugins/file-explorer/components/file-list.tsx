@@ -27,6 +27,7 @@ export function FileList({ side }: FileListProps) {
   const lastSelectedRef = useRef<string | null>(null);
   const [focusIdx, setFocusIdx] = useState(0);
   const lastBackspaceRef = useRef<string | null>(null);
+  const [disableHover, setDisableHover] = useState(false);
 
   // 筛选文本/条目变化时，重置焦点
   useEffect(() => {
@@ -129,6 +130,7 @@ export function FileList({ side }: FileListProps) {
             const next = Math.min(focusIdx + 1, entries.length - 1);
             selectSingle(side, entries[next].path);
             setFocusIdx(next);
+            setDisableHover(true);
             (document.activeElement as HTMLElement)?.blur();
           }
           break;
@@ -138,6 +140,7 @@ export function FileList({ side }: FileListProps) {
             const next = Math.max(focusIdx - 1, 0);
             selectSingle(side, entries[next].path);
             setFocusIdx(next);
+            setDisableHover(true);
             (document.activeElement as HTMLElement)?.blur();
           }
           break;
@@ -236,6 +239,14 @@ export function FileList({ side }: FileListProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [side, filterText, path, entries, selected, setFilter, clearSelection, navigateToPath, refresh, handleOpenFolder]);
 
+  // 键盘操作后禁 hover，鼠标移动恢复
+  useEffect(() => {
+    if (!disableHover) return;
+    const handler = () => setDisableHover(false);
+    window.addEventListener('mousemove', handler, { once: true });
+    return () => window.removeEventListener('mousemove', handler);
+  }, [disableHover]);
+
   // 聚焦项变化时滚动到可视区
   useEffect(() => {
     if (entries.length > 0 && focusIdx < entries.length) {
@@ -298,6 +309,7 @@ export function FileList({ side }: FileListProps) {
                 entry={entry}
                 isSelected={selected.has(entry.path)}
                 isActive={idx === focusIdx}
+                disableHover={disableHover}
                 highlight={filterText}
                 onClick={(e: React.MouseEvent) => {
                   if (e.ctrlKey || e.metaKey) {

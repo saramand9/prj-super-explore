@@ -5,6 +5,7 @@ interface FileRowProps {
   entry: FileEntry;
   isSelected: boolean;
   isActive: boolean;
+  disableHover?: boolean;
   highlight?: string;
   onClick: (e: React.MouseEvent) => void;
   onDoubleClick: () => void;
@@ -40,6 +41,7 @@ export const FileRow = memo(function FileRow({
   entry,
   isSelected,
   isActive,
+  disableHover,
   highlight,
   onClick,
   onDoubleClick,
@@ -63,7 +65,9 @@ export const FileRow = memo(function FileRow({
           ? 'bg-accent/40 text-white'
           : isActive
             ? 'bg-accent/20'
-            : 'hover:bg-surface-lighter'
+            : disableHover
+              ? ''
+              : 'hover:bg-surface-lighter'
       }`}
       onClick={handleClick}
       onDoubleClick={onDoubleClick}
