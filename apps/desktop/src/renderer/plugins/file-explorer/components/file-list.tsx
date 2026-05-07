@@ -154,6 +154,42 @@ export function FileList({ side }: FileListProps) {
           useLayoutStore.getState().setActivePanel('right');
           break;
 
+        case 'Tab':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            {
+              const tabs = useFileStore.getState()[side].tabs;
+              if (tabs.length > 1) {
+                const curIdx = tabs.findIndex((t) => t.id === useFileStore.getState()[side].activeTabId);
+                const next = e.shiftKey
+                  ? (curIdx - 1 + tabs.length) % tabs.length
+                  : (curIdx + 1) % tabs.length;
+                const target = tabs[next];
+                useFileStore.getState().activateTab(side, target.id);
+                navigateTo(side, target.path);
+                useLayoutStore.getState().setPanelPath(side, target.path);
+              }
+            }
+          }
+          break;
+
+        case '1': case '2': case '3': case '4': case '5':
+        case '6': case '7': case '8': case '9':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            {
+              const tabs = useFileStore.getState()[side].tabs;
+              const idx = parseInt(e.key) - 1;
+              if (idx < tabs.length) {
+                const target = tabs[idx];
+                useFileStore.getState().activateTab(side, target.id);
+                navigateTo(side, target.path);
+                useLayoutStore.getState().setPanelPath(side, target.path);
+              }
+            }
+          }
+          break;
+
         case 'Enter': {
           // 有选中项：打开选中项
           if (entries.length > 0 && state.selected.size === 1) {
