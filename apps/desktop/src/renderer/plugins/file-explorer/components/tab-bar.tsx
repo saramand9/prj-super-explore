@@ -21,6 +21,9 @@ export function TabBar({ side }: TabBarProps) {
   const [contextMenu, setContextMenu] = useState<{ tab: Tab; x: number; y: number } | null>(null);
   const [hoveredTabId, setHoveredTabId] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const editInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -90,13 +93,19 @@ export function TabBar({ side }: TabBarProps) {
 
   const handleRename = useCallback(() => {
     if (contextMenu) {
-      const name = prompt('New name:', contextMenu.tab.label);
-      if (name?.trim()) {
-        renameTab(side, contextMenu.tab.id, name.trim());
-      }
+      setEditingTabId(contextMenu.tab.id);
+      setEditValue(contextMenu.tab.label);
+      setTimeout(() => editInputRef.current?.select(), 0);
     }
     setContextMenu(null);
-  }, [contextMenu, side, renameTab]);
+  }, [contextMenu]);
+
+  const confirmRename = useCallback(() => {
+    if (editingTabId && editValue.trim()) {
+      renameTab(side, editingTabId, editValue.trim());
+    }
+    setEditingTabId(null);
+  }, [editingTabId, editValue, side, renameTab]);
 
   if (tabs.length === 0) return null;
 
@@ -135,7 +144,22 @@ export function TabBar({ side }: TabBarProps) {
         onMouseLeave={() => setHoveredTabId(null)}
       >
         {isPinned && <span className="text-[10px] flex-shrink-0">📍</span>}
-        <span className="truncate max-w-[120px]">{tab.label}</span>
+        {editingTabId === tab.id ? (
+          <input
+            ref={editInputRef}
+            className="bg-surface-lighter border border-accent rounded px-1 py-0 text-sm text-text-primary outline-none w-[100px]"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={confirmRename}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') confirmRename();
+              if (e.key === 'Escape') setEditingTabId(null);
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <span className="truncate max-w-[120px]">{tab.label}</span>
+        )}
         <span
           className="text-text-muted/0 group-hover:text-text-muted hover:text-accent cursor-pointer text-[10px] flex-shrink-0"
           onClick={(e) => {
