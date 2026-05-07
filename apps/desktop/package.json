@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@explore/shared": "workspace:*"
+    "@explore/shared": "workspace:*",
+    "pinyin-pro": "^3.28.1"
   },
   "devDependencies": {
     "@electron-toolkit/preload": "^3.0.0",

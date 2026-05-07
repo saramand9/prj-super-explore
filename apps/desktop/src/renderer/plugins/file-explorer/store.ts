@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { FileEntry, SortConfig } from '@explore/shared';
+import { pinyin } from 'pinyin-pro';
 import { ipc } from '../../framework/bridge/ipc-client';
 
 export interface Tab {
@@ -349,5 +350,9 @@ export function useFilteredEntries(side: 'left' | 'right') {
   const panel = useFileStore((s) => s[side]);
   if (!panel.filterText) return panel.entries;
   const lower = panel.filterText.toLowerCase();
-  return panel.entries.filter((e) => e.name.toLowerCase().includes(lower));
+  return panel.entries.filter((e) => {
+    if (e.name.toLowerCase().includes(lower)) return true;
+    const py = pinyin(e.name, { toneType: 'none' }).toLowerCase();
+    return py.includes(lower);
+  });
 }
