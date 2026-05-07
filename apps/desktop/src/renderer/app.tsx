@@ -311,8 +311,9 @@ function PanelSlot({
       </div>
 
       {/* Panel Content */}
-      <div className="flex-1 overflow-hidden bg-surface">
+      <div className="flex-1 overflow-hidden bg-surface relative">
         {renderPanel()}
+        {!isActive && <div className="absolute inset-0 bg-black/15 pointer-events-none" />}
       </div>
     </div>
   );
