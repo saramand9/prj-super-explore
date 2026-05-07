@@ -37,6 +37,7 @@ interface FileExplorerState {
   toggleSelect: (side: 'left' | 'right', path: string) => void;
   selectRange: (side: 'left' | 'right', from: string, to: string) => void;
   clearSelection: (side: 'left' | 'right') => void;
+  selectSingle: (side: 'left' | 'right', path: string) => void;
   selectAll: (side: 'left' | 'right') => void;
   setSort: (side: 'left' | 'right', key: SortConfig['key']) => void;
   toggleHidden: (side: 'left' | 'right') => void;
@@ -190,6 +191,9 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
 
   clearSelection: (side) =>
     set((s) => ({ [side]: { ...s[side], selected: new Set() } })),
+
+  selectSingle: (side, path) =>
+    set((s) => ({ [side]: { ...s[side], selected: new Set([path]) } })),
 
   selectAll: (side) =>
     set((s) => ({

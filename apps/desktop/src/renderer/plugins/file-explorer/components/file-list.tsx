@@ -20,6 +20,7 @@ export function FileList({ side }: FileListProps) {
   const navigateTo = useFileStore((s) => s.navigateTo);
   const toggleSelect = useFileStore((s) => s.toggleSelect);
   const clearSelection = useFileStore((s) => s.clearSelection);
+  const selectSingle = useFileStore((s) => s.selectSingle);
   const setFilter = useFileStore((s) => s.setFilter);
   const refresh = useFileStore((s) => s.refresh);
 
@@ -126,8 +127,7 @@ export function FileList({ side }: FileListProps) {
           e.preventDefault();
           {
             const next = Math.min(focusIdx + 1, entries.length - 1);
-            clearSelection(side);
-            toggleSelect(side, entries[next].path);
+            selectSingle(side, entries[next].path);
             setFocusIdx(next);
           }
           break;
@@ -135,8 +135,7 @@ export function FileList({ side }: FileListProps) {
           e.preventDefault();
           {
             const next = Math.max(focusIdx - 1, 0);
-            clearSelection(side);
-            toggleSelect(side, entries[next].path);
+            selectSingle(side, entries[next].path);
             setFocusIdx(next);
           }
           break;
@@ -302,8 +301,7 @@ export function FileList({ side }: FileListProps) {
                   if (e.ctrlKey || e.metaKey) {
                     toggleSelect(side, entry.path);
                   } else {
-                    clearSelection(side);
-                    toggleSelect(side, entry.path);
+                    selectSingle(side, entry.path);
                     setFocusIdx(idx);
                   }
                   lastSelectedRef.current = entry.path;
