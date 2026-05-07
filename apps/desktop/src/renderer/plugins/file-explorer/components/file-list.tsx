@@ -129,6 +129,15 @@ export function FileList({ side }: FileListProps) {
           setFocusIdx((prev) => Math.max(prev - 1, 0));
           break;
 
+        case 'ArrowLeft':
+          e.preventDefault();
+          useLayoutStore.getState().setActivePanel('left');
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          useLayoutStore.getState().setActivePanel('right');
+          break;
+
         case 'Enter': {
           // 有选中项：打开选中项
           if (entries.length > 0 && state.selected.size === 1) {

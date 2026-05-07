@@ -70,9 +70,6 @@ export function TabBar({ side }: TabBarProps) {
 
   if (tabs.length === 0) return null;
 
-  const pinnedTabs = tabs.filter((t) => t.pinned);
-  const unpinnedTabs = tabs.filter((t) => !t.pinned);
-
   function tabClass(isActive: boolean, isPinned: boolean) {
     const base = 'flex items-center gap-1 px-2 py-0.5 rounded-t cursor-pointer select-none whitespace-nowrap transition-colors border-l-2 ';
     if (isActive) {
@@ -126,13 +123,7 @@ export function TabBar({ side }: TabBarProps) {
 
   return (
     <div ref={containerRef} className="flex items-center text-sm overflow-x-auto scrollbar-none border-b border-border/40 px-1 flex-shrink-0">
-      {pinnedTabs.map(renderTab)}
-
-      {pinnedTabs.length > 0 && unpinnedTabs.length > 0 && (
-        <span className="w-px h-3 bg-border/50 mx-0.5 flex-shrink-0" />
-      )}
-
-      {unpinnedTabs.map(renderTab)}
+      {tabs.map(renderTab)}
 
       {/* 气泡路径提示 — fixed 定位，不受 overflow 影响 */}
       {hoveredTabId && tooltipPos && (
