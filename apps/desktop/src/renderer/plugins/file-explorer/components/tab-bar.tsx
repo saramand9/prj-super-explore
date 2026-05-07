@@ -103,9 +103,10 @@ export function TabBar({ side }: TabBarProps) {
   const confirmRename = useCallback(() => {
     if (editingTabId && editValue.trim()) {
       renameTab(side, editingTabId, editValue.trim());
+      persistPinnedTabs(side);
     }
     setEditingTabId(null);
-  }, [editingTabId, editValue, side, renameTab]);
+  }, [editingTabId, editValue, side, renameTab, persistPinnedTabs]);
 
   if (tabs.length === 0) return null;
 
