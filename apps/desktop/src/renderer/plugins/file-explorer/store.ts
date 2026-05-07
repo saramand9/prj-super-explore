@@ -352,7 +352,9 @@ export function useFilteredEntries(side: 'left' | 'right') {
   const lower = panel.filterText.toLowerCase();
   return panel.entries.filter((e) => {
     if (e.name.toLowerCase().includes(lower)) return true;
-    const py = pinyin(e.name, { toneType: 'none' }).toLowerCase();
-    return py.includes(lower);
+    const full = pinyin(e.name, { toneType: 'none' }).replace(/\s+/g, '').toLowerCase();
+    if (full.includes(lower)) return true;
+    const first = pinyin(e.name, { pattern: 'first', toneType: 'none' }).replace(/\s+/g, '').toLowerCase();
+    return first.includes(lower);
   });
 }
