@@ -109,10 +109,10 @@ export interface IpcChannels {
   // Pinned tabs persistence
   'tabs:load': {
     req: void;
-    res: { left: { path: string; label: string }[]; right: { path: string; label: string }[] };
+    res: { left: { path: string; label: string; initialPath: string }[]; right: { path: string; label: string; initialPath: string }[] };
   };
   'tabs:save': {
-    req: { side: 'left' | 'right'; tabs: { path: string; label: string }[] };
+    req: { side: 'left' | 'right'; tabs: { path: string; label: string; initialPath: string }[] };
     res: void;
   };
 

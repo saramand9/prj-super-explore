@@ -16,7 +16,11 @@ export function AddressBar({ side }: AddressBarProps) {
   const path = useFileStore((s) => s[side].path);
   const backStack = useFileStore((s) => s[side].backStack);
   const forwardStack = useFileStore((s) => s[side].forwardStack);
-  const initialPath = useFileStore((s) => s[side].initialPath);
+  const initialPath = useFileStore((s) => {
+    const panel = s[side];
+    const activeTab = panel.tabs.find((t) => t.id === panel.activeTabId);
+    return activeTab?.initialPath ?? null;
+  });
   const navigateTo = useFileStore((s) => s.navigateTo);
   const goBackFn = useFileStore((s) => s.goBack);
   const goForwardFn = useFileStore((s) => s.goForward);

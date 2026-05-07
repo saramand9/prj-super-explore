@@ -8,11 +8,13 @@ interface TabBarProps {
 
 export function TabBar({ side }: TabBarProps) {
   const tabs = useFileStore((s) => s[side].tabs);
-  const currentPath = useFileStore((s) => s[side].path);
+  const activeTabId = useFileStore((s) => s[side].activeTabId);
   const navigateTo = useFileStore((s) => s.navigateTo);
+  const activateTab = useFileStore((s) => s.activateTab);
   const pinTab = useFileStore((s) => s.pinTab);
   const unpinTab = useFileStore((s) => s.unpinTab);
   const closeTab = useFileStore((s) => s.closeTab);
+  const forkTab = useFileStore((s) => s.forkTab);
   const persistPinnedTabs = useFileStore((s) => s.persistPinnedTabs);
 
   const [contextMenu, setContextMenu] = useState<{ tab: Tab; x: number; y: number } | null>(null);
@@ -30,12 +32,13 @@ export function TabBar({ side }: TabBarProps) {
 
   const handleClick = useCallback(
     (tab: Tab) => {
-      if (tab.path !== currentPath) {
+      if (tab.id !== activeTabId) {
+        activateTab(side, tab.id);
         navigateTo(side, tab.path);
         useLayoutStore.getState().setPanelPath(side, tab.path);
       }
     },
-    [side, currentPath, navigateTo],
+    [side, activeTabId, activateTab, navigateTo],
   );
 
   const handleContextMenu = useCallback((e: React.MouseEvent, tab: Tab) => {
@@ -62,11 +65,27 @@ export function TabBar({ side }: TabBarProps) {
 
   const handleClose = useCallback(() => {
     if (contextMenu) {
+      const wasActive = contextMenu.tab.id === activeTabId;
       closeTab(side, contextMenu.tab.id);
       persistPinnedTabs(side);
+      if (wasActive) {
+        const remaining = useFileStore.getState()[side].tabs;
+        const next = remaining[remaining.length - 1];
+        if (next) {
+          navigateTo(side, next.path);
+          useLayoutStore.getState().setPanelPath(side, next.path);
+        }
+      }
     }
     setContextMenu(null);
-  }, [contextMenu, side, closeTab, persistPinnedTabs]);
+  }, [contextMenu, side, activeTabId, closeTab, navigateTo, persistPinnedTabs]);
+
+  const handleFork = useCallback(() => {
+    if (contextMenu) {
+      forkTab(side, contextMenu.tab.id);
+    }
+    setContextMenu(null);
+  }, [contextMenu, side, forkTab]);
 
   if (tabs.length === 0) return null;
 
@@ -89,7 +108,7 @@ export function TabBar({ side }: TabBarProps) {
   }
 
   const renderTab = (tab: Tab) => {
-    const isActive = tab.path === currentPath;
+    const isActive = tab.id === activeTabId;
     const isPinned = tab.pinned;
     return (
       <div
@@ -110,8 +129,17 @@ export function TabBar({ side }: TabBarProps) {
           className="text-text-muted/0 group-hover:text-text-muted hover:text-accent cursor-pointer text-[10px] flex-shrink-0"
           onClick={(e) => {
             e.stopPropagation();
+            const wasActive = tab.id === activeTabId;
             closeTab(side, tab.id);
             persistPinnedTabs(side);
+            if (wasActive) {
+              const remaining = useFileStore.getState()[side].tabs;
+              const next = remaining[remaining.length - 1];
+              if (next) {
+                navigateTo(side, next.path);
+                useLayoutStore.getState().setPanelPath(side, next.path);
+              }
+            }
           }}
           title="Close"
         >
@@ -161,6 +189,12 @@ export function TabBar({ side }: TabBarProps) {
               📌 Pin tab
             </button>
           )}
+          <button
+            className="w-full text-left px-3 py-1.5 hover:bg-accent/20 text-text-secondary hover:text-text-primary"
+            onClick={handleFork}
+          >
+            📋 Clone tab
+          </button>
           <button
             className="w-full text-left px-3 py-1.5 hover:bg-accent/20 text-text-secondary hover:text-text-primary"
             onClick={handleClose}

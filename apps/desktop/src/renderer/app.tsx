@@ -211,7 +211,7 @@ function PanelSlot({
       // 先用同步 action 创建标签，确保即时可见
       useFileStore.getState().addTab(side, result);
       // 再异步导航加载目录
-      useFileStore.getState().navigateTo(side, result, true);
+      useFileStore.getState().navigateTo(side, result, false);
       useLayoutStore.getState().setPanelPath(side, result);
     }
   }, [side, panel.path]);

@@ -7,6 +7,7 @@ export interface Tab {
   path: string;
   label: string;
   pinned: boolean;
+  initialPath: string;
 }
 
 interface PanelFileState {
@@ -19,8 +20,8 @@ interface PanelFileState {
   showHidden: boolean;
   backStack: string[];
   forwardStack: string[];
-  initialPath: string | null;
   tabs: Tab[];
+  activeTabId: string | null;
 }
 
 interface FileExplorerState {
@@ -44,6 +45,8 @@ interface FileExplorerState {
   loadPinnedTabs: () => Promise<void>;
   persistPinnedTabs: (side: 'left' | 'right') => void;
   addTab: (side: 'left' | 'right', path: string) => void;
+  forkTab: (side: 'left' | 'right', tabId: string) => void;
+  activateTab: (side: 'left' | 'right', tabId: string) => void;
 }
 
 let tabSeq = 0;
@@ -69,8 +72,8 @@ function defaultPanel(): PanelFileState {
     showHidden: false,
     backStack: [],
     forwardStack: [],
-    initialPath: null,
     tabs: [],
+    activeTabId: null,
   };
 }
 
@@ -96,8 +99,10 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
         path,
         filterText: '',
         selected: new Set(),
-        tabs: s[side].tabs,
-        // 有固定标签时冻结 backStack，◀ 永远回到固定时刻路径
+        // 同步当前活跃标签的路径（只改 path，不改 label）
+        tabs: s[side].tabs.map((t) =>
+          t.id === s[side].activeTabId ? { ...t, path } : t,
+        ),
         backStack: addToHistory && panel.path
           ? (s[side].tabs.some((t) => t.pinned)
               ? s[side].backStack
@@ -210,12 +215,10 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
         [side]: {
           ...s[side],
           tabs: s[side].tabs.map((t) =>
-            t.id === tabId ? { ...t, pinned: true, path: currentPath ?? t.path, label } : t,
+            t.id === tabId ? { ...t, pinned: true, path: currentPath ?? t.path, label, initialPath: currentPath ?? t.initialPath } : t,
           ),
-          // Pin 后 backStack 只保留固定路径一条，◀ 永远回到这里
           backStack: currentPath ? [currentPath] : s[side].backStack,
           forwardStack: [],
-          initialPath: currentPath ?? s[side].initialPath,
         },
       };
     }),
@@ -229,26 +232,74 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
     })),
 
   closeTab: (side, tabId) =>
-    set((s) => ({
-      [side]: {
-        ...s[side],
-        tabs: s[side].tabs.filter((t) => t.id !== tabId),
-      },
-    })),
+    set((s) => {
+      const remaining = s[side].tabs.filter((t) => t.id !== tabId);
+      const activeTabId =
+        s[side].activeTabId === tabId
+          ? remaining.length > 0
+            ? remaining[remaining.length - 1].id
+            : null
+          : s[side].activeTabId;
+      return {
+        [side]: {
+          ...s[side],
+          tabs: remaining,
+          activeTabId,
+        },
+      };
+    }),
 
   addTab: (side, path) =>
     set((s) => {
       const exists = s[side].tabs.find((t) => t.path === path);
       if (exists) {
-        // 已有标签不重复创建，但首次调用时仍记录起点
-        return s[side].initialPath ? {} : { [side]: { ...s[side], initialPath: path } };
+        return {
+          [side]: {
+            ...s[side],
+            activeTabId: exists.id,
+          },
+        };
       }
-      const newTab: Tab = { id: nextTabId(), path, label: tabLabel(path), pinned: false };
+      const newTab: Tab = { id: nextTabId(), path, label: tabLabel(path), pinned: false, initialPath: path };
       return {
         [side]: {
           ...s[side],
           tabs: [...s[side].tabs, newTab],
-          initialPath: path,
+          activeTabId: newTab.id,
+          backStack: [],
+          forwardStack: [],
+        },
+      };
+    }),
+
+  forkTab: (side, tabId) =>
+    set((s) => {
+      const tab = s[side].tabs.find((t) => t.id === tabId);
+      if (!tab) return {};
+      const newTab: Tab = { id: nextTabId(), path: tab.path, label: tab.label, pinned: false, initialPath: tab.initialPath };
+      return {
+        [side]: {
+          ...s[side],
+          tabs: [...s[side].tabs, newTab],
+          activeTabId: newTab.id,
+          backStack: [],
+          forwardStack: [],
+        },
+      };
+    }),
+
+  activateTab: (side, tabId) =>
+    set((s) => {
+      const oldActiveId = s[side].activeTabId;
+      const currentPath = s[side].path;
+      return {
+        [side]: {
+          ...s[side],
+          activeTabId: tabId,
+          // 把当前路径保存到旧活跃标签
+          tabs: s[side].tabs.map((t) =>
+            t.id === oldActiveId && currentPath ? { ...t, path: currentPath } : t,
+          ),
         },
       };
     }),
@@ -256,8 +307,8 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
   loadPinnedTabs: async () => {
     try {
       const data = await ipc.invoke('tabs:load', undefined);
-      const pinnedLeft = data.left.map((t, i) => ({ id: `pinned-left-${i}`, path: t.path, label: t.label, pinned: true as const }));
-      const pinnedRight = data.right.map((t, i) => ({ id: `pinned-right-${i}`, path: t.path, label: t.label, pinned: true as const }));
+      const pinnedLeft = data.left.map((t, i) => ({ id: `pinned-left-${i}`, path: t.path, label: t.label, pinned: true as const, initialPath: t.initialPath }));
+      const pinnedRight = data.right.map((t, i) => ({ id: `pinned-right-${i}`, path: t.path, label: t.label, pinned: true as const, initialPath: t.initialPath }));
       set((s) => ({
         left: {
           ...s.left,
@@ -279,7 +330,7 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
     const panel = get()[side];
     const pinnedTabs = panel.tabs
       .filter((t) => t.pinned)
-      .map((t) => ({ path: t.path, label: t.label }));
+      .map((t) => ({ path: t.path, label: t.label, initialPath: t.initialPath }));
     ipc.invoke('tabs:save', { side, tabs: pinnedTabs }).catch(() => {});
   },
 }));

@@ -66,9 +66,11 @@ export function FileList({ side }: FileListProps) {
       defaultPath: currentPath ?? undefined,
     });
     if (result) {
-      navigateToPath(result);
+      useFileStore.getState().addTab(side, result);
+      navigateTo(side, result, false);
+      syncToLayout(result);
     }
-  }, [side, navigateToPath]);
+  }, [side, navigateTo, syncToLayout]);
 
   // ── 键盘事件 ──
 
