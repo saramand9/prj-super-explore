@@ -89,8 +89,22 @@ export function FileList({ side }: FileListProps) {
       const state = useFileStore.getState()[side];
 
       // 快速筛选：字母/数字/点号
-      if (key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
         setFilter(side, state.filterText + key);
+        return;
+      }
+
+      // Shift+数字：切换标签
+      if (e.shiftKey && e.code >= 'Digit1' && e.code <= 'Digit9') {
+        e.preventDefault();
+        const tabs = useFileStore.getState()[side].tabs;
+        const idx = parseInt(e.code.replace('Digit', '')) - 1;
+        if (idx < tabs.length) {
+          const target = tabs[idx];
+          useFileStore.getState().activateTab(side, target.id);
+          navigateTo(side, target.path);
+          useLayoutStore.getState().setPanelPath(side, target.path);
+        }
         return;
       }
 
@@ -165,23 +179,6 @@ export function FileList({ side }: FileListProps) {
                   ? (curIdx - 1 + tabs.length) % tabs.length
                   : (curIdx + 1) % tabs.length;
                 const target = tabs[next];
-                useFileStore.getState().activateTab(side, target.id);
-                navigateTo(side, target.path);
-                useLayoutStore.getState().setPanelPath(side, target.path);
-              }
-            }
-          }
-          break;
-
-        case '1': case '2': case '3': case '4': case '5':
-        case '6': case '7': case '8': case '9':
-          if (e.ctrlKey || e.metaKey) {
-            e.preventDefault();
-            {
-              const tabs = useFileStore.getState()[side].tabs;
-              const idx = parseInt(e.key) - 1;
-              if (idx < tabs.length) {
-                const target = tabs[idx];
                 useFileStore.getState().activateTab(side, target.id);
                 navigateTo(side, target.path);
                 useLayoutStore.getState().setPanelPath(side, target.path);

@@ -111,14 +111,17 @@ export function TabBar({ side }: TabBarProps) {
   if (tabs.length === 0) return null;
 
   function tabClass(isActive: boolean, isPinned: boolean) {
-    const base = 'flex items-center gap-1 px-2 py-0.5 rounded-t cursor-pointer select-none whitespace-nowrap transition-colors border-l-2 ';
+    const base = 'flex items-center gap-1 px-2 py-0.5 rounded-t cursor-pointer select-none whitespace-nowrap border-l-2 text-sm ';
     if (isActive) {
-      return base + `bg-surface border-t border-x border-border/40 -mb-px ${isPinned ? 'text-accent border-l-accent' : 'text-text-primary border-l-transparent'}`;
+      const color = isPinned
+        ? 'text-[#22c55e] border-l-[#22c55e]'
+        : 'text-[#22c55e] border-l-[#22c55e]';
+      return base + `bg-[#2a2a35] font-semibold scale-110 origin-bottom border-t border-x border-border/40 -mb-px transition-transform ${color}`;
     }
     if (isPinned) {
-      return base + 'text-accent bg-accent/10 hover:bg-accent/20 border-l-accent/60';
+      return base + 'text-accent bg-accent/10 hover:bg-accent/20 border-l-accent/60 transition-colors';
     }
-    return base + 'text-text-secondary hover:text-text-primary hover:bg-surface-lighter border-l-transparent';
+    return base + 'text-text-muted hover:text-text-primary hover:bg-emerald-500/10 border-l-transparent transition-colors';
   }
 
   function tabName(isActive: boolean, isPinned: boolean): string {
@@ -188,7 +191,7 @@ export function TabBar({ side }: TabBarProps) {
   };
 
   return (
-    <div ref={containerRef} className="flex items-center text-sm overflow-x-auto scrollbar-none border-b border-border/40 px-1 flex-shrink-0">
+    <div ref={containerRef} className="flex items-center text-sm overflow-x-auto scrollbar-none border-b border-border/40 px-1 flex-shrink-0 bg-[#2a2a35]">
       {tabs.map(renderTab)}
 
       {/* 气泡路径提示 — fixed 定位，不受 overflow 影响 */}

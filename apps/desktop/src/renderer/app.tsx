@@ -218,7 +218,7 @@ function PanelSlot({
 
   return (
     <div
-      className="h-full flex flex-col"
+      className="h-full flex flex-col bg-[#1c1c25]"
       onClick={onClick}
     >
       {/* Tab Bar */}
@@ -227,7 +227,7 @@ function PanelSlot({
       {/* Panel Header */}
       <div
         className={`flex-shrink-0 h-9 flex items-center px-2 text-sm border-b border-border relative gap-1.5 ${
-          isActive ? 'bg-accent/30' : 'bg-surface-light'
+          isActive ? 'bg-[#22222d]' : 'bg-[#22222d]'
         }`}
       >
         {/* Side indicator */}
@@ -311,7 +311,7 @@ function PanelSlot({
       </div>
 
       {/* Panel Content */}
-      <div className="flex-1 overflow-hidden bg-surface relative">
+      <div className="flex-1 overflow-hidden relative bg-[#1c1c25]">
         {renderPanel()}
         {!isActive && <div className="absolute inset-0 bg-black/30 pointer-events-none" />}
       </div>
