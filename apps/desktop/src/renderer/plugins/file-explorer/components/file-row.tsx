@@ -58,7 +58,7 @@ export const FileRow = memo(function FileRow({
 
   return (
     <div
-      className={`flex items-center h-7 px-2 text-sm cursor-pointer select-none ${
+      className={`flex items-center h-7 px-2 text-sm cursor-pointer select-none outline-none ${
         isSelected
           ? 'bg-accent/40 text-white'
           : isActive
