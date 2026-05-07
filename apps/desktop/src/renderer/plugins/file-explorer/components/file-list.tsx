@@ -124,21 +124,21 @@ export function FileList({ side }: FileListProps) {
 
         case 'ArrowDown':
           e.preventDefault();
-          setFocusIdx((prev) => {
-            const next = Math.min(prev + 1, entries.length - 1);
+          {
+            const next = Math.min(focusIdx + 1, entries.length - 1);
             clearSelection(side);
             toggleSelect(side, entries[next].path);
-            return next;
-          });
+            setFocusIdx(next);
+          }
           break;
         case 'ArrowUp':
           e.preventDefault();
-          setFocusIdx((prev) => {
-            const next = Math.max(prev - 1, 0);
+          {
+            const next = Math.max(focusIdx - 1, 0);
             clearSelection(side);
             toggleSelect(side, entries[next].path);
-            return next;
-          });
+            setFocusIdx(next);
+          }
           break;
 
         case 'ArrowLeft':
