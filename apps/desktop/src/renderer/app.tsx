@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useState } from 'react';
 import { SplitPane, useLayoutStore } from './framework/layout';
+import { ErrorBoundary } from './components/error-boundary';
 import { Launcher } from './plugins/quick-launcher';
 import { FileList, useFileStore, AddressBar, TabBar } from './plugins/file-explorer';
 import { SearchPanel, useSearchStore } from './plugins/fulltext-search';
@@ -163,6 +164,20 @@ function PanelSlot({
   const panel = layout[side];
   const isActive = layout.id === side;
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showTabSearch, setShowTabSearch] = useState(false);
+
+  // Ctrl+T 搜索标签
+  useEffect(() => {
+    if (!isActive) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 't' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        setShowTabSearch((s) => !s);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isActive]);
 
   // 当 layout 中该面板的路径变化时，同步到 file-explorer store
   useEffect(() => {
@@ -218,16 +233,18 @@ function PanelSlot({
 
   return (
     <div
-      className="h-full flex flex-col bg-[#1c1c25]"
+      className="h-full flex flex-col"
       onClick={onClick}
     >
       {/* Tab Bar */}
-      {pluginId === 'file-explorer' && <TabBar side={side} />}
+      <ErrorBoundary name={`TabBar-${side}`}>
+        {pluginId === 'file-explorer' && <TabBar side={side} />}
+      </ErrorBoundary>
 
       {/* Panel Header */}
       <div
         className={`flex-shrink-0 h-9 flex items-center px-2 text-sm border-b border-border relative gap-1.5 ${
-          isActive ? 'bg-[#22222d]' : 'bg-[#22222d]'
+          isActive ? 'bg-accent/30' : 'bg-surface-light'
         }`}
       >
         {/* Side indicator */}
@@ -311,7 +328,7 @@ function PanelSlot({
       </div>
 
       {/* Panel Content */}
-      <div className="flex-1 overflow-hidden relative bg-[#1c1c25]">
+      <div className="flex-1 overflow-hidden bg-surface relative">
         {renderPanel()}
         {!isActive && <div className="absolute inset-0 bg-black/30 pointer-events-none" />}
       </div>

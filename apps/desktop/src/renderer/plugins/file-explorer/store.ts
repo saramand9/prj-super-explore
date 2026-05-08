@@ -387,3 +387,31 @@ export function useFilteredEntries(side: 'left' | 'right') {
     return matchPinyinMixed(lower, words);
   });
 }
+
+export interface TabGroup {
+  name: string;
+  path: string;
+  tabIds: string[];
+}
+
+/** 按父目录给标签分组（≥2 个非固定标签同目录时成组） */
+export function computeGroups(tabs: Tab[]): TabGroup[] {
+  const nonPinned = tabs.filter((t) => !t.pinned);
+  const groups = new Map<string, Tab[]>();
+  for (const tab of nonPinned) {
+    const parts = tab.path.split(/[/\\]/);
+    parts.pop();
+    const parentDir = parts.join('/') || tab.path;
+    if (!groups.has(parentDir)) groups.set(parentDir, []);
+    groups.get(parentDir)!.push(tab);
+  }
+  const result: TabGroup[] = [];
+  for (const [p, members] of groups) {
+    if (members.length >= 2) {
+      const name = p.split(/[/\\]/).pop() || p;
+      result.push({ name, path: p, tabIds: members.map((t) => t.id) });
+    }
+  }
+  result.sort((a, b) => a.name.localeCompare(b.name));
+  return result;
+}

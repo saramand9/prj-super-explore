@@ -51,4 +51,5 @@ export function createPlugin(): PluginModule {
 export { FileList } from './components/file-list';
 export { AddressBar } from './components/address-bar';
 export { TabBar } from './components/tab-bar';
+export { TabSearch } from './components/tab-search';
 export { useFileStore, useFilteredEntries } from './store';

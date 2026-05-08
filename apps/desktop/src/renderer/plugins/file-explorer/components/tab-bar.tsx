@@ -1,5 +1,5 @@
-import { useCallback, useState, useRef, useEffect } from 'react';
-import { useFileStore, type Tab } from '../store';
+import { useCallback, useState, useRef, useEffect, useMemo } from 'react';
+import { useFileStore, type Tab, type TabGroup, computeGroups } from '../store';
 import { useLayoutStore } from '../../../framework/store/layout-store';
 
 interface TabBarProps {
@@ -17,6 +17,7 @@ export function TabBar({ side }: TabBarProps) {
   const forkTab = useFileStore((s) => s.forkTab);
   const renameTab = useFileStore((s) => s.renameTab);
   const persistPinnedTabs = useFileStore((s) => s.persistPinnedTabs);
+  const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
 
   const [contextMenu, setContextMenu] = useState<{ tab: Tab; x: number; y: number } | null>(null);
   const [hoveredTabId, setHoveredTabId] = useState<string | null>(null);
@@ -108,6 +109,35 @@ export function TabBar({ side }: TabBarProps) {
     setEditingTabId(null);
   }, [editingTabId, editValue, side, renameTab, persistPinnedTabs]);
 
+  // ── 分组布局（hook，必须在提前 return 之前）──
+  const layout = useMemo(() => {
+    const groups = computeGroups(tabs);
+    const groupedTabIds = new Set(groups.flatMap((g) => g.tabIds));
+    const items: Array<
+      | { kind: 'tab'; tab: Tab }
+      | { kind: 'group'; group: TabGroup }
+    > = [];
+    for (const tab of tabs) {
+      if (tab.pinned) items.push({ kind: 'tab', tab });
+    }
+    for (const group of groups) {
+      const isCollapsed = collapsedGroups.includes(group.path);
+      items.push({ kind: 'group', group });
+      if (!isCollapsed) {
+        for (const tabId of group.tabIds) {
+          const tab = tabs.find((t) => t.id === tabId);
+          if (tab) items.push({ kind: 'tab', tab });
+        }
+      }
+    }
+    for (const tab of tabs) {
+      if (!tab.pinned && !groupedTabIds.has(tab.id)) {
+        items.push({ kind: 'tab', tab });
+      }
+    }
+    return items;
+  }, [tabs, collapsedGroups]);
+
   if (tabs.length === 0) return null;
 
   function tabClass(isActive: boolean, isPinned: boolean) {
@@ -190,9 +220,40 @@ export function TabBar({ side }: TabBarProps) {
     );
   };
 
+  const toggleGroupCollapse = (groupPath: string) => {
+    setCollapsedGroups((prev) =>
+      prev.includes(groupPath)
+        ? prev.filter((p) => p !== groupPath)
+        : [...prev, groupPath],
+    );
+  };
+
+  const renderGroupHeader = (group: TabGroup) => {
+    const isCollapsed = collapsedGroups.includes(group.path);
+    const hasActiveChild = group.tabIds.includes(activeTabId!);
+    return (
+      <div
+        key={`group-${group.path}`}
+        className={`flex items-center gap-0.5 px-2 py-0.5 rounded-t cursor-pointer select-none whitespace-nowrap text-sm transition-colors border-l-2
+          ${hasActiveChild && isCollapsed
+            ? 'text-[#22c55e] font-semibold border-l-[#22c55e]'
+            : 'text-text-muted hover:text-text-primary border-l-transparent hover:bg-surface-lighter'}`}
+        onClick={() => toggleGroupCollapse(group.path)}
+        title={`${group.path} (${group.tabIds.length} tabs)`}
+      >
+        <span className="text-[10px] flex-shrink-0">{isCollapsed ? '▸' : '▼'}</span>
+        <span className="truncate max-w-[100px]">{group.name}</span>
+        <span className="text-text-muted text-[10px]">({group.tabIds.length})</span>
+      </div>
+    );
+  };
+
   return (
     <div ref={containerRef} className="flex items-center text-sm overflow-x-auto scrollbar-none border-b border-border/40 px-1 flex-shrink-0 bg-[#2a2a35]">
-      {tabs.map(renderTab)}
+      {layout.map((item) => {
+        if (item.kind === 'group') return renderGroupHeader(item.group);
+        return renderTab(item.tab);
+      })}
 
       {/* 气泡路径提示 — fixed 定位，不受 overflow 影响 */}
       {hoveredTabId && tooltipPos && (
