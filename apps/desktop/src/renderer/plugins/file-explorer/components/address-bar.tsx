@@ -31,6 +31,7 @@ export function AddressBar({ side }: AddressBarProps) {
   const [showBackHistory, setShowBackHistory] = useState(false);
   const [showForwardHistory, setShowForwardHistory] = useState(false);
   const [showQuickAccess, setShowQuickAccess] = useState(false);
+  const [subDirs, setSubDirs] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const backBtnRef = useRef<HTMLButtonElement>(null);
   const fwdBtnRef = useRef<HTMLButtonElement>(null);
@@ -113,6 +114,17 @@ export function AddressBar({ side }: AddressBarProps) {
     window.addEventListener('mousedown', handler);
     return () => window.removeEventListener('mousedown', handler);
   }, [showBackHistory, showForwardHistory]);
+
+  // 打开快速访问时加载当前路径的子目录
+  useEffect(() => {
+    if (!showQuickAccess || !path) return;
+    ipc
+      .invoke('file:readDir', { path, showHidden: false })
+      .then((entries) => {
+        setSubDirs(entries.filter((e) => e.isDirectory).map((e) => e.path));
+      })
+      .catch(() => setSubDirs([]));
+  }, [showQuickAccess, path]);
 
   if (!path) return null;
 
@@ -269,6 +281,29 @@ export function AddressBar({ side }: AddressBarProps) {
         {/* Quick Access Dropdown */}
         {showQuickAccess && (
           <div className="absolute left-0 top-full mt-0.5 z-50 bg-surface-light border border-border rounded-lg shadow-xl py-1 min-w-[300px] max-h-[360px] overflow-y-auto">
+            {/* 当前目录的子文件夹 */}
+            {subDirs.length > 0 && (
+              <>
+                <div className="px-3 py-0.5 text-[10px] text-text-muted/60 uppercase tracking-wider">
+                  Subfolders
+                </div>
+                {subDirs.slice(0, 15).map((p) => (
+                  <button
+                    key={p}
+                    className="w-full text-left px-3 py-1 text-sm text-text-secondary hover:bg-accent/20 hover:text-text-primary flex items-center gap-2"
+                    onClick={() => {
+                      handleNavigate(p);
+                      setShowQuickAccess(false);
+                    }}
+                  >
+                    <span className="flex-shrink-0">📁</span>
+                    <span className="truncate">{p.split(/[/\\]/).pop()}</span>
+                  </button>
+                ))}
+                <div className="border-t border-border/40 my-0.5" />
+              </>
+            )}
+            {/* 最近路径 + 固定标签路径 */}
             {(() => {
               const pinnedPaths = useFileStore.getState()[side].tabs
                 .filter((t) => t.pinned)
