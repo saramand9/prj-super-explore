@@ -1,6 +1,7 @@
 import { useCallback, useState, useRef, useEffect } from 'react';
 import { useFileStore } from '../store';
 import { useLayoutStore } from '../../../framework/store/layout-store';
+import { ipc } from '../../../framework/bridge/ipc-client';
 
 interface AddressBarProps {
   side: 'left' | 'right';
@@ -29,6 +30,7 @@ export function AddressBar({ side }: AddressBarProps) {
   const [editValue, setEditValue] = useState('');
   const [showBackHistory, setShowBackHistory] = useState(false);
   const [showForwardHistory, setShowForwardHistory] = useState(false);
+  const [showQuickAccess, setShowQuickAccess] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const backBtnRef = useRef<HTMLButtonElement>(null);
   const fwdBtnRef = useRef<HTMLButtonElement>(null);
@@ -236,11 +238,12 @@ export function AddressBar({ side }: AddressBarProps) {
           spellCheck={false}
         />
       ) : (
-        <div
-          className="flex items-center gap-0.5 overflow-x-auto whitespace-nowrap scrollbar-none cursor-text flex-1"
-          onClick={startEdit}
-          title="Click empty area to edit path"
-        >
+        <div className="relative flex-1 min-w-0">
+          <div
+            className="flex items-center gap-0.5 overflow-x-auto whitespace-nowrap scrollbar-none cursor-pointer flex-1"
+            onClick={() => setShowQuickAccess(!showQuickAccess)}
+            title="Click to show quick access"
+          >
           {parts.map((part, i) => (
             <span key={part.fullPath} className="flex items-center gap-0.5">
               {i > 0 && <span className="text-text-muted/40">{sep}</span>}
@@ -262,6 +265,64 @@ export function AddressBar({ side }: AddressBarProps) {
           ))}
           <span className="w-1 flex-shrink-0" />
         </div>
+
+        {/* Quick Access Dropdown */}
+        {showQuickAccess && (
+          <div className="absolute left-0 top-full mt-0.5 z-50 bg-surface-light border border-border rounded-lg shadow-xl py-1 min-w-[300px] max-h-[360px] overflow-y-auto">
+            {(() => {
+              const pinnedPaths = useFileStore.getState()[side].tabs
+                .filter((t) => t.pinned)
+                .map((t) => t.path);
+              const quickPaths = [...new Set([...[...backStack].reverse(), ...pinnedPaths])].filter(
+                (p) => p !== path,
+              );
+              if (quickPaths.length === 0) {
+                return <div className="px-3 py-2 text-text-muted text-xs">No recent paths</div>;
+              }
+              return quickPaths.slice(0, 12).map((p) => (
+                <button
+                  key={p}
+                  className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-accent/20 hover:text-text-primary flex items-center gap-2"
+                  onClick={() => {
+                    handleNavigate(p);
+                    setShowQuickAccess(false);
+                  }}
+                >
+                  <span className="flex-shrink-0">📁</span>
+                  <span className="truncate">{p}</span>
+                </button>
+              ));
+            })()}
+            <div className="border-t border-border/40 mt-0.5 pt-0.5">
+              <button
+                className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-accent/20 hover:text-text-primary flex items-center gap-2"
+                onClick={async () => {
+                  setShowQuickAccess(false);
+                  const currentPath = useFileStore.getState()[side].path;
+                  const result = await ipc.invoke('dialog:openFolder', { defaultPath: currentPath ?? undefined });
+                  if (result) handleNavigate(result);
+                }}
+              >
+                <span>📂</span> Browse...
+              </button>
+              <button
+                className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-accent/20 hover:text-text-primary flex items-center gap-2"
+                onClick={() => {
+                  setShowQuickAccess(false);
+                  startEdit();
+                }}
+              >
+                <span>✎</span> Edit path...
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Click-away */}
+        {showQuickAccess && (
+          <div className="fixed inset-0 z-40" onClick={() => setShowQuickAccess(false)} />
+        )}
+      </div>
       )}
     </div>
   );
