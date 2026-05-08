@@ -153,10 +153,13 @@ export function FileList({ side }: FileListProps) {
 
   const ctxNewFolder = useCallback(async () => {
     const dir = useFileStore.getState()[side].path;
+    console.log('[ctxNewFolder] dir:', dir);
     if (!dir) { closeMenu(); return; }
     const name = prompt('Folder name:');
+    console.log('[ctxNewFolder] name:', name);
     if (!name) { closeMenu(); return; }
     const result = await ipc.invoke('file:mkdir', { parentPath: dir, name });
+    console.log('[ctxNewFolder] result:', result);
     if (!result.success) { alert(`Failed: ${result.error}`); closeMenu(); return; }
     refresh(side);
     closeMenu();
