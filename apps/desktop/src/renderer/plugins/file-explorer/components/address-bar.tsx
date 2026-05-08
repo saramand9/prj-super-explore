@@ -273,7 +273,7 @@ export function AddressBar({ side }: AddressBarProps) {
         }}
         title="Open in Explorer"
       >
-        📂
+        ↗️
       </button>
     </div>
   );
