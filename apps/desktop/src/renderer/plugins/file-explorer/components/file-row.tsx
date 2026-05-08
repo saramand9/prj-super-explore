@@ -13,6 +13,8 @@ interface FileRowProps {
   onContextMenu: (e: React.MouseEvent) => void;
   onDragStart: (e: React.DragEvent, entry: FileEntry) => void;
   onDrop: (e: React.DragEvent, entry: FileEntry) => void;
+  onDragEnterRow?: (entry: FileEntry) => void;
+  onDragLeaveRow?: () => void;
   dragOver?: boolean;
   dropFlash?: boolean;
 }
@@ -28,6 +30,8 @@ export const FileRow = memo(function FileRow({
   onContextMenu,
   onDragStart,
   onDrop,
+  onDragEnterRow,
+  onDragLeaveRow,
   dragOver,
   dropFlash,
 }: FileRowProps) {
@@ -70,8 +74,8 @@ export const FileRow = memo(function FileRow({
       onContextMenu={onContextMenu}
       onDragStart={handleDragStart}
       onDragOver={entry.isDirectory ? (e) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; } : undefined}
-      onDragEnter={entry.isDirectory ? (e) => { e.preventDefault(); e.stopPropagation(); } : undefined}
-      onDragLeave={entry.isDirectory ? (e) => { e.preventDefault(); e.stopPropagation(); } : undefined}
+      onDragEnter={entry.isDirectory ? (e) => { e.preventDefault(); e.stopPropagation(); onDragEnterRow?.(entry); } : undefined}
+      onDragLeave={entry.isDirectory ? (e) => { e.preventDefault(); e.stopPropagation(); onDragLeaveRow?.(); } : undefined}
       onDrop={entry.isDirectory ? (e) => { e.stopPropagation(); e.preventDefault(); onDrop(e, entry); } : undefined}
       draggable
       role="row"

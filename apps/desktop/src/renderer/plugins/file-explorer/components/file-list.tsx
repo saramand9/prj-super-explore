@@ -387,6 +387,8 @@ export function FileList({ side }: FileListProps) {
                 }}
                 dragOver={dragOverPath === entry.path}
                 dropFlash={dropFlashPath === entry.path}
+                onDragEnterRow={() => entry.isDirectory && setDragOverPath(entry.path)}
+                onDragLeaveRow={() => setDragOverPath(null)}
                 onDrop={async (e) => {
                   const data = e.dataTransfer.getData('application/x-explore-files');
                   if (!data) return;
