@@ -331,14 +331,15 @@ export function AddressBar({ side }: AddressBarProps) {
             <div className="border-t border-border/40 mt-0.5 pt-0.5">
               <button
                 className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-accent/20 hover:text-text-primary flex items-center gap-2"
-                onClick={async () => {
+                onClick={() => {
                   setShowQuickAccess(false);
                   const currentPath = useFileStore.getState()[side].path;
-                  const result = await ipc.invoke('dialog:openFolder', { defaultPath: currentPath ?? undefined });
-                  if (result) handleNavigate(result);
+                  if (currentPath) {
+                    ipc.invoke('file:openInExplorer', { path: currentPath });
+                  }
                 }}
               >
-                <span>📂</span> Browse...
+                <span>📂</span> Open in Explorer
               </button>
               <button
                 className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-accent/20 hover:text-text-primary flex items-center gap-2"
