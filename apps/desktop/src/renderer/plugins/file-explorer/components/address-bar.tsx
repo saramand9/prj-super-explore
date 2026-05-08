@@ -303,31 +303,10 @@ export function AddressBar({ side }: AddressBarProps) {
                 <div className="border-t border-border/40 my-0.5" />
               </>
             )}
-            {/* 最近路径 + 固定标签路径 */}
-            {(() => {
-              const pinnedPaths = useFileStore.getState()[side].tabs
-                .filter((t) => t.pinned)
-                .map((t) => t.path);
-              const quickPaths = [...new Set([...[...backStack].reverse(), ...pinnedPaths])].filter(
-                (p) => p !== path,
-              );
-              if (quickPaths.length === 0) {
-                return <div className="px-3 py-2 text-text-muted text-xs">No recent paths</div>;
-              }
-              return quickPaths.slice(0, 12).map((p) => (
-                <button
-                  key={p}
-                  className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-accent/20 hover:text-text-primary flex items-center gap-2"
-                  onClick={() => {
-                    handleNavigate(p);
-                    setShowQuickAccess(false);
-                  }}
-                >
-                  <span className="flex-shrink-0">📁</span>
-                  <span className="truncate">{p}</span>
-                </button>
-              ));
-            })()}
+            {/* 子文件夹为空的提示 */}
+            {subDirs.length === 0 && (
+              <div className="px-3 py-2 text-text-muted text-xs">No subfolders</div>
+            )}
             <div className="border-t border-border/40 mt-0.5 pt-0.5">
               <button
                 className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-accent/20 hover:text-text-primary flex items-center gap-2"
