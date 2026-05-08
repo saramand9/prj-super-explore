@@ -11,7 +11,7 @@ function hasWildcard(query: string): boolean {
 function buildPattern(query: string): RegExp {
   const escaped = query.replace(/[.+^${}()|[\]\\]/g, '\\$&');
   const glob = escaped.replace(/\*/g, '.*?').replace(/\?/g, '.');
-  return new RegExp(glob, 'i');
+  return new RegExp(glob, 'gi');
 }
 
 function highlightMatch(text: string, query: string): React.ReactNode {
@@ -21,18 +21,20 @@ function highlightMatch(text: string, query: string): React.ReactNode {
 
   if (hasWildcard(query)) {
     const regex = buildPattern(query);
-    let match: RegExpExecArray | null;
-    while ((match = regex.exec(text)) !== null) {
+    const matches = [...text.matchAll(regex)];
+    for (const match of matches) {
+      if (match.index === undefined) continue;
       if (match.index > cursor) {
         parts.push(<span key={cursor}>{text.slice(cursor, match.index)}</span>);
       }
-      parts.push(
-        <span key={match.index} className="text-yellow-400 font-bold">
-          {match[0]}
-        </span>,
-      );
-      cursor = match.index + match[0].length;
-      if (match[0].length === 0) break; // prevent infinite loop on zero-length match
+      if (match[0].length > 0) {
+        parts.push(
+          <span key={match.index} className="text-yellow-400 font-bold">
+            {match[0]}
+          </span>,
+        );
+        cursor = match.index + match[0].length;
+      }
     }
   } else {
     const lower = text.toLowerCase();
