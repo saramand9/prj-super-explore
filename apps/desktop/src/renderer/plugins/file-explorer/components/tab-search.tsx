@@ -1,6 +1,27 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useFileStore, type Tab } from '../store';
 import { useLayoutStore } from '../../../framework/store/layout-store';
+import { pinyin } from 'pinyin-pro';
+
+function matchPinyin(text: string, query: string): boolean {
+  if (!text || !query) return false;
+  const lower = text.toLowerCase();
+  const q = query.toLowerCase();
+  if (lower.includes(q)) return true;
+  // 中文才做拼音匹配
+  if (!/[一-鿿]/.test(text)) return false;
+  try {
+    const py = pinyin(text).toLowerCase().replace(/\s+/g, '');
+    if (py.includes(q)) return true;
+    const initials = pinyin(text)
+      .split(/\s+/)
+      .map((s: string) => s[0])
+      .join('')
+      .toLowerCase();
+    if (initials.includes(q)) return true;
+  } catch { /* ignore */ }
+  return false;
+}
 
 interface TabSearchProps {
   open: boolean;
@@ -36,9 +57,9 @@ export function TabSearch({ open, onClose, side }: TabSearchProps) {
     if (!query.trim()) return true;
     const q = query.toLowerCase();
     return (
-      t.label.toLowerCase().includes(q) ||
+      matchPinyin(t.label, q) ||
       t.path.toLowerCase().includes(q) ||
-      (t.groupName?.toLowerCase().includes(q))
+      (t.groupName?.toLowerCase().includes(q) ?? false)
     );
   });
 
