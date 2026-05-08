@@ -56,11 +56,7 @@ export function TabSearch({ open, onClose, side }: TabSearchProps) {
   const filtered = allTabs.filter((t) => {
     if (!query.trim()) return true;
     const q = query.toLowerCase();
-    return (
-      matchPinyin(t.label, q) ||
-      t.path.toLowerCase().includes(q) ||
-      (t.groupName?.toLowerCase().includes(q) ?? false)
-    );
+    return matchPinyin(t.label, q);
   });
 
   const handleSelect = useCallback(
