@@ -383,6 +383,20 @@ export function FileList({ side }: FileListProps) {
                     : [entry.path];
                   e.dataTransfer.setData('application/x-explore-files', JSON.stringify(paths));
                 }}
+                onDrop={async (e) => {
+                  const data = e.dataTransfer.getData('application/x-explore-files');
+                  if (!data) return;
+                  const sources: string[] = JSON.parse(data);
+                  const isMove = e.ctrlKey || e.metaKey;
+                  if (isMove) {
+                    await ipc.invoke('file:move', { sources, destDir: entry.path });
+                  } else {
+                    await ipc.invoke('file:copy', { sources, destDir: entry.path });
+                  }
+                  refresh(side);
+                  const otherSide = side === 'left' ? 'right' : 'left';
+                  useFileStore.getState().refresh(otherSide);
+                }}
               />
             </div>
           );

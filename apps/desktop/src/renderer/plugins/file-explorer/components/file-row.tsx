@@ -12,6 +12,7 @@ interface FileRowProps {
   onDoubleClick: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
   onDragStart: (e: React.DragEvent, entry: FileEntry) => void;
+  onDrop: (e: React.DragEvent, entry: FileEntry) => void;
 }
 
 export const FileRow = memo(function FileRow({
@@ -24,6 +25,7 @@ export const FileRow = memo(function FileRow({
   onDoubleClick,
   onContextMenu,
   onDragStart,
+  onDrop,
 }: FileRowProps) {
   const handleDragStart = useCallback(
     (e: React.DragEvent) => {
@@ -59,6 +61,8 @@ export const FileRow = memo(function FileRow({
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
       onDragStart={handleDragStart}
+      onDragOver={entry.isDirectory ? (e) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; } : undefined}
+      onDrop={entry.isDirectory ? (e) => { e.stopPropagation(); e.preventDefault(); onDrop(e, entry); } : undefined}
       draggable
       role="row"
     >
