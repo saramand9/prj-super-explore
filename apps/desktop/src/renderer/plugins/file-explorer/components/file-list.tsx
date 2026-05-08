@@ -622,30 +622,27 @@ export function FileList({ side }: FileListProps) {
     </div>
 
     {/* 内联输入框（代替 prompt()） */}
-    {inlinePrompt && (() => {
-      let value = inlinePrompt.defaultValue;
-      return (
-      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50" onClick={() => inlinePrompt.resolve(null)}>
+    {inlinePrompt && (
+      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50" onClick={() => { inlinePrompt.resolve(null); setInlinePrompt(null); }}>
         <div className="bg-surface-light border border-border rounded-lg shadow-2xl p-4 min-w-[320px]" onClick={(e) => e.stopPropagation()}>
           <div className="text-sm text-text-primary mb-3">{inlinePrompt.message}</div>
           <input
             autoFocus
+            id="inline-prompt-input"
             className="w-full bg-surface-lighter border border-border rounded px-3 py-1.5 text-sm text-text-primary outline-none focus:border-accent"
-            defaultValue={value}
-            onChange={(e) => { value = e.target.value; }}
+            defaultValue={inlinePrompt.defaultValue}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') inlinePrompt.resolve(value);
-              if (e.key === 'Escape') inlinePrompt.resolve(null);
+              if (e.key === 'Enter') { inlinePrompt.resolve((e.target as HTMLInputElement).value); setInlinePrompt(null); }
+              if (e.key === 'Escape') { inlinePrompt.resolve(null); setInlinePrompt(null); }
             }}
           />
           <div className="flex justify-end gap-2 mt-3">
-            <button className="px-3 py-1 text-xs text-text-muted hover:text-text-primary" onClick={() => inlinePrompt.resolve(null)}>Cancel</button>
-            <button className="px-3 py-1 text-xs bg-accent text-white rounded" onClick={() => inlinePrompt.resolve(value)}>OK</button>
+            <button className="px-3 py-1 text-xs text-text-muted hover:text-text-primary" onClick={() => { inlinePrompt.resolve(null); setInlinePrompt(null); }}>Cancel</button>
+            <button className="px-3 py-1 text-xs bg-accent text-white rounded" onClick={() => { const el = document.getElementById('inline-prompt-input') as HTMLInputElement; inlinePrompt.resolve(el?.value || ''); setInlinePrompt(null); }}>OK</button>
           </div>
         </div>
       </div>
-      );
-    })()}
+    )}
 
     {/* 右键菜单 */}
     {contextMenu && (
