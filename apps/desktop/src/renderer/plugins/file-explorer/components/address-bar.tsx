@@ -30,7 +30,6 @@ export function AddressBar({ side }: AddressBarProps) {
   const [editValue, setEditValue] = useState('');
   const [showBackHistory, setShowBackHistory] = useState(false);
   const [showForwardHistory, setShowForwardHistory] = useState(false);
-  const [showQuickAccess, setShowQuickAccess] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const backBtnRef = useRef<HTMLButtonElement>(null);
   const fwdBtnRef = useRef<HTMLButtonElement>(null);
@@ -238,12 +237,11 @@ export function AddressBar({ side }: AddressBarProps) {
           spellCheck={false}
         />
       ) : (
-        <div className="relative flex-1 min-w-0">
-          <div
-            className="flex items-center gap-0.5 overflow-x-auto whitespace-nowrap scrollbar-none cursor-pointer flex-1"
-            onClick={() => setShowQuickAccess(!showQuickAccess)}
-            title="Click to show quick access"
-          >
+        <div
+          className="flex items-center gap-0.5 overflow-x-auto whitespace-nowrap scrollbar-none cursor-text flex-1"
+          onClick={startEdit}
+          title="Click to edit path"
+        >
           {parts.map((part, i) => (
             <span key={part.fullPath} className="flex items-center gap-0.5">
               {i > 0 && <span className="text-text-muted/40">{sep}</span>}
@@ -265,40 +263,18 @@ export function AddressBar({ side }: AddressBarProps) {
           ))}
           <span className="w-1 flex-shrink-0" />
         </div>
-
-        {/* Quick Access Dropdown */}
-        {showQuickAccess && (
-          <div className="absolute left-0 top-full mt-0.5 z-50 bg-surface-light border border-border rounded-lg shadow-xl py-1 min-w-[200px]">
-              <button
-                className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-accent/20 hover:text-text-primary flex items-center gap-2"
-                onClick={() => {
-                  setShowQuickAccess(false);
-                  const currentPath = useFileStore.getState()[side].path;
-                  if (currentPath) {
-                    ipc.invoke('file:openInExplorer', { path: currentPath });
-                  }
-                }}
-              >
-                <span>📂</span> Open in Explorer
-              </button>
-              <button
-                className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-accent/20 hover:text-text-primary flex items-center gap-2"
-                onClick={() => {
-                  setShowQuickAccess(false);
-                  startEdit();
-                }}
-              >
-                <span>✎</span> Edit path...
-              </button>
-          </div>
-        )}
-
-        {/* Click-away */}
-        {showQuickAccess && (
-          <div className="fixed inset-0 z-40" onClick={() => setShowQuickAccess(false)} />
-        )}
-      </div>
       )}
+
+      {/* Open in Explorer 按钮 — 始终可见 */}
+      <button
+        className="flex-shrink-0 px-1.5 py-0.5 text-text-muted hover:text-accent hover:bg-accent/10 rounded text-xs transition-colors"
+        onClick={() => {
+          if (path) ipc.invoke('file:openInExplorer', { path });
+        }}
+        title="Open in Explorer"
+      >
+        📂
+      </button>
     </div>
   );
 }
