@@ -394,6 +394,88 @@ export interface TabGroup {
   tabIds: string[];
 }
 
+/** 拼音匹配高亮：返回每个字符是否匹配的分段 */
+export function highlightMatches(
+  name: string,
+  filter: string,
+): { text: string; match: boolean }[] {
+  if (!filter) return [{ text: name, match: false }];
+
+  const lowerName = name.toLowerCase();
+  const lowerFilter = filter.toLowerCase();
+
+  // 1. 直接子串匹配
+  const directIdx = lowerName.indexOf(lowerFilter);
+  if (directIdx >= 0) {
+    const result: { text: string; match: boolean }[] = [];
+    if (directIdx > 0) result.push({ text: name.slice(0, directIdx), match: false });
+    result.push({ text: name.slice(directIdx, directIdx + filter.length), match: true });
+    if (directIdx + filter.length < name.length)
+      result.push({ text: name.slice(directIdx + filter.length), match: false });
+    return result;
+  }
+
+  // 2. 拼音全拼匹配：找出 filter 在连续拼音串中的位置，反推中文字符
+  const pyArray = pinyin(name, { toneType: 'none', type: 'array' }).map((w: string) =>
+    w.toLowerCase(),
+  );
+  const fullPy = pyArray.join('');
+  const pyIdx = fullPy.indexOf(lowerFilter);
+  if (pyIdx >= 0) {
+    const pyEnd = pyIdx + lowerFilter.length;
+    let pos = 0;
+    const result: { text: string; match: boolean }[] = [];
+    for (let i = 0; i < pyArray.length; i++) {
+      const char = name[i];
+      const start = pos;
+      const end = start + pyArray[i].length;
+      const overlaps = start < pyEnd && end > pyIdx;
+      if (overlaps && result.length > 0 && result[result.length - 1].match) {
+        result[result.length - 1].text += char;
+      } else if (overlaps) {
+        result.push({ text: char, match: true });
+      } else if (result.length > 0 && !result[result.length - 1].match) {
+        result[result.length - 1].text += char;
+      } else {
+        result.push({ text: char, match: false });
+      }
+      pos = end;
+    }
+    return result;
+  }
+
+  // 3. 首字母匹配
+  const initials = pyArray.map((p) => p[0]).join('');
+  const initIdx = initials.indexOf(lowerFilter);
+  if (initIdx >= 0) {
+    const initEnd = initIdx + lowerFilter.length;
+    const result: { text: string; match: boolean }[] = [];
+    for (let i = 0; i < pyArray.length; i++) {
+      const char = name[i];
+      if (i >= initIdx && i < initEnd) {
+        if (result.length > 0 && result[result.length - 1].match) {
+          result[result.length - 1].text += char;
+        } else {
+          result.push({ text: char, match: true });
+        }
+      } else if (result.length > 0 && !result[result.length - 1].match) {
+        result[result.length - 1].text += char;
+      } else {
+        result.push({ text: char, match: false });
+      }
+    }
+    return result;
+  }
+
+  // 4. 混合拼音匹配成功但无法精确定位，整体高亮
+  const words = pyArray;
+  if (matchPinyinMixed(lowerFilter, words)) {
+    return [{ text: name, match: true }];
+  }
+
+  return [{ text: name, match: false }];
+}
+
 /** 按父目录给标签分组（≥2 个非固定标签同目录时成组） */
 export function computeGroups(tabs: Tab[]): TabGroup[] {
   const nonPinned = tabs.filter((t) => !t.pinned);

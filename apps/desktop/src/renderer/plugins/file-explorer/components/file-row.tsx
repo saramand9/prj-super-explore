@@ -1,5 +1,6 @@
 import { memo, useCallback } from 'react';
 import type { FileEntry } from '@explore/shared';
+import { highlightMatches } from '../store';
 
 interface FileRowProps {
   entry: FileEntry;
@@ -10,31 +11,6 @@ interface FileRowProps {
   onClick: (e: React.MouseEvent) => void;
   onDoubleClick: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
-}
-
-/** 分割文件名，匹配部分单独标记 */
-function splitMatch(name: string, pattern: string): { text: string; match: boolean }[] {
-  if (!pattern) return [{ text: name, match: false }];
-
-  const result: { text: string; match: boolean }[] = [];
-  const lowerName = name.toLowerCase();
-  const lowerPattern = pattern.toLowerCase();
-  let cursor = 0;
-
-  while (cursor < name.length) {
-    const idx = lowerName.indexOf(lowerPattern, cursor);
-    if (idx === -1) {
-      result.push({ text: name.slice(cursor), match: false });
-      break;
-    }
-    if (idx > cursor) {
-      result.push({ text: name.slice(cursor, idx), match: false });
-    }
-    result.push({ text: name.slice(idx, idx + pattern.length), match: true });
-    cursor = idx + pattern.length;
-  }
-
-  return result;
 }
 
 export const FileRow = memo(function FileRow({
@@ -56,7 +32,7 @@ export const FileRow = memo(function FileRow({
 
   const icon = entry.isDirectory ? '📁' : getFileIcon(entry.name);
   const sizeStr = formatSize(entry.size);
-  const segments = splitMatch(entry.name, highlight ?? '');
+  const segments = highlightMatches(entry.name, highlight ?? '');
 
   return (
     <div
