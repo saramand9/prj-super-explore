@@ -304,6 +304,18 @@ function PanelSlot({
       return;
     }
 
+    // 同名冲突确认
+    const sourceNames = new Set(sources.map((s) => s.split(/[/\\]/).pop()?.toLowerCase()));
+    const destEntries = await ipc.invoke('file:readDir', { path: targetDir });
+    const conflicts = destEntries.filter((de) => sourceNames.has(de.name.toLowerCase()));
+    if (conflicts.length > 0) {
+      const names = conflicts.map((c) => c.name).join(', ');
+      if (!confirm(`Overwrite existing files?\n${names}`)) {
+        notify('Cancelled', 'info');
+        return;
+      }
+    }
+
     const isMove = e.ctrlKey || e.metaKey;
     try {
       if (isMove) {
