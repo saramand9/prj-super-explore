@@ -13,6 +13,8 @@ interface FileRowProps {
   onContextMenu: (e: React.MouseEvent) => void;
   onDragStart: (e: React.DragEvent, entry: FileEntry) => void;
   onDrop: (e: React.DragEvent, entry: FileEntry) => void;
+  dragOver?: boolean;
+  dropFlash?: boolean;
 }
 
 export const FileRow = memo(function FileRow({
@@ -26,6 +28,8 @@ export const FileRow = memo(function FileRow({
   onContextMenu,
   onDragStart,
   onDrop,
+  dragOver,
+  dropFlash,
 }: FileRowProps) {
   const handleDragStart = useCallback(
     (e: React.DragEvent) => {
@@ -48,20 +52,26 @@ export const FileRow = memo(function FileRow({
 
   return (
     <div
-      className={`flex items-center h-7 px-2 text-sm cursor-pointer select-none outline-none focus-visible:outline-none ${
+      className={`flex items-center h-7 px-2 text-sm cursor-pointer select-none outline-none focus-visible:outline-none transition-colors ${
         isSelected
           ? 'bg-accent/40 text-white'
           : isActive
             ? 'bg-accent/20'
-            : disableHover
-              ? ''
-              : 'hover:bg-surface-lighter'
+            : dragOver
+              ? 'bg-green-500/30 ring-1 ring-green-500/50'
+              : dropFlash
+                ? 'bg-green-500/50'
+                : disableHover
+                  ? ''
+                  : 'hover:bg-surface-lighter'
       }`}
       onClick={handleClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
       onDragStart={handleDragStart}
       onDragOver={entry.isDirectory ? (e) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; } : undefined}
+      onDragEnter={entry.isDirectory ? (e) => { e.preventDefault(); e.stopPropagation(); } : undefined}
+      onDragLeave={entry.isDirectory ? (e) => { e.preventDefault(); e.stopPropagation(); } : undefined}
       onDrop={entry.isDirectory ? (e) => { e.stopPropagation(); e.preventDefault(); onDrop(e, entry); } : undefined}
       draggable
       role="row"

@@ -27,6 +27,8 @@ export function FileList({ side }: FileListProps) {
 
   const lastSelectedRef = useRef<string | null>(null);
   const [focusIdx, setFocusIdx] = useState(0);
+  const [dragOverPath, setDragOverPath] = useState<string | null>(null);
+  const [dropFlashPath, setDropFlashPath] = useState<string | null>(null);
   const lastBackspaceRef = useRef<string | null>(null);
   const [disableHover, setDisableHover] = useState(false);
 
@@ -383,6 +385,8 @@ export function FileList({ side }: FileListProps) {
                     : [entry.path];
                   e.dataTransfer.setData('application/x-explore-files', JSON.stringify(paths));
                 }}
+                dragOver={dragOverPath === entry.path}
+                dropFlash={dropFlashPath === entry.path}
                 onDrop={async (e) => {
                   const data = e.dataTransfer.getData('application/x-explore-files');
                   if (!data) return;
@@ -396,6 +400,9 @@ export function FileList({ side }: FileListProps) {
                   refresh(side);
                   const otherSide = side === 'left' ? 'right' : 'left';
                   useFileStore.getState().refresh(otherSide);
+                  // flash feedback
+                  setDropFlashPath(entry.path);
+                  setTimeout(() => setDropFlashPath(null), 600);
                 }}
               />
             </div>
