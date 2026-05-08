@@ -4,6 +4,31 @@ import { FileSearchIndex } from './file-search-index';
 import { ipc } from '../../../framework/bridge/ipc-client';
 import { useLayoutStore } from '../../../framework/store/layout-store';
 
+function highlightMatch(text: string, query: string): React.ReactNode {
+  if (!query) return text;
+  const lower = text.toLowerCase();
+  const q = query.toLowerCase();
+  const parts: React.ReactNode[] = [];
+  let cursor = 0;
+  while (cursor < text.length) {
+    const idx = lower.indexOf(q, cursor);
+    if (idx === -1) {
+      parts.push(<span key={cursor}>{text.slice(cursor)}</span>);
+      break;
+    }
+    if (idx > cursor) {
+      parts.push(<span key={cursor}>{text.slice(cursor, idx)}</span>);
+    }
+    parts.push(
+      <span key={idx} className="text-yellow-400 font-bold">
+        {text.slice(idx, idx + q.length)}
+      </span>,
+    );
+    cursor = idx + q.length;
+  }
+  return parts;
+}
+
 interface FileSearchProps {
   side: 'left' | 'right';
   open: boolean;
@@ -151,7 +176,7 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
                 onMouseEnter={() => setSelectedIdx(idx)}
               >
                 <span className="flex-shrink-0">{entry.isDirectory ? '📁' : '📄'}</span>
-                <span className="truncate">{entry.name}</span>
+                <span className="truncate">{highlightMatch(entry.name, query)}</span>
                 <span className="text-text-muted text-xs truncate ml-auto flex-shrink-0 max-w-[40%]">
                   {entry.path}
                 </span>
