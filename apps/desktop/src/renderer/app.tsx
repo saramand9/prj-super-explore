@@ -246,8 +246,9 @@ function PanelSlot({
   // 拖放处理
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    if (!panel.path) return;
     e.dataTransfer.dropEffect = e.ctrlKey || e.metaKey ? 'move' : 'copy';
-  }, []);
+  }, [panel.path]);
 
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
@@ -255,12 +256,41 @@ function PanelSlot({
     if (!data || !panel.path) return;
     const sources: string[] = JSON.parse(data);
     if (sources.length === 0) return;
-    if (sources.every((s) => s.startsWith(panel.path!))) return; // 同一目录不拖放
+
+    // 同一目录忽略
+    const targetDir = panel.path;
+    if (sources.every((s) => {
+      const parent = s.replace(/[/\\][^/\\]*$/, '');
+      return parent === targetDir || s === targetDir;
+    })) return;
+
+    // 拖文件夹到自己子目录 → 阻止
+    if (sources.some((s) => targetDir.startsWith(s + '\\') || targetDir.startsWith(s + '/'))) {
+      alert('Cannot copy a folder into itself or its subfolder.');
+      return;
+    }
+
+    // 同名冲突
+    const existingNames = new Set(
+      sources.map((s) => s.split(/[/\\]/).pop()?.toLowerCase()),
+    );
+    const destEntries = await ipc.invoke('file:readDir', { path: targetDir });
+    const conflicts = destEntries.filter((de) => existingNames.has(de.name.toLowerCase()));
+    if (conflicts.length > 0) {
+      const names = conflicts.map((c) => c.name).join(', ');
+      if (!confirm(`Files already exist:\n${names}\n\nOverwrite?`)) return;
+    }
+
     const isMove = e.ctrlKey || e.metaKey;
     if (isMove) {
-      await ipc.invoke('file:move', { sources, destDir: panel.path });
+      const result = await ipc.invoke('file:move', { sources, destDir: targetDir });
+      if (!result.success && result.skipped?.length) {
+        // 跨盘符 move 失败，回退 copy+delete
+        await ipc.invoke('file:copy', { sources: result.skipped, destDir: targetDir });
+        await ipc.invoke('file:delete', { paths: result.skipped });
+      }
     } else {
-      await ipc.invoke('file:copy', { sources, destDir: panel.path });
+      await ipc.invoke('file:copy', { sources, destDir: targetDir });
     }
     useFileStore.getState().refresh(side);
     const otherSide = side === 'left' ? 'right' : 'left';
