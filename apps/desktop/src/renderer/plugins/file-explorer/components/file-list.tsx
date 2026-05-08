@@ -423,7 +423,9 @@ export function FileList({ side }: FileListProps) {
                     } else {
                       await ipc.invoke('file:copy', { sources, destDir: entry.path });
                     }
-                  } catch { /* ignore */ }
+                  } catch (err: any) {
+                    alert(`Operation failed: ${err.message}`);
+                  }
                   refresh(side);
                   const otherSide = side === 'left' ? 'right' : 'left';
                   useFileStore.getState().refresh(otherSide);
