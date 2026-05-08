@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { FileEntry } from '@explore/shared';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useFileStore, useFilteredEntries } from '../store';
 import { FileRow } from './file-row';
@@ -31,6 +32,122 @@ export function FileList({ side }: FileListProps) {
   const [dropFlashPath, setDropFlashPath] = useState<string | null>(null);
   const lastBackspaceRef = useRef<string | null>(null);
   const [disableHover, setDisableHover] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number; y: number;
+    single?: FileEntry;
+    count: number;
+  } | null>(null);
+
+  // 关闭右键菜单
+  const closeMenu = useCallback(() => setContextMenu(null), []);
+  useEffect(() => {
+    if (!contextMenu) return;
+    const h = () => closeMenu();
+    window.addEventListener('click', h);
+    window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
+    return () => { window.removeEventListener('click', h); };
+  }, [contextMenu, closeMenu]);
+
+  // 右键菜单操作
+  const ctxOpen = useCallback(() => {
+    if (!contextMenu?.single) return;
+    if (contextMenu.single.isDirectory) {
+      navigateTo(side, contextMenu.single.path);
+      useLayoutStore.getState().setPanelPath(side, contextMenu.single.path);
+    } else {
+      ipc.invoke('file:open', { path: contextMenu.single.path });
+    }
+    closeMenu();
+  }, [contextMenu, side, navigateTo, closeMenu]);
+
+  const ctxOpenOther = useCallback(() => {
+    if (!contextMenu?.single) return;
+    const other = side === 'left' ? 'right' : 'left';
+    useLayoutStore.getState().setPanelPath(other, contextMenu.single.path);
+    closeMenu();
+  }, [contextMenu, side, closeMenu]);
+
+  const ctxDelete = useCallback(async () => {
+    if (!contextMenu) return;
+    const paths = contextMenu.single
+      ? [contextMenu.single.path]
+      : [...(useFileStore.getState()[side].selected)];
+    if (paths.length === 0) return;
+    if (!confirm(`Delete ${paths.length} item(s)?`)) return;
+    await ipc.invoke('file:delete', { paths });
+    clearSelection(side);
+    refresh(side);
+    closeMenu();
+  }, [contextMenu, side, clearSelection, refresh, closeMenu]);
+
+  const ctxRename = useCallback(async () => {
+    if (!contextMenu?.single) return;
+    const newName = prompt('New name:', contextMenu.single.name);
+    if (newName && newName !== contextMenu.single.name) {
+      await ipc.invoke('file:rename', { path: contextMenu.single.path, newName });
+      refresh(side);
+    }
+    closeMenu();
+  }, [contextMenu, side, refresh, closeMenu]);
+
+  const ctxCopy = useCallback(async () => {
+    if (!contextMenu) return;
+    const paths = contextMenu.single
+      ? [contextMenu.single.path]
+      : [...(useFileStore.getState()[side].selected)];
+    const other = side === 'left' ? 'right' : 'left';
+    const dest = useLayoutStore.getState().layout[other].path;
+    if (!dest || paths.length === 0) { closeMenu(); return; }
+    await ipc.invoke('file:copy', { sources: paths, destDir: dest });
+    refresh(side);
+    useFileStore.getState().refresh(other);
+    closeMenu();
+  }, [contextMenu, side, refresh, closeMenu]);
+
+  const ctxMove = useCallback(async () => {
+    if (!contextMenu) return;
+    const paths = contextMenu.single
+      ? [contextMenu.single.path]
+      : [...(useFileStore.getState()[side].selected)];
+    const other = side === 'left' ? 'right' : 'left';
+    const dest = useLayoutStore.getState().layout[other].path;
+    if (!dest || paths.length === 0) { closeMenu(); return; }
+    await ipc.invoke('file:move', { sources: paths, destDir: dest });
+    refresh(side);
+    useFileStore.getState().refresh(other);
+    closeMenu();
+  }, [contextMenu, side, refresh, closeMenu]);
+
+  const ctxCopyName = useCallback(() => {
+    if (!contextMenu) return;
+    const names = contextMenu.single
+      ? [contextMenu.single.name]
+      : [...(useFileStore.getState()[side].selected)].map((p) => p.split(/[/\\]/).pop()!);
+    navigator.clipboard.writeText(names.join('\n'));
+    closeMenu();
+  }, [contextMenu, side, closeMenu]);
+
+  const ctxCopyPath = useCallback(() => {
+    if (!contextMenu) return;
+    const paths = contextMenu.single
+      ? [contextMenu.single.path]
+      : [...(useFileStore.getState()[side].selected)];
+    navigator.clipboard.writeText(paths.join('\n'));
+    closeMenu();
+  }, [contextMenu, side, closeMenu]);
+
+  const ctxNewFolder = useCallback(async () => {
+    const name = prompt('Folder name:');
+    if (!name) { closeMenu(); return; }
+    await ipc.invoke('file:mkdir', { parentPath: path!, name });
+    refresh(side);
+    closeMenu();
+  }, [path, side, refresh, closeMenu]);
+
+  const ctxRefresh = useCallback(() => {
+    refresh(side);
+    closeMenu();
+  }, [side, refresh, closeMenu]);
 
   // 筛选文本/条目变化时，重置焦点
   useEffect(() => {
@@ -52,8 +169,6 @@ export function FileList({ side }: FileListProps) {
     },
     [side],
   );
-
-  // ── 封装 navigateTo：同时更新 FileStore 和 LayoutStore ──
 
   const navigateToPath = useCallback(
     async (newPath: string) => {
@@ -326,8 +441,13 @@ export function FileList({ side }: FileListProps) {
     );
   }
 
-  return (
-    <div ref={containerRef} className="h-full overflow-auto">
+  return (<>
+    <div ref={containerRef} className="h-full overflow-auto" onContextMenu={(e) => {
+      if (e.target === containerRef.current || (e.target as HTMLElement).classList.contains('relative')) {
+        e.preventDefault();
+        setContextMenu({ x: e.clientX, y: e.clientY, count: 0 });
+      }
+    }}>
       {filterText && (
         <div className="sticky top-0 z-10 px-2 py-0.5 bg-accent/80 text-white text-xs">
           Filter: "{filterText}" ({entries.length} items)
@@ -378,6 +498,12 @@ export function FileList({ side }: FileListProps) {
                     clearSelection(side);
                     toggleSelect(side, entry.path);
                   }
+                  const selCount = selected.size || 1;
+                  setContextMenu({
+                    x: e.clientX, y: e.clientY,
+                    single: selCount <= 1 ? entry : undefined,
+                    count: selCount,
+                  });
                 }}
                 onDragStart={(e) => {
                   const paths = selected.has(entry.path)
@@ -444,5 +570,70 @@ export function FileList({ side }: FileListProps) {
         </div>
       )}
     </div>
+
+    {/* 右键菜单 */}
+    {contextMenu && (
+      <div className="fixed z-[150]" style={{ left: contextMenu.x, top: contextMenu.y }}>
+        <div className="bg-surface-light border border-border rounded-lg shadow-xl py-1 min-w-[180px] text-xs">
+          {/* 空白区域 */}
+          {contextMenu.count === 0 && (
+            <>
+              <MenuBtn onClick={handleOpenFolder}>📂 Open folder...</MenuBtn>
+              <MenuBtn onClick={ctxNewFolder}>📁 New folder</MenuBtn>
+              <MenuSep />
+              <MenuBtn onClick={ctxRefresh}>🔄 Refresh</MenuBtn>
+            </>
+          )}
+          {/* 单个文件或文件夹 */}
+          {contextMenu.single && (
+            <>
+              <MenuBtn onClick={ctxOpen}>
+                {contextMenu.single.isDirectory ? '📂' : '📄'} {contextMenu.single.isDirectory ? 'Open' : 'Open file'}
+              </MenuBtn>
+              {contextMenu.single.isDirectory && (
+                <MenuBtn onClick={ctxOpenOther}>↗️ Open in other panel</MenuBtn>
+              )}
+              <MenuSep />
+              <MenuBtn onClick={ctxCopy}>📋 Copy to other panel</MenuBtn>
+              <MenuBtn onClick={ctxMove}>📦 Move to other panel</MenuBtn>
+              <MenuSep />
+              <MenuBtn onClick={ctxRename}>✏️ Rename</MenuBtn>
+              <MenuBtn onClick={ctxDelete}>🗑 Delete</MenuBtn>
+              <MenuSep />
+              <MenuBtn onClick={ctxCopyName}>📄 Copy filename</MenuBtn>
+              <MenuBtn onClick={ctxCopyPath}>📁 Copy path</MenuBtn>
+            </>
+          )}
+          {/* 多个选中 */}
+          {contextMenu.count > 1 && !contextMenu.single && (
+            <>
+              <MenuBtn onClick={ctxCopy}>📋 Copy {contextMenu.count} items to other panel</MenuBtn>
+              <MenuBtn onClick={ctxMove}>📦 Move {contextMenu.count} items to other panel</MenuBtn>
+              <MenuSep />
+              <MenuBtn onClick={ctxDelete}>🗑 Delete {contextMenu.count} items</MenuBtn>
+              <MenuSep />
+              <MenuBtn onClick={ctxCopyName}>📄 Copy filenames</MenuBtn>
+              <MenuBtn onClick={ctxCopyPath}>📁 Copy paths</MenuBtn>
+            </>
+          )}
+        </div>
+      </div>
+    )}
+  </>
   );
+}
+
+function MenuBtn({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      className="w-full text-left px-3 py-1.5 text-text-secondary hover:bg-accent/20 hover:text-text-primary flex items-center gap-2"
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
+function MenuSep() {
+  return <div className="border-t border-border/50 my-0.5" />;
 }
