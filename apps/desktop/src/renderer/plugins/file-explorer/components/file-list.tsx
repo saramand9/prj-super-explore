@@ -89,7 +89,7 @@ export function FileList({ side }: FileListProps) {
       ? [contextMenu.single.path]
       : [...(useFileStore.getState()[side].selected)];
     if (paths.length === 0) { closeMenu(); return; }
-    if (!await ipc.invoke('dialog:confirm', { message: `Delete ${paths.length} item(s)?` })) { closeMenu(); return; }
+    if (!await showConfirm(`Delete ${paths.length} item(s)?`)) { closeMenu(); return; }
     try {
       await ipc.invoke('file:delete', { paths });
       clearSelection(side);
@@ -198,6 +198,20 @@ export function FileList({ side }: FileListProps) {
     }
     closeMenu();
   }, [side, refresh, closeMenu]);
+
+  // Inline confirm helper
+  const showConfirm = useCallback(
+    (message: string): Promise<boolean> =>
+      new Promise((resolve) => {
+        setInlineConfirm({ message, resolve });
+      }),
+    [],
+  );
+
+  const [inlineConfirm, setInlineConfirm] = useState<{
+    message: string;
+    resolve: (ok: boolean) => void;
+  } | null>(null);
 
   // 筛选文本/条目变化时，重置焦点
   useEffect(() => {
@@ -639,6 +653,19 @@ export function FileList({ side }: FileListProps) {
           <div className="flex justify-end gap-2 mt-3">
             <button className="px-3 py-1 text-xs text-text-muted hover:text-text-primary" onClick={() => { inlinePrompt.resolve(null); setInlinePrompt(null); }}>Cancel</button>
             <button className="px-3 py-1 text-xs bg-accent text-white rounded" onClick={() => { const el = document.getElementById('inline-prompt-input') as HTMLInputElement; inlinePrompt.resolve(el?.value || ''); setInlinePrompt(null); }}>OK</button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* 内联确认框（代替 confirm） */}
+    {inlineConfirm && (
+      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50" onClick={() => { inlineConfirm.resolve(false); setInlineConfirm(null); }}>
+        <div className="bg-surface-light border border-border rounded-lg shadow-2xl p-4 min-w-[300px]" onClick={(e) => e.stopPropagation()}>
+          <div className="text-sm text-text-primary mb-4 whitespace-pre-wrap">{inlineConfirm.message}</div>
+          <div className="flex justify-end gap-2">
+            <button className="px-4 py-1 text-xs text-text-muted hover:text-text-primary border border-border rounded" onClick={() => { inlineConfirm.resolve(false); setInlineConfirm(null); }}>Cancel</button>
+            <button className="px-4 py-1 text-xs bg-accent text-white rounded" onClick={() => { inlineConfirm.resolve(true); setInlineConfirm(null); }}>OK</button>
           </div>
         </div>
       </div>
