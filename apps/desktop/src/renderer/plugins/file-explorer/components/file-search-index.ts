@@ -87,6 +87,11 @@ export class FileSearchIndex {
     if (!query || !this._ready) return [];
     const q = query.toLowerCase().trim();
 
+    // 通配符 → 正则匹配全量
+    if (q.includes('*') || q.includes('?')) {
+      return this.wildcardSearch(q, maxResults);
+    }
+
     // 策略 1：短查询 → Prefix Trie，无结果则 fallback trigram
     if (q.length <= 3) {
       const prefixResults = this.prefixSearch(q, maxResults);
@@ -220,6 +225,22 @@ export class FileSearchIndex {
       .slice(0, max)
       .map((s) => this.entryStore[s.id])
       .filter(Boolean);
+  }
+
+  /** 通配符搜索：将 * → .*?  ? → .  转为正则，遍历全量匹配 */
+  private wildcardSearch(query: string, max: number): FileEntry[] {
+    const escaped = query.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+    const glob = escaped.replace(/\*/g, '.*?').replace(/\?/g, '.');
+    const regex = new RegExp(glob, 'i');
+
+    const result: FileEntry[] = [];
+    for (const entry of this.entryStore) {
+      if (result.length >= max) break;
+      if (regex.test(entry.name)) {
+        result.push(entry);
+      }
+    }
+    return result;
   }
 
   /** 回退：全量子串匹配 */

@@ -4,27 +4,59 @@ import { FileSearchIndex } from './file-search-index';
 import { ipc } from '../../../framework/bridge/ipc-client';
 import { useLayoutStore } from '../../../framework/store/layout-store';
 
+function hasWildcard(query: string): boolean {
+  return query.includes('*') || query.includes('?');
+}
+
+function buildPattern(query: string): RegExp {
+  const escaped = query.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  const glob = escaped.replace(/\*/g, '.*?').replace(/\?/g, '.');
+  return new RegExp(glob, 'i');
+}
+
 function highlightMatch(text: string, query: string): React.ReactNode {
   if (!query) return text;
-  const lower = text.toLowerCase();
-  const q = query.toLowerCase();
   const parts: React.ReactNode[] = [];
   let cursor = 0;
-  while (cursor < text.length) {
-    const idx = lower.indexOf(q, cursor);
-    if (idx === -1) {
-      parts.push(<span key={cursor}>{text.slice(cursor)}</span>);
-      break;
+
+  if (hasWildcard(query)) {
+    const regex = buildPattern(query);
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(text)) !== null) {
+      if (match.index > cursor) {
+        parts.push(<span key={cursor}>{text.slice(cursor, match.index)}</span>);
+      }
+      parts.push(
+        <span key={match.index} className="text-yellow-400 font-bold">
+          {match[0]}
+        </span>,
+      );
+      cursor = match.index + match[0].length;
+      if (match[0].length === 0) break; // prevent infinite loop on zero-length match
     }
-    if (idx > cursor) {
-      parts.push(<span key={cursor}>{text.slice(cursor, idx)}</span>);
+  } else {
+    const lower = text.toLowerCase();
+    const q = query.toLowerCase();
+    while (cursor < text.length) {
+      const idx = lower.indexOf(q, cursor);
+      if (idx === -1) {
+        parts.push(<span key={cursor}>{text.slice(cursor)}</span>);
+        break;
+      }
+      if (idx > cursor) {
+        parts.push(<span key={cursor}>{text.slice(cursor, idx)}</span>);
+      }
+      parts.push(
+        <span key={idx} className="text-yellow-400 font-bold">
+          {text.slice(idx, idx + q.length)}
+        </span>,
+      );
+      cursor = idx + q.length;
     }
-    parts.push(
-      <span key={idx} className="text-yellow-400 font-bold">
-        {text.slice(idx, idx + q.length)}
-      </span>,
-    );
-    cursor = idx + q.length;
+  }
+
+  if (cursor < text.length) {
+    parts.push(<span key={cursor}>{text.slice(cursor)}</span>);
   }
   return parts;
 }
