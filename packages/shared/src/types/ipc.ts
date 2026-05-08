@@ -64,6 +64,12 @@ export interface IpcChannels {
     res: void;
   };
 
+  // Recursive directory walk for search index
+  'file:walkTree': {
+    req: { path: string; maxDepth?: number; excludePatterns?: string[] };
+    res: FileEntry[];
+  };
+
   // Search
   'search:fulltext': {
     req: { dir: string; query: string; filePattern?: string; maxResults?: number };

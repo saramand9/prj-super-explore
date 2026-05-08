@@ -1,5 +1,7 @@
 import { ipcMain, BrowserWindow, dialog, app } from 'electron';
-import type { IpcChannels, IpcEvents } from '@explore/shared';
+import { readdir, stat } from 'fs/promises';
+import { join, basename, extname } from 'path';
+import type { IpcChannels, IpcEvents, FileEntry } from '@explore/shared';
 import type { ServiceContainer } from '../service-container';
 import type { FileService } from '../services/file.service';
 import type { SearchService } from '../services/search.service';
@@ -74,6 +76,15 @@ export function registerIpcHandlers(container: ServiceContainer): void {
     (_e, payload: IpcChannels['file:openInExplorer']['req']) => {
       const { shell } = require('electron');
       shell.showItemInFolder(payload.path);
+    },
+  );
+
+  // ── Walk Tree (recursive directory listing for search index) ──
+
+  ipcMain.handle(
+    'file:walkTree',
+    async (_e, payload: IpcChannels['file:walkTree']['req']) => {
+      return walkTree(payload.path, payload.maxDepth ?? 5, new Set(payload.excludePatterns ?? []));
     },
   );
 
@@ -179,4 +190,40 @@ export function registerIpcHandlers(container: ServiceContainer): void {
 
   ipcMain.handle('app:getPlatform', () => process.platform);
   ipcMain.handle('app:getHomeDir', () => app.getPath('home'));
+}
+
+async function walkTree(
+  dirPath: string,
+  maxDepth: number,
+  excludePatterns: Set<string>,
+): Promise<FileEntry[]> {
+  if (maxDepth <= 0) return [];
+  const exclude = new Set(['node_modules', '.git', '$RECYCLE.BIN', 'System Volume Information', ...excludePatterns]);
+  const result: FileEntry[] = [];
+
+  try {
+    const names = await readdir(dirPath);
+    const tasks = names.map(async (name) => {
+      if (exclude.has(name) || name.startsWith('.')) return;
+      const fullPath = join(dirPath, name);
+      try {
+        const st = await stat(fullPath);
+        result.push({
+          name,
+          path: fullPath,
+          isDirectory: st.isDirectory(),
+          isSymlink: st.isSymbolicLink(),
+          size: st.size,
+          modifiedAt: st.mtimeMs,
+        });
+        if (st.isDirectory() && !st.isSymbolicLink()) {
+          const children = await walkTree(fullPath, maxDepth - 1, excludePatterns);
+          result.push(...children);
+        }
+      } catch { /* skip */ }
+    });
+    await Promise.all(tasks);
+  } catch { /* skip */ }
+
+  return result;
 }

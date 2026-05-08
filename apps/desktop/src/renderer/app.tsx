@@ -1,8 +1,11 @@
 import { useEffect, useCallback, useState } from 'react';
 import { SplitPane, useLayoutStore } from './framework/layout';
 import { ErrorBoundary } from './components/error-boundary';
+import { MenuBar } from './components/menu-bar';
+import { ActivityBar } from './components/activity-bar';
 import { Launcher } from './plugins/quick-launcher';
 import { FileList, useFileStore, AddressBar, TabBar } from './plugins/file-explorer';
+import { FileSearch } from './plugins/file-explorer/components/file-search';
 import { SearchPanel, useSearchStore } from './plugins/fulltext-search';
 import { BookmarkPanel } from './plugins/bookmarks';
 import { ipc } from './framework/bridge/ipc-client';
@@ -107,8 +110,10 @@ function MainApp() {
 
   return (
     <div className="h-full flex flex-col bg-surface">
-      {/* Split Panels */}
-      <div className="flex-1 overflow-hidden pt-0.5">
+      <MenuBar />
+      <div className="flex-1 flex overflow-hidden">
+        <ActivityBar />
+        <div className="flex-1 flex flex-col overflow-hidden">
         <SplitPane defaultSplit={50} minSize={200}>
           <PanelSlot
             side="left"
@@ -123,6 +128,7 @@ function MainApp() {
             onTypeChange={(t) => handlePanelTypeChange('right', t)}
           />
         </SplitPane>
+        </div>
       </div>
 
       {/* Status Bar */}
@@ -165,14 +171,19 @@ function PanelSlot({
   const isActive = layout.id === side;
   const [showDropdown, setShowDropdown] = useState(false);
   const [showTabSearch, setShowTabSearch] = useState(false);
+  const [showFileSearch, setShowFileSearch] = useState(false);
 
   // Ctrl+T 搜索标签
   useEffect(() => {
     if (!isActive) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 't' && (e.ctrlKey || e.metaKey)) {
+      if (e.key === 't' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
         e.preventDefault();
         setShowTabSearch((s) => !s);
+      }
+      if (e.key === 'f' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+        e.preventDefault();
+        setShowFileSearch((s) => !s);
       }
     };
     window.addEventListener('keydown', handler);
@@ -329,6 +340,13 @@ function PanelSlot({
 
       {/* Panel Content */}
       <div className="flex-1 overflow-hidden bg-surface relative">
+        {showFileSearch && pluginId === 'file-explorer' && (
+          <FileSearch
+            side={side}
+            open={showFileSearch}
+            onClose={() => setShowFileSearch(false)}
+          />
+        )}
         {renderPanel()}
         {!isActive && <div className="absolute inset-0 bg-black/30 pointer-events-none" />}
       </div>

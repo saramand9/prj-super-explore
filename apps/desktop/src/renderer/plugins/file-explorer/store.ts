@@ -50,6 +50,7 @@ interface FileExplorerState {
   forkTab: (side: 'left' | 'right', tabId: string) => void;
   activateTab: (side: 'left' | 'right', tabId: string) => void;
   renameTab: (side: 'left' | 'right', tabId: string, label: string) => void;
+  getGroups: (side: 'left' | 'right') => { name: string; tabIds: string[] }[];
 }
 
 let tabSeq = 0;
@@ -263,6 +264,10 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
           [side]: {
             ...s[side],
             activeTabId: exists.id,
+            // 补充旧存盘数据中缺失的 initialPath
+            tabs: s[side].tabs.map((t) =>
+              t.id === exists.id && !t.initialPath ? { ...t, initialPath: t.path } : t,
+            ),
           },
         };
       }
@@ -318,6 +323,9 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
       },
     })),
 
+  // TODO: 标签分组功能后续实现，目前返回空数组
+  getGroups: () => [],
+
   loadPinnedTabs: async () => {
     try {
       const data = await ipc.invoke('tabs:load', undefined);
@@ -327,11 +335,13 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
         left: {
           ...s.left,
           tabs: [...pinnedLeft, ...s.left.tabs.filter((t) => !t.pinned)],
+          activeTabId: pinnedLeft.length > 0 ? pinnedLeft[pinnedLeft.length - 1].id : s.left.activeTabId,
           backStack: pinnedLeft.length > 0 ? [pinnedLeft[pinnedLeft.length - 1].path] : s.left.backStack,
         },
         right: {
           ...s.right,
           tabs: [...pinnedRight, ...s.right.tabs.filter((t) => !t.pinned)],
+          activeTabId: pinnedRight.length > 0 ? pinnedRight[pinnedRight.length - 1].id : s.right.activeTabId,
           backStack: pinnedRight.length > 0 ? [pinnedRight[pinnedRight.length - 1].path] : s.right.backStack,
         },
       }));
