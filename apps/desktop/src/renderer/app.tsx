@@ -155,7 +155,7 @@ function MainApp() {
 
       {/* Toast notification */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] pointer-events-none">
+        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[200] pointer-events-none">
           <div className={`px-4 py-2 rounded-lg shadow-lg text-sm ${
             toast.type === 'error' ? 'bg-red-600/90 text-white' :
             toast.type === 'warn' ? 'bg-yellow-600/90 text-white' :
