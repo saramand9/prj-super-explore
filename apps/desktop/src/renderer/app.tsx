@@ -6,6 +6,7 @@ import { ActivityBar } from './components/activity-bar';
 import { Launcher } from './plugins/quick-launcher';
 import { FileList, useFileStore, AddressBar, TabBar } from './plugins/file-explorer';
 import { FileSearch } from './plugins/file-explorer/components/file-search';
+import { TabSearch } from './plugins/file-explorer/components/tab-search';
 import { SearchPanel, useSearchStore } from './plugins/fulltext-search';
 import { BookmarkPanel } from './plugins/bookmarks';
 import { ipc } from './framework/bridge/ipc-client';
@@ -345,6 +346,13 @@ function PanelSlot({
             side={side}
             open={showFileSearch}
             onClose={() => setShowFileSearch(false)}
+          />
+        )}
+        {showTabSearch && (
+          <TabSearch
+            side={side}
+            open={showTabSearch}
+            onClose={() => setShowTabSearch(false)}
           />
         )}
         {renderPanel()}
