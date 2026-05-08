@@ -173,11 +173,11 @@ function PanelSlot({
   const [showTabSearch, setShowTabSearch] = useState(false);
   const [showFileSearch, setShowFileSearch] = useState(false);
 
-  // Ctrl+T 搜索标签
+  // Ctrl+T / Ctrl+P 搜索标签
   useEffect(() => {
     if (!isActive) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 't' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+      if ((e.key === 't' || e.key === 'p') && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
         e.preventDefault();
         setShowTabSearch((s) => !s);
       }
