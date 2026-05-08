@@ -377,6 +377,12 @@ export function FileList({ side }: FileListProps) {
                     toggleSelect(side, entry.path);
                   }
                 }}
+                onDragStart={(e) => {
+                  const paths = selected.has(entry.path)
+                    ? [...selected]
+                    : [entry.path];
+                  e.dataTransfer.setData('application/x-explore-files', JSON.stringify(paths));
+                }}
               />
             </div>
           );

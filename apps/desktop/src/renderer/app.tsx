@@ -243,6 +243,30 @@ function PanelSlot({
     }
   }, [side, panel.path]);
 
+  // 拖放处理
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = e.ctrlKey || e.metaKey ? 'move' : 'copy';
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    const data = e.dataTransfer.getData('application/x-explore-files');
+    if (!data || !panel.path) return;
+    const sources: string[] = JSON.parse(data);
+    if (sources.length === 0) return;
+    if (sources.every((s) => s.startsWith(panel.path!))) return; // 同一目录不拖放
+    const isMove = e.ctrlKey || e.metaKey;
+    if (isMove) {
+      await ipc.invoke('file:move', { sources, destDir: panel.path });
+    } else {
+      await ipc.invoke('file:copy', { sources, destDir: panel.path });
+    }
+    useFileStore.getState().refresh(side);
+    const otherSide = side === 'left' ? 'right' : 'left';
+    useFileStore.getState().refresh(otherSide);
+  }, [side, panel.path]);
+
   return (
     <div
       className="h-full flex flex-col"
@@ -340,7 +364,11 @@ function PanelSlot({
       </div>
 
       {/* Panel Content */}
-      <div className="flex-1 overflow-hidden bg-surface relative">
+      <div
+        className="flex-1 overflow-hidden bg-surface relative"
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+      >
         {showFileSearch && pluginId === 'file-explorer' && (
           <FileSearch
             side={side}

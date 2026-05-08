@@ -11,6 +11,7 @@ interface FileRowProps {
   onClick: (e: React.MouseEvent) => void;
   onDoubleClick: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
+  onDragStart: (e: React.DragEvent, entry: FileEntry) => void;
 }
 
 export const FileRow = memo(function FileRow({
@@ -22,7 +23,16 @@ export const FileRow = memo(function FileRow({
   onClick,
   onDoubleClick,
   onContextMenu,
+  onDragStart,
 }: FileRowProps) {
+  const handleDragStart = useCallback(
+    (e: React.DragEvent) => {
+      e.dataTransfer.effectAllowed = 'copyMove';
+      onDragStart(e, entry);
+    },
+    [entry, onDragStart],
+  );
+
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       onClick(e);
@@ -48,6 +58,8 @@ export const FileRow = memo(function FileRow({
       onClick={handleClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
+      onDragStart={handleDragStart}
+      draggable
       role="row"
     >
       <span className="w-5 text-center flex-shrink-0">{icon}</span>
