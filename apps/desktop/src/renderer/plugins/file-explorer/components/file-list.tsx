@@ -137,12 +137,15 @@ export function FileList({ side }: FileListProps) {
   }, [contextMenu, side, closeMenu]);
 
   const ctxNewFolder = useCallback(async () => {
+    const dir = useFileStore.getState()[side].path;
+    if (!dir) { closeMenu(); return; }
     const name = prompt('Folder name:');
     if (!name) { closeMenu(); return; }
-    await ipc.invoke('file:mkdir', { parentPath: path!, name });
+    const result = await ipc.invoke('file:mkdir', { parentPath: dir, name });
+    if (!result.success) { alert(`Failed: ${result.error}`); closeMenu(); return; }
     refresh(side);
     closeMenu();
-  }, [path, side, refresh, closeMenu]);
+  }, [side, refresh, closeMenu]);
 
   const ctxRefresh = useCallback(() => {
     refresh(side);
