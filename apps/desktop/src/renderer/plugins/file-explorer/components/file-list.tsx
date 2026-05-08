@@ -393,16 +393,40 @@ export function FileList({ side }: FileListProps) {
                   const data = e.dataTransfer.getData('application/x-explore-files');
                   if (!data) return;
                   const sources: string[] = JSON.parse(data);
-                  const isMove = e.ctrlKey || e.metaKey;
-                  if (isMove) {
-                    await ipc.invoke('file:move', { sources, destDir: entry.path });
-                  } else {
-                    await ipc.invoke('file:copy', { sources, destDir: entry.path });
+                  if (sources.length === 0) return;
+
+                  // 同目录忽略
+                  if (sources.every((s) => {
+                    const parent = s.replace(/[/\\][^/\\]*$/, '');
+                    return parent === entry.path;
+                  })) return;
+
+                  // 拖到自己子目录 → 阻止
+                  if (sources.some((s) => entry.path.startsWith(s + '\\') || entry.path.startsWith(s + '/'))) return;
+
+                  // 同名冲突
+                  const sourceNames = new Set(sources.map((s) => s.split(/[/\\]/).pop()?.toLowerCase()));
+                  const destEntries = await ipc.invoke('file:readDir', { path: entry.path });
+                  const conflicts = destEntries.filter((de) => sourceNames.has(de.name.toLowerCase()));
+                  if (conflicts.length > 0) {
+                    if (!confirm(`Overwrite in ${entry.name}?\n${conflicts.map((c) => c.name).join(', ')}`)) return;
                   }
+
+                  const isMove = e.ctrlKey || e.metaKey;
+                  try {
+                    if (isMove) {
+                      const result = await ipc.invoke('file:move', { sources, destDir: entry.path });
+                      if (!result.success && result.skipped?.length) {
+                        await ipc.invoke('file:copy', { sources: result.skipped, destDir: entry.path });
+                        await ipc.invoke('file:delete', { paths: result.skipped });
+                      }
+                    } else {
+                      await ipc.invoke('file:copy', { sources, destDir: entry.path });
+                    }
+                  } catch { /* ignore */ }
                   refresh(side);
                   const otherSide = side === 'left' ? 'right' : 'left';
                   useFileStore.getState().refresh(otherSide);
-                  // flash feedback
                   setDropFlashPath(entry.path);
                   setTimeout(() => setDropFlashPath(null), 600);
                 }}
