@@ -30,6 +30,12 @@ export function App() {
 
 function MainApp() {
   const layout = useLayoutStore((s) => s.layout);
+  const [toast, setToast] = useState<{ message: string; type: 'info' | 'warn' | 'error' } | null>(null);
+
+  const notify = useCallback((message: string, type: 'info' | 'warn' | 'error' = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 2500);
+  }, []);
 
   // 启动时恢复固定标签，打开第一个标签或默认目录
   useEffect(() => {
@@ -121,12 +127,14 @@ function MainApp() {
             pluginId={layout.left.pluginId}
             onClick={() => handlePanelClick('left')}
             onTypeChange={(t) => handlePanelTypeChange('left', t)}
+            notify={notify}
           />
           <PanelSlot
             side="right"
             pluginId={layout.right.pluginId}
             onClick={() => handlePanelClick('right')}
             onTypeChange={(t) => handlePanelTypeChange('right', t)}
+            notify={notify}
           />
         </SplitPane>
         </div>
@@ -144,6 +152,19 @@ function MainApp() {
         <span>F8 Delete</span>
         <span>Ctrl+Shift+F Search</span>
       </div>
+
+      {/* Toast notification */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] pointer-events-none">
+          <div className={`px-4 py-2 rounded-lg shadow-lg text-sm ${
+            toast.type === 'error' ? 'bg-red-600/90 text-white' :
+            toast.type === 'warn' ? 'bg-yellow-600/90 text-white' :
+            'bg-accent/90 text-white'
+          }`}>
+            {toast.message}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -161,11 +182,13 @@ function PanelSlot({
   pluginId,
   onClick,
   onTypeChange,
+  notify,
 }: {
   side: 'left' | 'right';
   pluginId: string;
   onClick: () => void;
   onTypeChange: (type: PanelType) => void;
+  notify: (message: string, type?: 'info' | 'warn' | 'error') => void;
 }) {
   const layout = useLayoutStore((s) => s.layout);
   const panel = layout[side];
@@ -246,56 +269,65 @@ function PanelSlot({
   // 拖放处理
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    if (!panel.path) return;
+    if (!panel.path) {
+      e.dataTransfer.dropEffect = 'none';
+      return;
+    }
     e.dataTransfer.dropEffect = e.ctrlKey || e.metaKey ? 'move' : 'copy';
   }, [panel.path]);
 
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
+    if (!panel.path) {
+      notify('No folder open in target panel', 'warn');
+      return;
+    }
     const data = e.dataTransfer.getData('application/x-explore-files');
-    if (!data || !panel.path) return;
+    if (!data) return;
     const sources: string[] = JSON.parse(data);
     if (sources.length === 0) return;
 
-    // 同一目录忽略
     const targetDir = panel.path;
+
+    // 同一目录忽略
     if (sources.every((s) => {
       const parent = s.replace(/[/\\][^/\\]*$/, '');
       return parent === targetDir || s === targetDir;
-    })) return;
-
-    // 拖文件夹到自己子目录 → 阻止
-    if (sources.some((s) => targetDir.startsWith(s + '\\') || targetDir.startsWith(s + '/'))) {
-      alert('Cannot copy a folder into itself or its subfolder.');
+    })) {
+      notify('Already in the same directory', 'info');
       return;
     }
 
-    // 同名冲突
-    const existingNames = new Set(
-      sources.map((s) => s.split(/[/\\]/).pop()?.toLowerCase()),
-    );
-    const destEntries = await ipc.invoke('file:readDir', { path: targetDir });
-    const conflicts = destEntries.filter((de) => existingNames.has(de.name.toLowerCase()));
-    if (conflicts.length > 0) {
-      const names = conflicts.map((c) => c.name).join(', ');
-      if (!confirm(`Files already exist:\n${names}\n\nOverwrite?`)) return;
+    // 拖文件夹到自己子目录 → 阻止
+    if (sources.some((s) => targetDir.startsWith(s + '\\') || targetDir.startsWith(s + '/'))) {
+      notify('Cannot copy a folder into itself', 'error');
+      return;
     }
 
     const isMove = e.ctrlKey || e.metaKey;
-    if (isMove) {
-      const result = await ipc.invoke('file:move', { sources, destDir: targetDir });
-      if (!result.success && result.skipped?.length) {
-        // 跨盘符 move 失败，回退 copy+delete
-        await ipc.invoke('file:copy', { sources: result.skipped, destDir: targetDir });
-        await ipc.invoke('file:delete', { paths: result.skipped });
+    try {
+      if (isMove) {
+        const result = await ipc.invoke('file:move', { sources, destDir: targetDir });
+        if (!result.success && result.skipped?.length) {
+          await ipc.invoke('file:copy', { sources: result.skipped, destDir: targetDir });
+          await ipc.invoke('file:delete', { paths: result.skipped });
+          notify(`Moved ${sources.length} item(s) (cross-drive fallback)`, 'info');
+        } else if (result.success) {
+          notify(`Moved ${sources.length} item(s)`, 'info');
+        } else {
+          notify(`Move failed: ${result.error || 'unknown'}`, 'error');
+        }
+      } else {
+        await ipc.invoke('file:copy', { sources, destDir: targetDir });
+        notify(`Copied ${sources.length} item(s)`, 'info');
       }
-    } else {
-      await ipc.invoke('file:copy', { sources, destDir: targetDir });
+    } catch (err: any) {
+      notify(`Operation failed: ${err.message}`, 'error');
     }
     useFileStore.getState().refresh(side);
     const otherSide = side === 'left' ? 'right' : 'left';
     useFileStore.getState().refresh(otherSide);
-  }, [side, panel.path]);
+  }, [side, panel.path, notify]);
 
   return (
     <div
