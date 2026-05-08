@@ -21,6 +21,7 @@ export function FileList({ side }: FileListProps) {
   const toggleSelect = useFileStore((s) => s.toggleSelect);
   const clearSelection = useFileStore((s) => s.clearSelection);
   const selectSingle = useFileStore((s) => s.selectSingle);
+  const selectAll = useFileStore((s) => s.selectAll);
   const setFilter = useFileStore((s) => s.setFilter);
   const refresh = useFileStore((s) => s.refresh);
 
@@ -123,6 +124,15 @@ export function FileList({ side }: FileListProps) {
             navigateToPath(parent);
           }
           break;
+
+        case 'a':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            selectAll(side);
+            break;
+          }
+          setFilter(side, state.filterText + key);
+          return;
 
         case 'o':
           if (e.ctrlKey || e.metaKey) {
