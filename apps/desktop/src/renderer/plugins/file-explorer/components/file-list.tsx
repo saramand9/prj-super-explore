@@ -38,6 +38,22 @@ export function FileList({ side }: FileListProps) {
     count: number;
   } | null>(null);
 
+  // Inline prompt helper
+  const showPrompt = useCallback(
+    (message: string, defaultValue: string): Promise<string | null> =>
+      new Promise((resolve) => {
+        setInlinePrompt({ message, defaultValue, resolve });
+      }),
+    [],
+  );
+
+  // Inline prompt state（代替 prompt()）
+  const [inlinePrompt, setInlinePrompt] = useState<{
+    message: string;
+    defaultValue: string;
+    resolve: (value: string | null) => void;
+  } | null>(null);
+
   // 关闭右键菜单
   const closeMenu = useCallback(() => setContextMenu(null), []);
   useEffect(() => {
@@ -73,7 +89,7 @@ export function FileList({ side }: FileListProps) {
       ? [contextMenu.single.path]
       : [...(useFileStore.getState()[side].selected)];
     if (paths.length === 0) { closeMenu(); return; }
-    if (!confirm(`Delete ${paths.length} item(s)?`)) { closeMenu(); return; }
+    if (!await ipc.invoke('dialog:confirm', { message: `Delete ${paths.length} item(s)?` })) { closeMenu(); return; }
     try {
       await ipc.invoke('file:delete', { paths });
       clearSelection(side);
@@ -86,7 +102,7 @@ export function FileList({ side }: FileListProps) {
 
   const ctxRename = useCallback(async () => {
     if (!contextMenu?.single) return;
-    const newName = prompt('New name:', contextMenu.single.name);
+    const newName = await showPrompt('New name:', contextMenu.single.name);
     if (!newName || newName === contextMenu.single.name) { closeMenu(); return; }
     try {
       await ipc.invoke('file:rename', { path: contextMenu.single.path, newName });
@@ -95,7 +111,7 @@ export function FileList({ side }: FileListProps) {
       alert(`Rename failed: ${err.message}`);
     }
     closeMenu();
-  }, [contextMenu, side, refresh, closeMenu]);
+  }, [contextMenu, side, refresh, closeMenu, showPrompt]);
 
   const ctxCopy = useCallback(async () => {
     if (!contextMenu) return;
@@ -155,7 +171,7 @@ export function FileList({ side }: FileListProps) {
     const dir = useFileStore.getState()[side].path;
     console.log('[ctxNewFolder] dir:', dir);
     if (!dir) { closeMenu(); return; }
-    const name = prompt('Folder name:');
+    const name = await showPrompt('Folder name:', 'New folder');
     console.log('[ctxNewFolder] name:', name);
     if (!name) { closeMenu(); return; }
     const result = await ipc.invoke('file:mkdir', { parentPath: dir, name });
@@ -163,7 +179,7 @@ export function FileList({ side }: FileListProps) {
     if (!result.success) { alert(`Failed: ${result.error}`); closeMenu(); return; }
     refresh(side);
     closeMenu();
-  }, [side, refresh, closeMenu]);
+  }, [side, refresh, closeMenu, showPrompt]);
 
   const ctxRefresh = useCallback(() => {
     refresh(side);
@@ -173,7 +189,7 @@ export function FileList({ side }: FileListProps) {
   const ctxEmptyFolder = useCallback(async () => {
     const allPaths = useFileStore.getState()[side].entries.map((e) => e.path);
     if (allPaths.length === 0) { closeMenu(); return; }
-    if (!confirm(`Move all ${allPaths.length} item(s) to recycle bin?`)) { closeMenu(); return; }
+    if (!await ipc.invoke('dialog:confirm', { message: `Move all ${allPaths.length} item(s) to recycle bin?` })) { closeMenu(); return; }
     try {
       await ipc.invoke('file:delete', { paths: allPaths });
       refresh(side);
@@ -402,7 +418,7 @@ export function FileList({ side }: FileListProps) {
         }
         case 'F7': {
           if (state.path) {
-            const name = prompt('Folder name:');
+            const name = await showPrompt('Folder name:', 'New folder');
             if (name) {
               const result = await ipc.invoke('file:mkdir', {
                 parentPath: state.path,
@@ -418,7 +434,7 @@ export function FileList({ side }: FileListProps) {
             const names = [...state.selected]
               .map((p) => p.split(/[/\\]/).pop())
               .join(', ');
-            if (confirm(`Delete ${names}?`)) {
+            if (await ipc.invoke('dialog:confirm', { message: `Delete ${names}?` })) {
               await ipc.invoke('file:delete', { paths: [...state.selected] });
               clearSelection(side);
               refresh(side);
@@ -569,7 +585,7 @@ export function FileList({ side }: FileListProps) {
                   const destEntries = await ipc.invoke('file:readDir', { path: entry.path });
                   const conflicts = destEntries.filter((de) => sourceNames.has(de.name.toLowerCase()));
                   if (conflicts.length > 0) {
-                    if (!confirm(`Overwrite in ${entry.name}?\n${conflicts.map((c) => c.name).join(', ')}`)) return;
+                    if (!await ipc.invoke('dialog:confirm', { message: `Overwrite in ${entry.name}?\n${conflicts.map((c) => c.name).join(', ')}` })) return;
                   }
 
                   const isMove = e.ctrlKey || e.metaKey;
@@ -604,6 +620,32 @@ export function FileList({ side }: FileListProps) {
         </div>
       )}
     </div>
+
+    {/* 内联输入框（代替 prompt()） */}
+    {inlinePrompt && (() => {
+      let value = inlinePrompt.defaultValue;
+      return (
+      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50" onClick={() => inlinePrompt.resolve(null)}>
+        <div className="bg-surface-light border border-border rounded-lg shadow-2xl p-4 min-w-[320px]" onClick={(e) => e.stopPropagation()}>
+          <div className="text-sm text-text-primary mb-3">{inlinePrompt.message}</div>
+          <input
+            autoFocus
+            className="w-full bg-surface-lighter border border-border rounded px-3 py-1.5 text-sm text-text-primary outline-none focus:border-accent"
+            defaultValue={value}
+            onChange={(e) => { value = e.target.value; }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') inlinePrompt.resolve(value);
+              if (e.key === 'Escape') inlinePrompt.resolve(null);
+            }}
+          />
+          <div className="flex justify-end gap-2 mt-3">
+            <button className="px-3 py-1 text-xs text-text-muted hover:text-text-primary" onClick={() => inlinePrompt.resolve(null)}>Cancel</button>
+            <button className="px-3 py-1 text-xs bg-accent text-white rounded" onClick={() => inlinePrompt.resolve(value)}>OK</button>
+          </div>
+        </div>
+      </div>
+      );
+    })()}
 
     {/* 右键菜单 */}
     {contextMenu && (

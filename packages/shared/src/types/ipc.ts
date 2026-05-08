@@ -143,6 +143,14 @@ export interface IpcChannels {
     req: { defaultPath?: string };
     res: string | null;
   };
+  'dialog:confirm': {
+    req: { title?: string; message: string };
+    res: boolean;
+  };
+  'dialog:prompt': {
+    req: { title?: string; message: string; defaultValue?: string };
+    res: string | null;
+  };
 
   // App
   'app:getVersion': {

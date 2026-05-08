@@ -56,7 +56,8 @@ export function MenuBar() {
             const side = activeSide();
             const state = useFileStore.getState()[side as 'left' | 'right'];
             if (!state.path) return;
-            const name = prompt('Folder name:');
+            // TODO: Replace with inline prompt
+            const name = ''; // FIXME
             if (name) {
               await ipc.invoke('file:mkdir', { parentPath: state.path, name });
               useFileStore.getState().refresh(side as 'left' | 'right');

@@ -181,6 +181,44 @@ export function registerIpcHandlers(container: ServiceContainer): void {
     },
   );
 
+  ipcMain.handle(
+    'dialog:confirm',
+    async (_e, payload: IpcChannels['dialog:confirm']['req']) => {
+      const win = BrowserWindow.getFocusedWindow();
+      if (!win) return false;
+      const result = await dialog.showMessageBox(win, {
+        type: 'question',
+        buttons: ['OK', 'Cancel'],
+        defaultId: 0,
+        title: payload.title || 'Confirm',
+        message: payload.message,
+      });
+      return result.response === 0;
+    },
+  );
+
+  ipcMain.handle(
+    'dialog:prompt',
+    async (_e, payload: IpcChannels['dialog:prompt']['req']) => {
+      const win = BrowserWindow.getFocusedWindow();
+      if (!win) return null;
+      // Electron doesn't have a native prompt, use a simple workaround
+      const { BrowserWindow: _ } = require('electron');
+      // For now, use showMessageBox with a workaround
+      const result = await dialog.showMessageBox(win, {
+        type: 'question',
+        buttons: ['OK', 'Cancel'],
+        defaultId: 0,
+        title: payload.title || 'Input',
+        message: `${payload.message}\n\nDefault: ${payload.defaultValue || ''}`,
+      });
+      if (result.response === 0) {
+        return payload.defaultValue || '';
+      }
+      return null;
+    },
+  );
+
   // ── App ──
 
   ipcMain.handle('app:getVersion', () => {

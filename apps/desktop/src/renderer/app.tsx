@@ -310,7 +310,7 @@ function PanelSlot({
     const conflicts = destEntries.filter((de) => sourceNames.has(de.name.toLowerCase()));
     if (conflicts.length > 0) {
       const names = conflicts.map((c) => c.name).join(', ');
-      if (!confirm(`Overwrite existing files?\n${names}`)) {
+      if (!await ipc.invoke('dialog:confirm', { message: `Overwrite existing files?\n${names}` })) {
         notify('Cancelled', 'info');
         return;
       }
