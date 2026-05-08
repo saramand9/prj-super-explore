@@ -1,4 +1,5 @@
 import type { PluginModule } from '@explore/shared';
+import { FileList } from './components/file-list';
 
 const manifest = {
   id: 'file-explorer',
@@ -12,7 +13,7 @@ const manifest = {
       {
         id: 'browser',
         title: 'File Browser',
-        icon: 'folder',
+        icon: '📁',
         defaultSize: { minWidth: 200, minHeight: 300 },
       },
     ],
@@ -32,24 +33,19 @@ const manifest = {
   },
 };
 
-/** File Explorer 插件入口 */
 export function createPlugin(): PluginModule {
   return {
     manifest,
-
+    components: { browser: FileList },
     async activate(_ctx) {
-      // PluginContext 已注入，文件操作通过 ctx.fs 完成
       console.log('[file-explorer] activated');
     },
-
     async deactivate() {
       console.log('[file-explorer] deactivated');
     },
   };
 }
 
-export { FileList } from './components/file-list';
-export { AddressBar } from './components/address-bar';
 export { TabBar } from './components/tab-bar';
-export { TabSearch } from './components/tab-search';
+export { AddressBar } from './components/address-bar';
 export { useFileStore, useFilteredEntries } from './store';

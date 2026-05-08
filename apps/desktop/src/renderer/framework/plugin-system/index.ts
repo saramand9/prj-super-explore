@@ -1,4 +1,4 @@
-export { PluginManager } from './plugin-manager';
+export { PluginManager, pluginManager } from './plugin-manager';
 export { createPluginContext } from './plugin-context';
 export type {
   PluginRegistration,

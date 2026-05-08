@@ -1,4 +1,5 @@
 import type { PluginModule } from '@explore/shared';
+import { BookmarkPanel } from './components/bookmark-panel';
 
 const manifest = {
   id: 'bookmarks',
@@ -12,7 +13,7 @@ const manifest = {
       {
         id: 'list',
         title: 'Bookmarks',
-        icon: 'star',
+        icon: '⭐',
         defaultSize: { minWidth: 180, minHeight: 200 },
       },
     ],
@@ -29,16 +30,12 @@ const manifest = {
 export function createPlugin(): PluginModule {
   return {
     manifest,
-
+    components: { list: BookmarkPanel },
     async activate(_ctx) {
       console.log('[bookmarks] activated');
     },
-
     async deactivate() {
       console.log('[bookmarks] deactivated');
     },
   };
 }
-
-export { BookmarkPanel } from './components/bookmark-panel';
-export { useBookmarkStore } from './store';

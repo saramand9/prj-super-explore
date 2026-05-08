@@ -1,4 +1,5 @@
 import type { PluginModule } from '@explore/shared';
+import { SearchPanel } from './components/search-panel';
 
 const manifest = {
   id: 'fulltext-search',
@@ -12,7 +13,7 @@ const manifest = {
       {
         id: 'search',
         title: 'Full-text Search',
-        icon: 'search',
+        icon: '🔍',
         defaultSize: { minWidth: 250, minHeight: 200 },
       },
     ],
@@ -28,16 +29,14 @@ const manifest = {
 export function createPlugin(): PluginModule {
   return {
     manifest,
-
+    components: { search: SearchPanel },
     async activate(_ctx) {
       console.log('[fulltext-search] activated');
     },
-
     async deactivate() {
       console.log('[fulltext-search] deactivated');
     },
   };
 }
 
-export { SearchPanel } from './components/search-panel';
 export { useSearchStore } from './store';

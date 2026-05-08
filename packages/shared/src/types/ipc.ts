@@ -49,6 +49,10 @@ export interface IpcChannels {
     req: { path: string };
     res: void;
   };
+  'file:read': {
+    req: { path: string; maxSize?: number };
+    res: { content: string; size: number };
+  };
   'file:openInExplorer': {
     req: { path: string };
     res: void;
@@ -130,6 +134,18 @@ export interface IpcChannels {
   'plugin:loadManifest': {
     req: { pluginPath: string };
     res: PluginManifest | null;
+  };
+  'plugin:scanExternal': {
+    req: void;
+    res: { pluginId: string; pluginPath: string }[];
+  };
+  'plugin:readFile': {
+    req: { pluginId: string; file: string };
+    res: string;
+  };
+  'plugin:install': {
+    req: { sourcePath: string };
+    res: { success: boolean; pluginId?: string; error?: string };
   };
 
   // Window

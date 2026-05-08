@@ -5,6 +5,7 @@ import { useFileStore, useFilteredEntries } from '../store';
 import { FileRow } from './file-row';
 import { ipc } from '../../../framework/bridge/ipc-client';
 import { useLayoutStore } from '../../../framework/store/layout-store';
+import { pluginManager } from '../../../framework/plugin-system';
 
 interface FileListProps {
   side: 'left' | 'right';
@@ -64,17 +65,28 @@ export function FileList({ side }: FileListProps) {
     return () => { window.removeEventListener('click', h); };
   }, [contextMenu, closeMenu]);
 
-  // 右键菜单操作
+  // 文件打开路由：有插件处理→右侧预览，否则→外部打开
+  const openFile = useCallback((entry: FileEntry) => {
+    const ext = entry.name.slice(entry.name.lastIndexOf('.')).toLowerCase();
+    const handler = pluginManager.getFileHandlerForExtension(ext);
+    if (handler) {
+      const targetSide = side === 'left' ? 'right' : 'left';
+      useLayoutStore.getState().setPanelPath(targetSide, entry.path);
+      useLayoutStore.getState().setPanelPlugin(targetSide, handler.pluginId, handler.panelId);
+    } else {
+      ipc.invoke('file:open', { path: entry.path });
+    }
+  }, [side]);
   const ctxOpen = useCallback(() => {
     if (!contextMenu?.single) return;
     if (contextMenu.single.isDirectory) {
       navigateTo(side, contextMenu.single.path);
       useLayoutStore.getState().setPanelPath(side, contextMenu.single.path);
     } else {
-      ipc.invoke('file:open', { path: contextMenu.single.path });
+      openFile(contextMenu.single);
     }
     closeMenu();
-  }, [contextMenu, side, navigateTo, closeMenu]);
+  }, [contextMenu, side, navigateTo, closeMenu, openFile]);
 
   const ctxOpenOther = useCallback(() => {
     if (!contextMenu?.single) return;
@@ -379,22 +391,20 @@ export function FileList({ side }: FileListProps) {
           break;
 
         case 'Enter': {
-          // 有选中项：打开选中项
           if (entries.length > 0 && state.selected.size === 1) {
             const selPath = [...state.selected][0];
             const entry = entries.find((e) => e.path === selPath);
             if (entry?.isDirectory) {
               navigateToPath(entry.path);
             } else if (entry) {
-              ipc.invoke('file:open', { path: entry.path });
+              openFile(entry);
             }
           } else if (entries.length > 0 && focusIdx < entries.length) {
-            // 无选中但有焦点项：打开焦点项
             const entry = entries[focusIdx];
             if (entry.isDirectory) {
               navigateToPath(entry.path);
             } else {
-              ipc.invoke('file:open', { path: entry.path });
+              openFile(entry);
             }
           }
           break;
@@ -553,7 +563,7 @@ export function FileList({ side }: FileListProps) {
                   if (entry.isDirectory) {
                     navigateToPath(entry.path);
                   } else {
-                    ipc.invoke('file:open', { path: entry.path });
+                    openFile(entry);
                   }
                 }}
                 onContextMenu={(e) => {

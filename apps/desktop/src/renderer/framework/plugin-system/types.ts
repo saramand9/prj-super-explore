@@ -15,4 +15,4 @@ export interface PluginRegistration {
 export type CommandHandler = (...args: any[]) => any;
 
 /** 面板渲染器 */
-export type PanelRenderer = ComponentType<{ pluginId: string }>;
+export type PanelRenderer = ComponentType<{ side: 'left' | 'right' }>;

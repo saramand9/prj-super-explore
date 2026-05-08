@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useLayoutStore } from '../framework/layout';
 import { useFileStore } from '../plugins/file-explorer/store';
+import { useAppStore } from '../framework/store/app-store';
 import { ipc } from '../framework/bridge/ipc-client';
 
 interface MenuItem {
@@ -151,6 +152,13 @@ export function MenuBar() {
         },
         { separator: true },
         {
+          label: 'Manage Plugins...',
+          action: () => {
+            useAppStore.getState().setShowPluginManager(true);
+          },
+        },
+        { separator: true },
+        {
           label: 'Focus Left Panel',
           shortcut: 'Left',
           action: () => useLayoutStore.getState().setActivePanel('left'),
@@ -218,6 +226,23 @@ export function MenuBar() {
           )}
         </div>
       ))}
+      <span className="flex-1" />
+      <LayoutModeToggle />
     </div>
+  );
+}
+
+function LayoutModeToggle() {
+  const mode = useLayoutStore((s) => s.layout.mode);
+  const setMode = useLayoutStore((s) => s.setMode);
+
+  return (
+    <button
+      className="px-1.5 py-0.5 text-base rounded text-text-secondary hover:text-text-primary hover:bg-surface-lighter transition-colors"
+      title={mode === 'dual' ? 'Switch to single panel' : 'Switch to dual panel'}
+      onClick={() => setMode(mode === 'dual' ? 'single' : 'dual')}
+    >
+      {mode === 'dual' ? '◫' : '▣'}
+    </button>
   );
 }

@@ -107,6 +107,8 @@ export interface PluginModule {
   manifest: PluginManifest;
   activate(ctx: PluginContext): Promise<void> | void;
   deactivate?(): Promise<void> | void;
+  components?: Record<string, React.ComponentType<any>>;
+  commandHandlers?: Record<string, (...args: any[]) => any>;
 }
 
 /** 框架暴露给插件的 API */

@@ -1,17 +1,18 @@
 import { useEffect, useCallback, useState } from 'react';
 import { SplitPane, useLayoutStore } from './framework/layout';
+import { pluginManager } from './framework/plugin-system';
+import { setNotificationHandler } from './framework/plugin-system/plugin-context';
 import { ErrorBoundary } from './components/error-boundary';
 import { MenuBar } from './components/menu-bar';
 import { ActivityBar } from './components/activity-bar';
+import { PluginManagerDialog } from './components/plugin-manager-dialog';
 import { Launcher } from './plugins/quick-launcher';
-import { FileList, useFileStore, AddressBar, TabBar } from './plugins/file-explorer';
+import { useFileStore, TabBar, AddressBar } from './plugins/file-explorer';
+import type { Tab } from './plugins/file-explorer/store';
 import { FileSearch } from './plugins/file-explorer/components/file-search';
 import { TabSearch } from './plugins/file-explorer/components/tab-search';
-import { SearchPanel, useSearchStore } from './plugins/fulltext-search';
-import { BookmarkPanel } from './plugins/bookmarks';
+import { useSearchStore } from './plugins/fulltext-search';
 import { ipc } from './framework/bridge/ipc-client';
-
-type PanelType = 'file-explorer' | 'fulltext-search' | 'bookmarks';
 
 // ── App Shell ──
 
@@ -36,6 +37,11 @@ function MainApp() {
     setToast({ message, type });
     setTimeout(() => setToast(null), 2500);
   }, []);
+
+  // Wire plugin notification handler
+  useEffect(() => {
+    setNotificationHandler(notify);
+  }, [notify]);
 
   // 启动时恢复固定标签，打开第一个标签或默认目录
   useEffect(() => {
@@ -74,6 +80,7 @@ function MainApp() {
     }
     init();
   }, []);
+
   const activePanel = layout.id;
   const activePath =
     activePanel === 'left'
@@ -89,13 +96,9 @@ function MainApp() {
     [],
   );
 
-  const handlePanelTypeChange = useCallback(
-    (side: 'left' | 'right', type: PanelType) => {
-      useLayoutStore.getState().setPanelPlugin(
-        side,
-        type,
-        type === 'file-explorer' ? 'browser' : type === 'fulltext-search' ? 'search' : 'list',
-      );
+  const handlePluginChange = useCallback(
+    (side: 'left' | 'right', pluginId: string, panelId: string) => {
+      useLayoutStore.getState().setPanelPlugin(side, pluginId, panelId);
     },
     [],
   );
@@ -107,13 +110,13 @@ function MainApp() {
         e.preventDefault();
         const activeSide = useLayoutStore.getState().layout.id;
         if (activeSide === 'left' || activeSide === 'right') {
-          handlePanelTypeChange(activeSide, 'fulltext-search');
+          handlePluginChange(activeSide, 'fulltext-search', 'search');
         }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handlePanelTypeChange]);
+  }, [handlePluginChange]);
 
   return (
     <div className="h-full flex flex-col bg-surface">
@@ -121,22 +124,32 @@ function MainApp() {
       <div className="flex-1 flex overflow-hidden">
         <ActivityBar />
         <div className="flex-1 flex flex-col overflow-hidden">
+        {layout.mode === 'single' ? (
+          <PanelSlot
+            side="left"
+            pluginId={layout.left.pluginId}
+            onClick={() => handlePanelClick('left')}
+            onPluginChange={(pluginId, panelId) => handlePluginChange('left', pluginId, panelId)}
+            notify={notify}
+          />
+        ) : (
         <SplitPane defaultSplit={50} minSize={200}>
           <PanelSlot
             side="left"
             pluginId={layout.left.pluginId}
             onClick={() => handlePanelClick('left')}
-            onTypeChange={(t) => handlePanelTypeChange('left', t)}
+            onPluginChange={(pluginId, panelId) => handlePluginChange('left', pluginId, panelId)}
             notify={notify}
           />
           <PanelSlot
             side="right"
             pluginId={layout.right.pluginId}
             onClick={() => handlePanelClick('right')}
-            onTypeChange={(t) => handlePanelTypeChange('right', t)}
+            onPluginChange={(pluginId, panelId) => handlePluginChange('right', pluginId, panelId)}
             notify={notify}
           />
         </SplitPane>
+        )}
         </div>
       </div>
 
@@ -165,29 +178,25 @@ function MainApp() {
           </div>
         </div>
       )}
+
+      <PluginManagerDialog />
     </div>
   );
 }
 
 // ── 面板插槽 ──
 
-const PANEL_TYPES: { id: PanelType; label: string }[] = [
-  { id: 'file-explorer', label: 'Files' },
-  { id: 'fulltext-search', label: 'Search' },
-  { id: 'bookmarks', label: 'Bookmarks' },
-];
-
 function PanelSlot({
   side,
   pluginId,
   onClick,
-  onTypeChange,
+  onPluginChange,
   notify,
 }: {
   side: 'left' | 'right';
   pluginId: string;
   onClick: () => void;
-  onTypeChange: (type: PanelType) => void;
+  onPluginChange: (pluginId: string, panelId: string) => void;
   notify: (message: string, type?: 'info' | 'warn' | 'error') => void;
 }) {
   const layout = useLayoutStore((s) => s.layout);
@@ -222,7 +231,7 @@ function PanelSlot({
         fileStore.navigateTo(side, panel.path);
       }
     }
-  }, [panel.path, pluginId]);
+  }, [panel.path, pluginId, side]);
 
   // 当切换到全文搜索面板时，自动设置搜索目录
   useEffect(() => {
@@ -233,24 +242,21 @@ function PanelSlot({
   }, [pluginId, panel.path]);
 
   const renderPanel = () => {
-    if (pluginId === 'file-explorer') {
-      return <FileList side={side} />;
+    const panelId = panel.panelId;
+    const entry = pluginManager.getPanel(`${pluginId}:${panelId}`);
+    if (!entry?.renderer) {
+      return (
+        <div className="h-full flex items-center justify-center text-text-muted text-sm">
+          Unknown plugin: {pluginId}
+        </div>
+      );
     }
-    if (pluginId === 'fulltext-search') {
-      return <SearchPanel />;
-    }
-    if (pluginId === 'bookmarks') {
-      return <BookmarkPanel />;
-    }
-
-    return (
-      <div className="h-full flex items-center justify-center text-text-muted text-sm">
-        Unknown plugin: {pluginId}
-      </div>
-    );
+    const Renderer = entry.renderer;
+    return <Renderer side={side} />;
   };
 
-  const currentType = PANEL_TYPES.find((t) => t.id === pluginId);
+  const availablePanels = pluginManager.getAllPanels();
+  const currentEntry = pluginManager.getPanel(`${pluginId}:${panel.panelId}`);
 
   // 打开文件夹
   const handleOpenFolder = useCallback(async () => {
@@ -258,9 +264,7 @@ function PanelSlot({
       defaultPath: panel.path ?? undefined,
     });
     if (result) {
-      // 先用同步 action 创建标签，确保即时可见
       useFileStore.getState().addTab(side, result);
-      // 再异步导航加载目录
       useFileStore.getState().navigateTo(side, result, false);
       useLayoutStore.getState().setPanelPath(side, result);
     }
@@ -371,7 +375,7 @@ function PanelSlot({
           }}
           title="Click to change panel type"
         >
-          {currentType?.label ?? pluginId}
+          {currentEntry?.title ?? pluginId}
           <span className="ml-0.5 text-[10px] text-text-muted">▼</span>
         </button>
 
@@ -379,13 +383,12 @@ function PanelSlot({
         {pluginId === 'file-explorer' && panel.path && (
           <AddressBar side={side} />
         )}
-        {(!pluginId || pluginId !== 'file-explorer' || !panel.path) && (
+        {((!pluginId || pluginId !== 'file-explorer' || !panel.path)) && (
           <span className="flex-1" />
         )}
 
         {/* 工具栏 — 最右 */}
         <div className="flex items-center gap-0.5 flex-shrink-0 ml-auto">
-          {/* Open Folder button */}
           <button
             className="text-text-muted hover:text-accent hover:bg-accent/10 rounded px-1.5 py-0.5 cursor-pointer text-base leading-none transition-colors"
             title="Open folder (Ctrl+O)"
@@ -408,19 +411,19 @@ function PanelSlot({
             className="absolute left-8 top-7 z-50 bg-surface-light border border-border rounded shadow-lg py-1 min-w-[120px]"
             onClick={(e) => e.stopPropagation()}
           >
-            {PANEL_TYPES.map((t) => (
+            {availablePanels.map((p) => (
               <button
-                key={t.id}
+                key={p.id}
                 className={`w-full text-left px-3 py-1.5 text-xs hover:bg-accent/20 ${
-                  t.id === pluginId ? 'text-accent' : 'text-text-secondary'
+                  p.pluginId === pluginId ? 'text-accent' : 'text-text-secondary'
                 }`}
                 onClick={() => {
-                  onTypeChange(t.id);
+                  onPluginChange(p.pluginId, p.panelId);
                   setShowDropdown(false);
                 }}
               >
-                {t.label}
-                {t.id === pluginId && (
+                {p.title}
+                {p.pluginId === pluginId && (
                   <span className="ml-1">✓</span>
                 )}
               </button>

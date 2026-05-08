@@ -1,9 +1,20 @@
 import type { PluginContext } from '@explore/shared';
 import { ipc } from '../bridge/ipc-client';
+import { pluginManager } from './plugin-manager';
+import { useLayoutStore } from '../store/layout-store';
 
-/**
- * 创建插件上下文（暴露给插件的 API）
- */
+let notifyFn: ((message: string, type: 'info' | 'warn' | 'error') => void) | null = null;
+
+export function setNotificationHandler(fn: typeof notifyFn): void {
+  notifyFn = fn;
+}
+
+const eventListeners = new Map<string, Set<(...args: any[]) => void>>();
+
+export function emitEvent(event: string, ...args: any[]): void {
+  eventListeners.get(event)?.forEach((cb) => cb(...args));
+}
+
 export function createPluginContext(): PluginContext {
   return {
     fs: {
@@ -46,40 +57,42 @@ export function createPluginContext(): PluginContext {
     },
 
     commands: {
-      register(_id: string, _handler: (...args: any[]) => any): void {
-        // 由 PluginManager 代理
+      register(id, handler) {
+        pluginManager.registerCommandHandler(id, handler);
       },
       async execute<T = unknown>(id: string, ...args: any[]): Promise<T> {
-        // 通过 IPC 触发命令执行
-        console.warn(`Command "${id}" not registered in plugin context`);
-        return undefined as unknown as T;
+        return pluginManager.executeCommand<T>(id, ...args);
       },
       list() {
-        return []; // 由 PluginManager 代理
+        return pluginManager.getAllCommands();
       },
     },
 
     notifications: {
-      info(message: string): void {
-        console.info(`[Explore] ${message}`);
+      info(message) {
+        notifyFn?.(message, 'info');
       },
-      warn(message: string): void {
-        console.warn(`[Explore] ${message}`);
+      warn(message) {
+        notifyFn?.(message, 'warn');
       },
-      error(message: string): void {
-        console.error(`[Explore] ${message}`);
+      error(message) {
+        notifyFn?.(message, 'error');
       },
     },
 
     panels: {
-      openPanel(_pluginId: string, _panelId: string): void {
-        // 由布局引擎代理
+      openPanel(pluginId, panelId) {
+        const layout = useLayoutStore.getState().layout;
+        const targetSide = (layout.id === 'left' || layout.id === 'right') ? layout.id : 'left';
+        useLayoutStore.getState().setPanelPlugin(targetSide, pluginId, panelId);
       },
     },
 
     events: {
-      on(_event: string, _cb: (...args: any[]) => void) {
-        return () => {};
+      on(event, cb) {
+        if (!eventListeners.has(event)) eventListeners.set(event, new Set());
+        eventListeners.get(event)!.add(cb);
+        return () => eventListeners.get(event)?.delete(cb);
       },
     },
   };

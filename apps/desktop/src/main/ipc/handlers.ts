@@ -1,5 +1,5 @@
 import { ipcMain, BrowserWindow, dialog, app } from 'electron';
-import { readdir, stat } from 'fs/promises';
+import { readdir, readFile, stat, mkdir, cp } from 'fs/promises';
 import { join, basename, extname } from 'path';
 import type { IpcChannels, IpcEvents, FileEntry } from '@explore/shared';
 import type { ServiceContainer } from '../service-container';
@@ -69,6 +69,17 @@ export function registerIpcHandlers(container: ServiceContainer): void {
     'file:open',
     (_e, payload: IpcChannels['file:open']['req']) =>
       file.open(payload.path),
+  );
+
+  ipcMain.handle(
+    'file:read',
+    async (_e, payload: IpcChannels['file:read']['req']) => {
+      const maxSize = payload.maxSize ?? 1024 * 1024;
+      const st = await stat(payload.path);
+      if (st.size > maxSize) throw new Error(`File too large: ${(st.size / 1024).toFixed(1)} KB`);
+      const content = await readFile(payload.path, 'utf-8');
+      return { content, size: st.size };
+    },
   );
 
   ipcMain.handle(
@@ -216,6 +227,58 @@ export function registerIpcHandlers(container: ServiceContainer): void {
         return payload.defaultValue || '';
       }
       return null;
+    },
+  );
+
+  // ── Plugins ──
+
+  const pluginsDir = join(app.getPath('userData'), 'plugins');
+
+  // Ensure plugins directory exists
+  mkdir(pluginsDir, { recursive: true }).catch(() => {});
+
+  ipcMain.handle('plugin:scanExternal', async () => {
+    const result: { pluginId: string; pluginPath: string }[] = [];
+    try {
+      const dirs = await readdir(pluginsDir, { withFileTypes: true });
+      for (const d of dirs) {
+        if (!d.isDirectory()) continue;
+        const pluginPath = join(pluginsDir, d.name);
+        const manifestPath = join(pluginPath, 'manifest.json');
+        try {
+          await stat(manifestPath);
+          const manifestRaw = await readFile(manifestPath, 'utf-8');
+          const manifest = JSON.parse(manifestRaw);
+          result.push({ pluginId: manifest.id || d.name, pluginPath });
+        } catch { /* skip */ }
+      }
+    } catch { /* no plugins dir */ }
+    return result;
+  });
+
+  ipcMain.handle(
+    'plugin:readFile',
+    async (_e, payload: IpcChannels['plugin:readFile']['req']) => {
+      const pluginPath = join(pluginsDir, payload.pluginId);
+      const filePath = join(pluginPath, payload.file);
+      return readFile(filePath, 'utf-8');
+    },
+  );
+
+  ipcMain.handle(
+    'plugin:install',
+    async (_e, payload: IpcChannels['plugin:install']['req']) => {
+      try {
+        const sourcePath = payload.sourcePath;
+        const manifestRaw = await readFile(join(sourcePath, 'manifest.json'), 'utf-8');
+        const manifest = JSON.parse(manifestRaw);
+        const pluginId = manifest.id || basename(sourcePath);
+        const destPath = join(pluginsDir, pluginId);
+        await cp(sourcePath, destPath, { recursive: true });
+        return { success: true, pluginId };
+      } catch (err: any) {
+        return { success: false, error: err.message };
+      }
     },
   );
 

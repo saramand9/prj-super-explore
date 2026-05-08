@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 export interface PanelState {
   id: string | null; // 当前活跃面板 'left' | 'right'
+  mode: 'single' | 'dual';
   left: {
     path: string | null;
     pluginId: string;
@@ -19,9 +20,11 @@ export const useLayoutStore = create<{
   setActivePanel: (id: 'left' | 'right') => void;
   setPanelPath: (side: 'left' | 'right', path: string) => void;
   setPanelPlugin: (side: 'left' | 'right', pluginId: string, panelId: string) => void;
+  setMode: (mode: 'single' | 'dual') => void;
 }>((set) => ({
   layout: {
     id: 'left',
+    mode: 'dual',
     left: {
       path: null,
       pluginId: 'file-explorer',
@@ -44,6 +47,11 @@ export const useLayoutStore = create<{
   setPanelPlugin: (side, pluginId, panelId) =>
     set((s) => ({
       layout: { ...s.layout, [side]: { ...s.layout[side], pluginId, panelId } },
+    })),
+
+  setMode: (mode) =>
+    set((s) => ({
+      layout: { ...s.layout, mode, id: mode === 'single' ? 'left' : s.layout.id },
     })),
 }));
 
