@@ -72,20 +72,27 @@ export function FileList({ side }: FileListProps) {
     const paths = contextMenu.single
       ? [contextMenu.single.path]
       : [...(useFileStore.getState()[side].selected)];
-    if (paths.length === 0) return;
-    if (!confirm(`Delete ${paths.length} item(s)?`)) return;
-    await ipc.invoke('file:delete', { paths });
-    clearSelection(side);
-    refresh(side);
+    if (paths.length === 0) { closeMenu(); return; }
+    if (!confirm(`Delete ${paths.length} item(s)?`)) { closeMenu(); return; }
+    try {
+      await ipc.invoke('file:delete', { paths });
+      clearSelection(side);
+      refresh(side);
+    } catch (err: any) {
+      alert(`Delete failed: ${err.message}`);
+    }
     closeMenu();
   }, [contextMenu, side, clearSelection, refresh, closeMenu]);
 
   const ctxRename = useCallback(async () => {
     if (!contextMenu?.single) return;
     const newName = prompt('New name:', contextMenu.single.name);
-    if (newName && newName !== contextMenu.single.name) {
+    if (!newName || newName === contextMenu.single.name) { closeMenu(); return; }
+    try {
       await ipc.invoke('file:rename', { path: contextMenu.single.path, newName });
       refresh(side);
+    } catch (err: any) {
+      alert(`Rename failed: ${err.message}`);
     }
     closeMenu();
   }, [contextMenu, side, refresh, closeMenu]);
@@ -98,9 +105,13 @@ export function FileList({ side }: FileListProps) {
     const other = side === 'left' ? 'right' : 'left';
     const dest = useLayoutStore.getState().layout[other].path;
     if (!dest || paths.length === 0) { closeMenu(); return; }
-    await ipc.invoke('file:copy', { sources: paths, destDir: dest });
-    refresh(side);
-    useFileStore.getState().refresh(other);
+    try {
+      await ipc.invoke('file:copy', { sources: paths, destDir: dest });
+      refresh(side);
+      useFileStore.getState().refresh(other);
+    } catch (err: any) {
+      alert(`Copy failed: ${err.message}`);
+    }
     closeMenu();
   }, [contextMenu, side, refresh, closeMenu]);
 
@@ -112,9 +123,13 @@ export function FileList({ side }: FileListProps) {
     const other = side === 'left' ? 'right' : 'left';
     const dest = useLayoutStore.getState().layout[other].path;
     if (!dest || paths.length === 0) { closeMenu(); return; }
-    await ipc.invoke('file:move', { sources: paths, destDir: dest });
-    refresh(side);
-    useFileStore.getState().refresh(other);
+    try {
+      await ipc.invoke('file:move', { sources: paths, destDir: dest });
+      refresh(side);
+      useFileStore.getState().refresh(other);
+    } catch (err: any) {
+      alert(`Move failed: ${err.message}`);
+    }
     closeMenu();
   }, [contextMenu, side, refresh, closeMenu]);
 
@@ -156,8 +171,12 @@ export function FileList({ side }: FileListProps) {
     const allPaths = useFileStore.getState()[side].entries.map((e) => e.path);
     if (allPaths.length === 0) { closeMenu(); return; }
     if (!confirm(`Move all ${allPaths.length} item(s) to recycle bin?`)) { closeMenu(); return; }
-    await ipc.invoke('file:delete', { paths: allPaths });
-    refresh(side);
+    try {
+      await ipc.invoke('file:delete', { paths: allPaths });
+      refresh(side);
+    } catch (err: any) {
+      alert(`Empty folder failed: ${err.message}`);
+    }
     closeMenu();
   }, [side, refresh, closeMenu]);
 
