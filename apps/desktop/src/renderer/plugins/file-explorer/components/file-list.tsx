@@ -149,6 +149,15 @@ export function FileList({ side }: FileListProps) {
     closeMenu();
   }, [side, refresh, closeMenu]);
 
+  const ctxEmptyFolder = useCallback(async () => {
+    const allPaths = useFileStore.getState()[side].entries.map((e) => e.path);
+    if (allPaths.length === 0) { closeMenu(); return; }
+    if (!confirm(`Move all ${allPaths.length} item(s) to recycle bin?`)) { closeMenu(); return; }
+    await ipc.invoke('file:delete', { paths: allPaths });
+    refresh(side);
+    closeMenu();
+  }, [side, refresh, closeMenu]);
+
   // 筛选文本/条目变化时，重置焦点
   useEffect(() => {
     setFocusIdx(0);
@@ -582,6 +591,8 @@ export function FileList({ side }: FileListProps) {
               <MenuBtn onClick={ctxNewFolder}>📁 New folder</MenuBtn>
               <MenuSep />
               <MenuBtn onClick={ctxRefresh}>🔄 Refresh</MenuBtn>
+              <MenuSep />
+              <MenuBtn onClick={ctxEmptyFolder}>🗑 Empty folder</MenuBtn>
             </>
           )}
           {/* 单个文件或文件夹 */}
