@@ -372,15 +372,13 @@ export function FileList({ side }: FileListProps) {
           break;
 
         case 'Tab':
-          if (e.ctrlKey || e.metaKey) {
+          if (e.shiftKey) {
             e.preventDefault();
             {
               const tabs = useFileStore.getState()[side].tabs;
               if (tabs.length > 1) {
                 const curIdx = tabs.findIndex((t) => t.id === useFileStore.getState()[side].activeTabId);
-                const next = e.shiftKey
-                  ? (curIdx - 1 + tabs.length) % tabs.length
-                  : (curIdx + 1) % tabs.length;
+                const next = (curIdx + 1) % tabs.length;
                 const target = tabs[next];
                 useFileStore.getState().activateTab(side, target.id);
                 navigateTo(side, target.path);
