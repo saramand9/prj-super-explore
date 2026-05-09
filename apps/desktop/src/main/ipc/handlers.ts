@@ -86,7 +86,7 @@ export function registerIpcHandlers(container: ServiceContainer): void {
     'file:openInExplorer',
     (_e, payload: IpcChannels['file:openInExplorer']['req']) => {
       const { shell } = require('electron');
-      shell.showItemInFolder(payload.path);
+      shell.openPath(payload.path);
     },
   );
 
