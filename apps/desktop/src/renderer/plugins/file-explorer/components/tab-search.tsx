@@ -96,7 +96,7 @@ export function TabSearch({ open, onClose, side }: TabSearchProps) {
       onClick={onClose}
     >
       <div
-        className="bg-[#1c1c25] border border-border rounded-lg shadow-2xl w-[400px] max-h-[400px] flex flex-col overflow-hidden"
+        className="bg-surface-light border border-border rounded-lg shadow-2xl w-[400px] max-h-[400px] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-2 border-b border-border/40">
@@ -132,10 +132,10 @@ export function TabSearch({ open, onClose, side }: TabSearchProps) {
                 >
                   <span
                     className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                      isActive ? 'bg-[#22c55e]' : 'bg-transparent'
+                      isActive ? 'bg-green' : 'bg-transparent'
                     }`}
                   />
-                  <span className={`truncate ${isActive ? 'text-[#22c55e] font-semibold' : ''}`}>
+                  <span className={`truncate ${isActive ? 'text-green font-semibold' : ''}`}>
                     {tab.label}
                   </span>
                   {tab.groupName && (

@@ -161,7 +161,7 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
       onClick={onClose}
     >
       <div
-        className="bg-[#1c1c25] border border-border rounded-lg shadow-2xl w-[400px] max-h-[400px] flex flex-col overflow-hidden"
+        className="bg-surface-light border border-border rounded-lg shadow-2xl w-[400px] max-h-[400px] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 输入框 */}

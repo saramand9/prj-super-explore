@@ -58,7 +58,7 @@ export function PluginManagerDialog() {
       onClick={() => setShow(false)}
     >
       <div
-        className="bg-[#1c1c25] border border-border rounded-lg shadow-2xl w-[420px] max-h-[500px] flex flex-col overflow-hidden"
+        className="bg-surface-light border border-border rounded-lg shadow-2xl w-[420px] max-h-[500px] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

@@ -246,7 +246,7 @@ function FontScaleDropdown() {
       title="Font Size"
     >
       {scales.map((s) => (
-        <option key={s} value={s} className="bg-[#1c1c25] text-text-primary">
+        <option key={s} value={s} className="bg-surface-light text-text-primary">
           {s}%
         </option>
       ))}

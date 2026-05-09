@@ -41,7 +41,7 @@ export function TextViewer({ side }: { side: 'left' | 'right' }) {
   }
 
   return (
-    <div className="h-full flex flex-col bg-[#1e1e2e]">
+    <div className="h-full flex flex-col bg-surface">
       <div className="flex-shrink-0 px-3 py-1 border-b border-border text-xs text-text-muted truncate">
         {filePath}
       </div>

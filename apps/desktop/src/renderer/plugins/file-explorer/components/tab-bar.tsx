@@ -1,4 +1,5 @@
 import { useCallback, useState, useRef, useEffect, useMemo } from 'react';
+import { Pin, PinOff, X, Pencil, Copy, ChevronRight, ChevronDown } from 'lucide-react';
 import { useFileStore, type Tab, type TabGroup, computeGroups } from '../store';
 import { useLayoutStore } from '../../../framework/store/layout-store';
 import { SpaceDropdown } from './space-dropdown';
@@ -110,7 +111,6 @@ export function TabBar({ side }: TabBarProps) {
     setEditingTabId(null);
   }, [editingTabId, editValue, side, renameTab, persistPinnedTabs]);
 
-  // ── 分组布局（hook，必须在提前 return 之前）──
   const layout = useMemo(() => {
     const groups = computeGroups(tabs);
     const groupedTabIds = new Set(groups.flatMap((g) => g.tabIds));
@@ -143,32 +143,11 @@ export function TabBar({ side }: TabBarProps) {
 
   if (tabs.length === 0 && side === 'left') {
     return (
-      <div className="flex items-center text-sm border-b border-border/40 px-1 flex-shrink-0 bg-[#2a2a35]">
+      <div className="flex items-center px-1 flex-shrink-0 h-8">
         <SpaceDropdown />
         <span className="flex-1" />
       </div>
     );
-  }
-
-  function tabClass(isActive: boolean, isPinned: boolean) {
-    const base = 'flex items-center gap-1 px-2 py-0.5 rounded-t cursor-pointer select-none whitespace-nowrap border-l-2 text-sm ';
-    if (isActive) {
-      const color = isPinned
-        ? 'text-[#22c55e] border-l-[#22c55e]'
-        : 'text-[#22c55e] border-l-[#22c55e]';
-      return base + `bg-[#2a2a35] font-semibold scale-110 origin-bottom border-t border-x border-border/40 -mb-px transition-transform ${color}`;
-    }
-    if (isPinned) {
-      return base + 'text-accent bg-accent/10 hover:bg-accent/20 border-l-accent/60 transition-colors';
-    }
-    return base + 'text-text-muted hover:text-text-primary hover:bg-emerald-500/10 border-l-transparent transition-colors';
-  }
-
-  function tabName(isActive: boolean, isPinned: boolean): string {
-    if (isActive && isPinned) return '📍 Active · Pinned';
-    if (isActive) return 'Active tab';
-    if (isPinned) return 'Pinned tab';
-    return '';
   }
 
   const renderTab = (tab: Tab) => {
@@ -177,7 +156,11 @@ export function TabBar({ side }: TabBarProps) {
     return (
       <div
         key={tab.id}
-        className={tabClass(isActive, isPinned)}
+        className={`group flex items-center gap-1.5 px-3 py-1 cursor-pointer select-none whitespace-nowrap text-xs transition-colors duration-150 border-t border-x rounded-t -mb-px ${
+          isActive
+            ? 'text-text-primary bg-surface-light border-border font-medium'
+            : 'text-text-muted hover:text-text-secondary hover:bg-surface-lighter border-transparent'
+        }`}
         onClick={() => handleClick(tab)}
         onContextMenu={(e) => handleContextMenu(e, tab)}
         onMouseEnter={(e) => {
@@ -187,11 +170,13 @@ export function TabBar({ side }: TabBarProps) {
         }}
         onMouseLeave={() => setHoveredTabId(null)}
       >
-        {isPinned && <span className="text-[10px] flex-shrink-0">📍</span>}
+        {isPinned && (
+          <Pin className="w-3 h-3 flex-shrink-0 text-accent/60" />
+        )}
         {editingTabId === tab.id ? (
           <input
             ref={editInputRef}
-            className="bg-surface-lighter border border-accent rounded px-1 py-0 text-sm text-text-primary outline-none w-[100px]"
+            className="bg-surface-lighter border border-accent/50 rounded px-1.5 py-0 text-xs text-text-primary outline-none w-[100px]"
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
             onBlur={confirmRename}
@@ -202,29 +187,29 @@ export function TabBar({ side }: TabBarProps) {
             onClick={(e) => e.stopPropagation()}
           />
         ) : (
-          <span className="truncate max-w-[120px]">{tab.label}</span>
+          <span className="truncate max-w-[140px]">{tab.label}</span>
         )}
         {!tab.pinned && (
           <span
-          className="text-text-muted/0 group-hover:text-text-muted hover:text-accent cursor-pointer text-[10px] flex-shrink-0"
-          onClick={(e) => {
-            e.stopPropagation();
-            const wasActive = tab.id === activeTabId;
-            closeTab(side, tab.id);
-            persistPinnedTabs(side);
-            if (wasActive) {
-              const remaining = useFileStore.getState()[side].tabs;
-              const next = remaining[remaining.length - 1];
-              if (next) {
-                navigateTo(side, next.path);
-                useLayoutStore.getState().setPanelPath(side, next.path);
+            className="opacity-0 group-hover:opacity-60 hover:opacity-100 hover:text-text-primary cursor-pointer flex-shrink-0 rounded-sm hover:bg-white/5 transition-all p-0.5"
+            onClick={(e) => {
+              e.stopPropagation();
+              const wasActive = tab.id === activeTabId;
+              closeTab(side, tab.id);
+              persistPinnedTabs(side);
+              if (wasActive) {
+                const remaining = useFileStore.getState()[side].tabs;
+                const next = remaining[remaining.length - 1];
+                if (next) {
+                  navigateTo(side, next.path);
+                  useLayoutStore.getState().setPanelPath(side, next.path);
+                }
               }
-            }
-          }}
-          title="Close"
-        >
-          ✕
-        </span>
+            }}
+            title="Close"
+          >
+            <X className="w-3 h-3" />
+          </span>
         )}
       </div>
     );
@@ -244,35 +229,35 @@ export function TabBar({ side }: TabBarProps) {
     return (
       <div
         key={`group-${group.path}`}
-        className={`flex items-center gap-0.5 px-2 py-0.5 rounded-t cursor-pointer select-none whitespace-nowrap text-sm transition-colors border-l-2
-          ${hasActiveChild && isCollapsed
-            ? 'text-[#22c55e] font-semibold border-l-[#22c55e]'
-            : 'text-text-muted hover:text-text-primary border-l-transparent hover:bg-surface-lighter'}`}
+        className={`flex items-center gap-1 px-3 py-1 cursor-pointer select-none whitespace-nowrap text-xs transition-colors duration-150 ${
+          hasActiveChild && isCollapsed
+            ? 'text-accent font-medium'
+            : 'text-text-muted hover:text-text-secondary'
+        }`}
         onClick={() => toggleGroupCollapse(group.path)}
         title={`${group.path} (${group.tabIds.length} tabs)`}
       >
-        <span className="text-[10px] flex-shrink-0">{isCollapsed ? '▸' : '▼'}</span>
+        {isCollapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         <span className="truncate max-w-[100px]">{group.name}</span>
-        <span className="text-text-muted text-[10px]">({group.tabIds.length})</span>
+        <span className="text-text-muted/50">· {group.tabIds.length}</span>
       </div>
     );
   };
 
   return (
-    <div ref={containerRef} className="flex items-center text-sm overflow-x-auto scrollbar-none border-b border-border/40 px-1 flex-shrink-0 bg-[#2a2a35]">
+    <div ref={containerRef} className="flex items-center overflow-x-auto scrollbar-none px-1 flex-shrink-0 gap-0.5 h-8">
       {side === 'left' && <SpaceDropdown />}
       {layout.map((item) => {
         if (item.kind === 'group') return renderGroupHeader(item.group);
         return renderTab(item.tab);
       })}
 
-      {/* 气泡路径提示 — fixed 定位，不受 overflow 影响 */}
       {hoveredTabId && tooltipPos && (
         <div
           className="fixed z-50 pointer-events-none"
           style={{ left: tooltipPos.x, top: tooltipPos.y }}
         >
-          <div className="bg-surface-lighter border border-border rounded shadow-lg px-2 py-0.5 text-xs text-text-primary whitespace-nowrap">
+          <div className="bg-surface-light border border-border/50 rounded-md shadow-lg px-3 py-1.5 text-xs text-text-primary whitespace-nowrap">
             {tabs.find((t) => t.id === hoveredTabId)?.path}
           </div>
         </div>
@@ -281,46 +266,46 @@ export function TabBar({ side }: TabBarProps) {
       {contextMenu && (
         <div
           ref={menuRef}
-          className="fixed z-50 bg-surface-light border border-border rounded shadow-lg py-1 min-w-[140px] text-xs"
+          className="fixed z-50 bg-surface-light border border-border/50 rounded-lg shadow-xl py-1 min-w-[160px] text-xs"
           style={{ left: contextMenu.x, top: contextMenu.y }}
         >
-          <div className="px-3 py-1 text-text-muted truncate max-w-[250px] border-b border-border/50 mb-0.5">
+          <div className="px-3 py-1.5 text-text-muted truncate max-w-[250px] border-b border-border/30 mb-0.5">
             {contextMenu.tab.path}
           </div>
           {contextMenu.tab.pinned ? (
             <button
-              className="w-full text-left px-3 py-1.5 hover:bg-accent/20 text-text-secondary hover:text-text-primary"
+              className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
               onClick={handleUnpin}
             >
-              📍 Unpin tab
+              <PinOff className="w-3.5 h-3.5" /> Unpin tab
             </button>
           ) : (
             <button
-              className="w-full text-left px-3 py-1.5 hover:bg-accent/20 text-text-secondary hover:text-text-primary"
+              className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
               onClick={handlePin}
             >
-              📌 Pin tab
+              <Pin className="w-3.5 h-3.5" /> Pin tab
             </button>
           )}
           <button
-            className="w-full text-left px-3 py-1.5 hover:bg-accent/20 text-text-secondary hover:text-text-primary"
+            className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
             onClick={handleRename}
           >
-            ✏️ Rename tab
+            <Pencil className="w-3.5 h-3.5" /> Rename tab
           </button>
           <button
-            className="w-full text-left px-3 py-1.5 hover:bg-accent/20 text-text-secondary hover:text-text-primary"
+            className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
             onClick={handleFork}
           >
-            📋 Clone tab
+            <Copy className="w-3.5 h-3.5" /> Clone tab
           </button>
           {!contextMenu.tab.pinned && (
-          <button
-            className="w-full text-left px-3 py-1.5 hover:bg-accent/20 text-text-secondary hover:text-text-primary"
-            onClick={handleClose}
-          >
-            ✕ Close tab
-          </button>
+            <button
+              className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
+              onClick={handleClose}
+            >
+              <X className="w-3.5 h-3.5" /> Close tab
+            </button>
           )}
         </div>
       )}

@@ -1,4 +1,5 @@
 import { useEffect, useCallback, useState } from 'react';
+import { FolderOpen, Dot } from 'lucide-react';
 import { SplitPane, useLayoutStore } from './framework/layout';
 import { pluginManager } from './framework/plugin-system';
 import { setNotificationHandler } from './framework/plugin-system/plugin-context';
@@ -210,7 +211,6 @@ function PanelSlot({
   const layout = useLayoutStore((s) => s.layout);
   const panel = layout[side];
   const isActive = layout.id === side;
-  const [showDropdown, setShowDropdown] = useState(false);
   const [showTabSearch, setShowTabSearch] = useState(false);
   const [showFileSearch, setShowFileSearch] = useState(false);
 
@@ -250,8 +250,7 @@ function PanelSlot({
   }, [pluginId, panel.path]);
 
   const renderPanel = () => {
-    const panelId = panel.panelId;
-    const entry = pluginManager.getPanel(`${pluginId}:${panelId}`);
+    const entry = pluginManager.getPanel(`${pluginId}:${panel.panelId}`);
     if (!entry?.renderer) {
       return (
         <div className="h-full flex items-center justify-center text-text-muted text-sm">
@@ -262,9 +261,6 @@ function PanelSlot({
     const Renderer = entry.renderer;
     return <Renderer side={side} />;
   };
-
-  const availablePanels = pluginManager.getAllPanels();
-  const currentEntry = pluginManager.getPanel(`${pluginId}:${panel.panelId}`);
 
   // 打开文件夹
   const handleOpenFolder = useCallback(async () => {
@@ -358,35 +354,17 @@ function PanelSlot({
       className="h-full flex flex-col"
       onClick={onClick}
     >
-      {/* Tab Bar */}
+      {/* Tab Bar + Panel Header — 统一背景 */}
       <ErrorBoundary name={`TabBar-${side}`}>
         {pluginId === 'file-explorer' && <TabBar side={side} />}
       </ErrorBoundary>
 
-      {/* Panel Header */}
+      {/* Panel Header — 地址栏区 */}
       <div
-        className={`flex-shrink-0 h-9 flex items-center px-2 text-sm border-b border-border relative gap-1.5 ${
-          isActive ? 'bg-accent/30' : 'bg-surface-light'
+        className={`flex-shrink-0 h-8 flex items-center px-2 text-sm border-b border-border/30 relative gap-1.5 ${
+          isActive ? 'bg-surface-lighter' : 'bg-surface'
         }`}
       >
-        {/* Side indicator */}
-        <span className="text-text-secondary text-xs flex-shrink-0">
-          {side === 'left' ? '◀' : '▶'}
-        </span>
-
-        {/* Panel type dropdown */}
-        <button
-          className="text-text-primary font-medium hover:text-accent cursor-pointer flex-shrink-0 text-sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowDropdown(!showDropdown);
-          }}
-          title="Click to change panel type"
-        >
-          {currentEntry?.title ?? pluginId}
-          <span className="ml-0.5 text-[10px] text-text-muted">▼</span>
-        </button>
-
         {/* 地址栏 / 路径面包屑 */}
         {pluginId === 'file-explorer' && panel.path && (
           <AddressBar side={side} />
@@ -396,56 +374,24 @@ function PanelSlot({
         )}
 
         {/* 工具栏 — 最右 */}
-        <div className="flex items-center gap-0.5 flex-shrink-0 ml-auto">
+        <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
           <button
-            className="text-text-muted hover:text-accent hover:bg-accent/10 rounded px-1.5 py-0.5 cursor-pointer text-base leading-none transition-colors"
+            className="text-text-muted hover:text-text-primary hover:bg-white/5 rounded p-0.5 cursor-pointer transition-colors"
             title="Open folder (Ctrl+O)"
             onClick={(e) => {
               e.stopPropagation();
               handleOpenFolder();
             }}
           >
-            📂
+            <FolderOpen className="w-4 h-4" />
           </button>
 
           {isActive && (
-            <span className="text-xs text-accent font-medium">◉ 活跃</span>
+            <span className="text-[10px] text-accent/70 font-medium flex items-center gap-0.5">
+              <Dot className="w-3 h-3" /> Active
+            </span>
           )}
         </div>
-
-        {/* Dropdown menu */}
-        {showDropdown && (
-          <div
-            className="absolute left-8 top-7 z-50 bg-surface-light border border-border rounded shadow-lg py-1 min-w-[120px]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {availablePanels.map((p) => (
-              <button
-                key={p.id}
-                className={`w-full text-left px-3 py-1.5 text-xs hover:bg-accent/20 ${
-                  p.pluginId === pluginId ? 'text-accent' : 'text-text-secondary'
-                }`}
-                onClick={() => {
-                  onPluginChange(p.pluginId, p.panelId);
-                  setShowDropdown(false);
-                }}
-              >
-                {p.title}
-                {p.pluginId === pluginId && (
-                  <span className="ml-1">✓</span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Click-away to close dropdown */}
-        {showDropdown && (
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setShowDropdown(false)}
-          />
-        )}
       </div>
 
       {/* Panel Content */}

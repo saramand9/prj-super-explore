@@ -1,4 +1,5 @@
 import { useCallback, useState, useRef, useEffect } from 'react';
+import { ExternalLink } from 'lucide-react';
 import { useFileStore } from '../store';
 import { useLayoutStore } from '../../../framework/store/layout-store';
 import { ipc } from '../../../framework/bridge/ipc-client';
@@ -13,25 +14,16 @@ function naturalName(fullPath: string): string {
 
 export function AddressBar({ side }: AddressBarProps) {
   const path = useFileStore((s) => s[side].path);
-  const backStack = useFileStore((s) => s[side].backStack);
-  const forwardStack = useFileStore((s) => s[side].forwardStack);
   const initialPath = useFileStore((s) => {
     const panel = s[side];
     const activeTab = panel.tabs.find((t) => t.id === panel.activeTabId);
     return activeTab?.initialPath ?? null;
   });
   const navigateTo = useFileStore((s) => s.navigateTo);
-  const goBackFn = useFileStore((s) => s.goBack);
-  const goForwardFn = useFileStore((s) => s.goForward);
-
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
-  const [showBackHistory, setShowBackHistory] = useState(false);
-  const [showForwardHistory, setShowForwardHistory] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const backBtnRef = useRef<HTMLButtonElement>(null);
-  const fwdBtnRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const syncLayout = useCallback(
@@ -40,20 +32,6 @@ export function AddressBar({ side }: AddressBarProps) {
     },
     [side],
   );
-
-  const handleBack = useCallback(async () => {
-    setShowBackHistory(false);
-    await goBackFn(side);
-    const newPath = useFileStore.getState()[side].path;
-    if (newPath) syncLayout(newPath);
-  }, [side, goBackFn, syncLayout]);
-
-  const handleForward = useCallback(async () => {
-    setShowForwardHistory(false);
-    await goForwardFn(side);
-    const newPath = useFileStore.getState()[side].path;
-    if (newPath) syncLayout(newPath);
-  }, [side, goForwardFn, syncLayout]);
 
   const handleNavigate = useCallback(
     (targetPath: string) => {
@@ -102,20 +80,6 @@ export function AddressBar({ side }: AddressBarProps) {
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [expanded]);
-
-  // 关闭下拉
-  useEffect(() => {
-    if (!showBackHistory && !showForwardHistory) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.closest('.history-dropdown')) return;
-      if (backBtnRef.current?.contains(target) || fwdBtnRef.current?.contains(target)) return;
-      setShowBackHistory(false);
-      setShowForwardHistory(false);
-    };
-    window.addEventListener('mousedown', handler);
-    return () => window.removeEventListener('mousedown', handler);
-  }, [showBackHistory, showForwardHistory]);
 
   if (!path) return null;
 
@@ -180,81 +144,10 @@ export function AddressBar({ side }: AddressBarProps) {
     },
     [],
   );
-  const backItems = [...backStack].reverse();
-  const fwdItems = [...forwardStack].reverse();
-
   const initialName = initialPath ? (initialPath.split(/[/\\]/).pop() || initialPath) : null;
 
   return (
     <div className="flex items-center gap-0.5 flex-1 min-w-0 text-sm">
-      {/* 后退 */}
-      <div className="relative flex-shrink-0">
-        <button
-          ref={backBtnRef}
-          className={`px-0.5 ${backStack.length > 0 ? 'text-text-secondary hover:text-accent' : 'text-text-muted/30 cursor-default'}`}
-          onClick={() => {
-            if (backStack.length > 0) {
-              setShowBackHistory(!showBackHistory);
-              setShowForwardHistory(false);
-            }
-          }}
-          title="Back"
-        >
-          ◀
-        </button>
-        {showBackHistory && backItems.length > 0 && (
-          <div className="history-dropdown absolute left-0 top-6 z-50 bg-surface-light border border-border rounded shadow-lg py-1 min-w-[280px] max-h-[300px] overflow-y-auto">
-            {backItems.map((p) => (
-              <button
-                key={p}
-                className="w-full text-left px-3 py-1.5 text-xs text-text-secondary hover:bg-accent/20 hover:text-text-primary truncate"
-                onClick={() => {
-                  handleNavigate(p);
-                  setShowBackHistory(false);
-                }}
-                title={p}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* 前进 */}
-      <div className="relative flex-shrink-0">
-        <button
-          ref={fwdBtnRef}
-          className={`px-0.5 ${forwardStack.length > 0 ? 'text-text-secondary hover:text-accent' : 'text-text-muted/30 cursor-default'}`}
-          onClick={() => {
-            if (forwardStack.length > 0) {
-              setShowForwardHistory(!showForwardHistory);
-              setShowBackHistory(false);
-            }
-          }}
-          title="Forward"
-        >
-          ▶
-        </button>
-        {showForwardHistory && fwdItems.length > 0 && (
-          <div className="history-dropdown absolute left-0 top-6 z-50 bg-surface-light border border-border rounded shadow-lg py-1 min-w-[280px] max-h-[300px] overflow-y-auto">
-            {fwdItems.map((p) => (
-              <button
-                key={p}
-                className="w-full text-left px-3 py-1.5 text-xs text-text-secondary hover:bg-accent/20 hover:text-text-primary truncate"
-                onClick={() => {
-                  handleNavigate(p);
-                  setShowForwardHistory(false);
-                }}
-                title={p}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
       {/* 起始路径 */}
       {initialPath && (
         <button
@@ -340,13 +233,13 @@ export function AddressBar({ side }: AddressBarProps) {
 
       {/* Open in Explorer */}
       <button
-        className="flex-shrink-0 px-1.5 py-0.5 text-text-muted hover:text-accent hover:bg-accent/10 rounded text-xs transition-colors"
+        className="flex-shrink-0 p-0.5 text-text-muted hover:text-text-primary hover:bg-white/5 rounded transition-colors"
         onClick={() => {
           if (path) ipc.invoke('file:openInExplorer', { path });
         }}
         title="Open in Explorer"
       >
-        ↗️
+        <ExternalLink className="w-4 h-4" />
       </button>
     </div>
   );

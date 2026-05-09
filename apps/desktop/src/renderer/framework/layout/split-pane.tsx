@@ -68,7 +68,7 @@ export function SplitPane({
           isHorizontal
             ? 'w-[3px] cursor-col-resize hover:w-[5px]'
             : 'h-[3px] cursor-row-resize hover:h-[5px]'
-        } bg-[#4a4a6a] hover:bg-accent transition-all`}
+        } bg-border-strong hover:bg-accent/50 transition-all`}
       />
 
       <div

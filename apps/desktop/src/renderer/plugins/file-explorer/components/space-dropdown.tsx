@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { Wrench, Pencil, X, ChevronDown } from 'lucide-react';
 import { useSpaceStore } from '../space-store';
 
 export function SpaceDropdown() {
@@ -22,7 +23,6 @@ export function SpaceDropdown() {
 
   const activeSpace = spaces.find((s) => s.id === activeSpaceId);
 
-  // Click outside closes
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
@@ -38,7 +38,6 @@ export function SpaceDropdown() {
     return () => window.removeEventListener('mousedown', handler);
   }, [open]);
 
-  // Focus edit input
   useEffect(() => {
     if (editingId || showNewInput) setTimeout(() => editRef.current?.focus(), 0);
   }, [editingId, showNewInput]);
@@ -79,37 +78,35 @@ export function SpaceDropdown() {
 
   return (
     <>
-      {/* Trigger button */}
       <button
         ref={btnRef}
-        className="flex items-center gap-1 px-1.5 py-0.5 text-xs rounded text-accent hover:bg-accent/10 transition-colors flex-shrink-0 mr-1"
+        className="flex items-center gap-1 px-1.5 py-0.5 text-xs rounded text-text-secondary hover:text-text-primary hover:bg-white/5 transition-colors flex-shrink-0 mr-1"
         onClick={toggleOpen}
         title="Switch workspace"
       >
-        <span className="text-[10px]">🔧</span>
+        <Wrench className="w-3 h-3 text-text-muted" />
         <span className="truncate max-w-[80px]">{activeSpace?.name ?? 'Default'}</span>
-        <span className="text-[8px] text-text-muted ml-0.5">▼</span>
+        <ChevronDown className="w-2.5 h-2.5 text-text-muted ml-0.5" />
       </button>
 
-      {/* Portal dropdown */}
       {open &&
         createPortal(
           <div
             ref={menuRef}
-            className="fixed z-[200] bg-surface-light border border-border rounded shadow-lg py-1 min-w-[180px] text-xs"
+            className="fixed z-[200] bg-surface-light border border-border/50 rounded-lg shadow-xl py-1 min-w-[180px] text-xs"
             style={{ left: menuPos.x, top: menuPos.y }}
           >
             {spaces.map((s) => (
               <div
                 key={s.id}
-                className={`flex items-center gap-1 px-2 py-1 hover:bg-accent/10 ${
+                className={`flex items-center gap-1 px-2 py-1.5 hover:bg-accent/10 transition-colors ${
                   s.id === activeSpaceId ? 'text-accent' : 'text-text-secondary'
                 }`}
               >
                 {editingId === s.id ? (
                   <input
                     ref={editRef}
-                    className="flex-1 bg-surface-lighter border border-accent rounded px-1 py-0 text-xs outline-none min-w-0"
+                    className="flex-1 bg-surface-lighter border border-accent/50 rounded px-1.5 py-0.5 text-xs outline-none min-w-0"
                     value={editValue}
                     onChange={(e) => setEditValue(e.target.value)}
                     onBlur={() => handleRename(s.id)}
@@ -131,7 +128,7 @@ export function SpaceDropdown() {
                 {spaces.length > 1 && (
                   <>
                     <button
-                      className="text-text-muted hover:text-text-primary flex-shrink-0"
+                      className="text-text-muted hover:text-text-primary flex-shrink-0 p-0.5 rounded hover:bg-white/5 transition-colors"
                       title="Rename"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -139,17 +136,17 @@ export function SpaceDropdown() {
                         setEditValue(s.name);
                       }}
                     >
-                      ✏️
+                      <Pencil className="w-3 h-3" />
                     </button>
                     <button
-                      className="text-text-muted hover:text-red-400 flex-shrink-0"
+                      className="text-text-muted hover:text-red-400 flex-shrink-0 p-0.5 rounded hover:bg-white/5 transition-colors"
                       title="Delete"
                       onClick={(e) => {
                         e.stopPropagation();
                         removeSpace(s.id);
                       }}
                     >
-                      ✕
+                      <X className="w-3 h-3" />
                     </button>
                   </>
                 )}
@@ -157,10 +154,10 @@ export function SpaceDropdown() {
             ))}
 
             {showNewInput ? (
-              <div className="flex items-center gap-1 px-2 py-1">
+              <div className="flex items-center gap-1 px-2 py-1.5">
                 <input
                   ref={editRef}
-                  className="flex-1 bg-surface-lighter border border-accent rounded px-1 py-0 text-xs outline-none"
+                  className="flex-1 bg-surface-lighter border border-accent/50 rounded px-1.5 py-0.5 text-xs outline-none"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   onBlur={handleAdd}
@@ -176,7 +173,7 @@ export function SpaceDropdown() {
               </div>
             ) : (
               <button
-                className="w-full text-left px-2 py-1 text-text-muted hover:bg-accent/10 hover:text-text-primary"
+                className="w-full text-left px-3 py-1.5 text-text-muted hover:bg-accent/10 hover:text-text-primary transition-colors"
                 onClick={() => setShowNewInput(true)}
               >
                 + New Space
