@@ -39,7 +39,6 @@ function highlightMatch(text: string, query: string): React.ReactNode {
   } else {
     const lower = text.toLowerCase();
     const q = query.toLowerCase();
-    let cursor = 0;
     while (cursor < text.length) {
       const idx = lower.indexOf(q, cursor);
       if (idx === -1) break;
