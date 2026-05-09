@@ -29,6 +29,8 @@ export function FileList({ side }: FileListProps) {
 
   const lastSelectedRef = useRef<string | null>(null);
   const [focusIdx, setFocusIdx] = useState(0);
+  const focusIdxRef = useRef(0);
+  focusIdxRef.current = focusIdx;
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
   const [dropFlashPath, setDropFlashPath] = useState<string | null>(null);
   const lastBackspaceRef = useRef<string | null>(null);
@@ -312,9 +314,18 @@ export function FileList({ side }: FileListProps) {
             lastBackspaceRef.current = null;
           } else if (state.path) {
             // 返回上层目录，记录来源
-            lastBackspaceRef.current = state.path;
+            const originPath = state.path;
+            lastBackspaceRef.current = originPath;
             const parent = state.path.split(/[/\\]/).slice(0, -1).join('\\') || state.path.slice(0, 2) + '\\';
-            navigateToPath(parent);
+            navigateToPath(parent).then(() => {
+              const entries = useFileStore.getState()[side].entries;
+              const target = entries.find((e) => e.path === originPath);
+              if (target) {
+                selectSingle(side, target.path);
+                const idx = entries.indexOf(target);
+                if (idx >= 0) setFocusIdx(idx);
+              }
+            });
           }
           break;
 
@@ -344,7 +355,7 @@ export function FileList({ side }: FileListProps) {
         case 'ArrowDown':
           e.preventDefault();
           {
-            const next = Math.min(focusIdx + 1, entries.length - 1);
+            const next = Math.min(focusIdxRef.current + 1, entries.length - 1);
             selectSingle(side, entries[next].path);
             setFocusIdx(next);
             setDisableHover(true);
@@ -354,7 +365,7 @@ export function FileList({ side }: FileListProps) {
         case 'ArrowUp':
           e.preventDefault();
           {
-            const next = Math.max(focusIdx - 1, 0);
+            const next = Math.max(focusIdxRef.current - 1, 0);
             selectSingle(side, entries[next].path);
             setFocusIdx(next);
             setDisableHover(true);
@@ -397,8 +408,8 @@ export function FileList({ side }: FileListProps) {
             } else if (entry) {
               openFile(entry);
             }
-          } else if (entries.length > 0 && focusIdx < entries.length) {
-            const entry = entries[focusIdx];
+          } else if (entries.length > 0 && focusIdxRef.current < entries.length) {
+            const entry = entries[focusIdxRef.current];
             if (entry.isDirectory) {
               navigateToPath(entry.path);
             } else {
@@ -469,7 +480,7 @@ export function FileList({ side }: FileListProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [side, filterText, path, entries, selected, setFilter, clearSelection, navigateToPath, refresh, handleOpenFolder]);
+  }, [side, filterText, path, entries, selected, setFilter, clearSelection, selectSingle, navigateToPath, refresh, handleOpenFolder]);
 
   // 键盘操作后禁 hover，鼠标移动恢复
   useEffect(() => {
