@@ -31,6 +31,7 @@ export function App() {
 
 function MainApp() {
   const layout = useLayoutStore((s) => s.layout);
+  const fontScale = useLayoutStore((s) => s.fontScale);
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'warn' | 'error' } | null>(null);
 
   const notify = useCallback((message: string, type: 'info' | 'warn' | 'error' = 'info') => {
@@ -42,6 +43,11 @@ function MainApp() {
   useEffect(() => {
     setNotificationHandler(notify);
   }, [notify]);
+
+  // Sync font size to CSS variable
+  useEffect(() => {
+    document.documentElement.style.setProperty('--font-scale', `${fontScale}`);
+  }, [fontScale]);
 
   // 启动时恢复固定标签，打开第一个标签或默认目录
   useEffect(() => {

@@ -318,9 +318,9 @@ export function AddressBar({ side }: AddressBarProps) {
                 )}
 
                 <span
-                  className={`hover:text-accent hover:bg-accent/10 rounded px-0.5 cursor-pointer ${
+                  className={`hover:text-accent hover:bg-accent/10 rounded px-0.5 cursor-pointer truncate ${
                     isLast
-                      ? 'text-text-primary font-medium flex-shrink min-w-[3em]'
+                      ? 'text-text-primary font-medium flex-shrink-0 max-w-[200px]'
                       : 'text-text-secondary flex-shrink-0 max-w-[120px]'
                   }`}
                   onClick={(e) => {

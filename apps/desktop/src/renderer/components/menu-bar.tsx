@@ -227,8 +227,30 @@ export function MenuBar() {
         </div>
       ))}
       <span className="flex-1" />
+      <FontScaleDropdown />
       <LayoutModeToggle />
     </div>
+  );
+}
+
+function FontScaleDropdown() {
+  const fontScale = useLayoutStore((s) => s.fontScale);
+  const setFontScale = useLayoutStore((s) => s.setFontScale);
+  const scales = [100, 120, 140, 160, 180, 200];
+
+  return (
+    <select
+      className="px-1 py-0.5 text-xs rounded bg-transparent border border-transparent hover:border-border text-text-secondary hover:text-text-primary cursor-pointer outline-none"
+      value={fontScale}
+      onChange={(e) => setFontScale(Number(e.target.value))}
+      title="Font Size"
+    >
+      {scales.map((s) => (
+        <option key={s} value={s} className="bg-[#1c1c25] text-text-primary">
+          {s}%
+        </option>
+      ))}
+    </select>
   );
 }
 

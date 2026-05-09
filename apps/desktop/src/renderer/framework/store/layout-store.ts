@@ -17,10 +17,12 @@ export interface PanelState {
 
 export const useLayoutStore = create<{
   layout: PanelState;
+  fontScale: number;
   setActivePanel: (id: 'left' | 'right') => void;
   setPanelPath: (side: 'left' | 'right', path: string) => void;
   setPanelPlugin: (side: 'left' | 'right', pluginId: string, panelId: string) => void;
   setMode: (mode: 'single' | 'dual') => void;
+  setFontScale: (scale: number) => void;
 }>((set) => ({
   layout: {
     id: 'left',
@@ -36,6 +38,7 @@ export const useLayoutStore = create<{
       panelId: 'browser',
     },
   },
+  fontScale: 100,
 
   setActivePanel: (id) => set((s) => ({ layout: { ...s.layout, id } })),
 
@@ -53,6 +56,8 @@ export const useLayoutStore = create<{
     set((s) => ({
       layout: { ...s.layout, mode, id: mode === 'single' ? 'left' : s.layout.id },
     })),
+
+  setFontScale: (fontScale) => set({ fontScale }),
 }));
 
 export function useActivePanel() {

@@ -25,7 +25,7 @@ html, body, #root {
   height: 100%;
   overflow: hidden;
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale) / 100);
   background: var(--bg-primary);
   color: var(--text-primary);
   user-select: none;
