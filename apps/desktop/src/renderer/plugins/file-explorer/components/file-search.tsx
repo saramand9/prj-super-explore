@@ -156,8 +156,14 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
   if (!open) return null;
 
   return (
-    <div className="absolute inset-x-0 top-0 z-50 mx-1 mt-1">
-      <div className="bg-surface-light border border-border rounded-lg shadow-2xl overflow-hidden">
+    <div
+      className="fixed inset-0 z-[100] flex items-start justify-center pt-[20vh]"
+      onClick={onClose}
+    >
+      <div
+        className="bg-[#1c1c25] border border-border rounded-lg shadow-2xl w-[400px] max-h-[400px] flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* 输入框 */}
         <div className="flex items-center gap-2 px-3 py-2 border-b border-border/40">
           <span className="text-text-muted text-sm">🔍</span>
