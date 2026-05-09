@@ -3,6 +3,7 @@ import { FolderOpen, Dot } from 'lucide-react';
 import { SplitPane, useLayoutStore } from './framework/layout';
 import { pluginManager } from './framework/plugin-system';
 import { setNotificationHandler } from './framework/plugin-system/plugin-context';
+import { themes } from './framework/themes';
 import { ErrorBoundary } from './components/error-boundary';
 import { MenuBar } from './components/menu-bar';
 import { ActivityBar } from './components/activity-bar';
@@ -34,6 +35,7 @@ export function App() {
 function MainApp() {
   const layout = useLayoutStore((s) => s.layout);
   const fontScale = useLayoutStore((s) => s.fontScale);
+  const theme = useLayoutStore((s) => s.theme);
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'warn' | 'error' } | null>(null);
 
   const notify = useCallback((message: string, type: 'info' | 'warn' | 'error' = 'info') => {
@@ -50,6 +52,15 @@ function MainApp() {
   useEffect(() => {
     document.documentElement.style.setProperty('--font-scale', `${fontScale}`);
   }, [fontScale]);
+
+  // Sync theme to CSS variables
+  useEffect(() => {
+    const t = themes[theme as keyof typeof themes] ?? themes.linear;
+    for (const [key, value] of Object.entries(t.vars)) {
+      document.documentElement.style.setProperty(key, value);
+    }
+    document.body.classList.toggle('anime-bg', theme === 'sakura');
+  }, [theme]);
 
   // 启动时恢复固定标签，打开第一个标签或默认目录
   useEffect(() => {

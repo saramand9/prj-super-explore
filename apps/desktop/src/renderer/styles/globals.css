@@ -5,6 +5,7 @@
 :root {
   /* Background — deep navy-gray, Linear-inspired */
   --bg-app: #0d0f13;
+  --bg-pattern: none;
   --bg-surface: #181a21;
   --bg-surface-elevated: #1e2029;
   --bg-surface-hover: #252832;
@@ -17,6 +18,7 @@
 
   /* Accent — subtle blue, not aggressive */
   --accent: #5b8def;
+  --accent-rgb: 91 141 239;
   --accent-muted: #3b5fa0;
   --accent-subtle: rgba(91, 141, 239, 0.08);
 
@@ -50,11 +52,21 @@ html, body, #root {
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Text', 'Inter', system-ui, sans-serif;
   font-size: calc(13px * var(--font-scale) / 100);
-  background: var(--bg-app);
+  background-color: var(--bg-app);
   color: var(--text-primary);
   user-select: none;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* 二次元主题背景图案 — 用伪元素放在 body 下层，不影响交互 */
+body.anime-bg::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--bg-pattern);
 }
 
 /* Use mono font only for code/file paths */

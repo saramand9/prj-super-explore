@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useLayoutStore } from '../framework/layout';
 import { useFileStore } from '../plugins/file-explorer/store';
 import { useAppStore } from '../framework/store/app-store';
+import { themes } from '../framework/themes';
 import { ipc } from '../framework/bridge/ipc-client';
 
 interface MenuItem {
@@ -227,9 +228,32 @@ export function MenuBar() {
         </div>
       ))}
       <span className="flex-1" />
+      <ThemeDropdown />
+      <span className="w-1" />
       <FontScaleDropdown />
       <LayoutModeToggle />
     </div>
+  );
+}
+
+function ThemeDropdown() {
+  const theme = useLayoutStore((s) => s.theme);
+  const setTheme = useLayoutStore((s) => s.setTheme);
+  const entries = Object.entries(themes);
+
+  return (
+    <select
+      className="px-1 py-0.5 text-xs rounded bg-transparent border border-transparent hover:border-border text-text-secondary hover:text-text-primary cursor-pointer outline-none"
+      value={theme}
+      onChange={(e) => setTheme(e.target.value)}
+      title="Theme"
+    >
+      {entries.map(([key, t]) => (
+        <option key={key} value={key} className="bg-surface-light text-text-primary">
+          {t.label}
+        </option>
+      ))}
+    </select>
   );
 }
 
