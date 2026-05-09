@@ -7,10 +7,8 @@ interface AddressBarProps {
   side: 'left' | 'right';
 }
 
-/** Windows 风格地址栏：面包屑 + 历史下拉 + 点击空白输入路径 */
 function naturalName(fullPath: string): string {
-  const name = fullPath.split(/[/\\]/).pop() || fullPath;
-  return `起点 · ${name}`;
+  return '起点';
 }
 
 export function AddressBar({ side }: AddressBarProps) {
@@ -30,9 +28,11 @@ export function AddressBar({ side }: AddressBarProps) {
   const [editValue, setEditValue] = useState('');
   const [showBackHistory, setShowBackHistory] = useState(false);
   const [showForwardHistory, setShowForwardHistory] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const backBtnRef = useRef<HTMLButtonElement>(null);
   const fwdBtnRef = useRef<HTMLButtonElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const syncLayout = useCallback(
     (newPath: string) => {
@@ -93,21 +93,25 @@ export function AddressBar({ side }: AddressBarProps) {
     return () => window.removeEventListener('keydown', handler);
   }, [editing, cancelEdit]);
 
-  // 点击外部关闭历史下拉
+  // 展开时 Esc 折叠
+  useEffect(() => {
+    if (!expanded) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setExpanded(false);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [expanded]);
+
+  // 关闭下拉
   useEffect(() => {
     if (!showBackHistory && !showForwardHistory) return;
     const handler = (e: MouseEvent) => {
-      if (
-        backBtnRef.current && !backBtnRef.current.contains(e.target as Node) &&
-        fwdBtnRef.current && !fwdBtnRef.current.contains(e.target as Node)
-      ) {
-        // 检查是否点在下拉菜单内部
-        const target = e.target as HTMLElement;
-        if (!target.closest('.history-dropdown')) {
-          setShowBackHistory(false);
-          setShowForwardHistory(false);
-        }
-      }
+      const target = e.target as HTMLElement;
+      if (target.closest('.history-dropdown')) return;
+      if (backBtnRef.current?.contains(target) || fwdBtnRef.current?.contains(target)) return;
+      setShowBackHistory(false);
+      setShowForwardHistory(false);
     };
     window.addEventListener('mousedown', handler);
     return () => window.removeEventListener('mousedown', handler);
@@ -133,7 +137,49 @@ export function AddressBar({ side }: AddressBarProps) {
     }
   }
 
-  // 历史栈（最新在前）
+  // 自适应折叠：首3段 + ... + 末2段
+  const KEEP_FIRST = 3;
+  const KEEP_LAST = 2;
+  const COLLAPSE_THRESHOLD = KEEP_FIRST + KEEP_LAST;
+  let visibleParts: { label: string; fullPath: string }[] = [];
+  let isCollapsed = false;
+
+  if (parts.length > COLLAPSE_THRESHOLD) {
+    isCollapsed = true;
+    visibleParts = [...parts.slice(0, KEEP_FIRST), ...parts.slice(-KEEP_LAST)];
+  } else {
+    visibleParts = parts;
+  }
+
+  // 展开时显示全部，折叠时缩略
+  const displayParts = expanded ? parts : visibleParts;
+
+  // 点击段落后折叠恢复
+  const handleSegmentClick = useCallback(
+    (fullPath: string) => {
+      handleNavigate(fullPath);
+      setExpanded(false);
+    },
+    [handleNavigate],
+  );
+
+  const handleToggleExpand = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setExpanded(true);
+      // 下一帧注册折叠监听，避免同一点击事件触发
+      requestAnimationFrame(() => {
+        const collapse = (ev: MouseEvent) => {
+          if (containerRef.current && !containerRef.current.contains(ev.target as HTMLElement)) {
+            setExpanded(false);
+            document.removeEventListener('mousedown', collapse);
+          }
+        };
+        document.addEventListener('mousedown', collapse);
+      });
+    },
+    [],
+  );
   const backItems = [...backStack].reverse();
   const fwdItems = [...forwardStack].reverse();
 
@@ -141,7 +187,7 @@ export function AddressBar({ side }: AddressBarProps) {
 
   return (
     <div className="flex items-center gap-0.5 flex-1 min-w-0 text-sm">
-      {/* 后退 + 历史下拉 */}
+      {/* 后退 */}
       <div className="relative flex-shrink-0">
         <button
           ref={backBtnRef}
@@ -152,7 +198,7 @@ export function AddressBar({ side }: AddressBarProps) {
               setShowForwardHistory(false);
             }
           }}
-          title="Back (click to see history)"
+          title="Back"
         >
           ◀
         </button>
@@ -175,7 +221,7 @@ export function AddressBar({ side }: AddressBarProps) {
         )}
       </div>
 
-      {/* 前进 + 历史下拉 */}
+      {/* 前进 */}
       <div className="relative flex-shrink-0">
         <button
           ref={fwdBtnRef}
@@ -186,7 +232,7 @@ export function AddressBar({ side }: AddressBarProps) {
               setShowBackHistory(false);
             }
           }}
-          title="Forward (click to see history)"
+          title="Forward"
         >
           ▶
         </button>
@@ -209,7 +255,7 @@ export function AddressBar({ side }: AddressBarProps) {
         )}
       </div>
 
-      {/* 起始路径 — 🏠 + 路径简述 */}
+      {/* 起始路径 */}
       {initialPath && (
         <button
           className="flex-shrink-0 px-1.5 py-px rounded bg-accent/10 hover:bg-accent/30 text-accent text-[10px] transition-colors flex items-center gap-0.5"
@@ -238,34 +284,61 @@ export function AddressBar({ side }: AddressBarProps) {
         />
       ) : (
         <div
-          className="flex items-center gap-0.5 overflow-x-auto whitespace-nowrap scrollbar-none cursor-text flex-1"
+          ref={containerRef}
+          className={`flex items-center gap-0.5 cursor-text flex-1 min-w-0 ${
+            expanded ? 'flex-wrap' : 'overflow-hidden whitespace-nowrap'
+          }`}
           onClick={startEdit}
           title="Click to edit path"
         >
-          {parts.map((part, i) => (
-            <span key={part.fullPath} className="flex items-center gap-0.5">
-              {i > 0 && <span className="text-text-muted/40">{sep}</span>}
-              <span
-                className={`hover:text-accent hover:bg-accent/10 rounded px-0.5 cursor-pointer ${
-                  i === parts.length - 1
-                    ? 'text-text-primary font-medium'
-                    : 'text-text-secondary'
-                }`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleNavigate(part.fullPath);
-                }}
-                title={part.fullPath}
-              >
-                {part.label}
+          {displayParts.map((part, i) => {
+            const isFirst = i === 0;
+            const isLast = i === displayParts.length - 1;
+            const showCollapse = !expanded && isCollapsed && i === KEEP_FIRST;
+
+            return (
+              <span key={part.fullPath} className="flex items-center gap-0.5 min-w-0">
+                {/* 分隔符（第一段前不显示） */}
+                {!isFirst && (
+                  <span className="text-text-muted/40 flex-shrink-0">{sep}</span>
+                )}
+
+                {/* 折叠按钮 */}
+                {showCollapse && (
+                  <span className="flex-shrink-0 flex items-center gap-0.5">
+                    <span
+                      className="text-xs text-accent hover:bg-accent/20 rounded px-0.5 cursor-pointer"
+                      onClick={handleToggleExpand}
+                      title="Click to expand full path"
+                    >
+                      ...
+                    </span>
+                    <span className="text-text-muted/40 flex-shrink-0">{sep}</span>
+                  </span>
+                )}
+
+                <span
+                  className={`hover:text-accent hover:bg-accent/10 rounded px-0.5 cursor-pointer ${
+                    isLast
+                      ? 'text-text-primary font-medium flex-shrink min-w-[3em]'
+                      : 'text-text-secondary flex-shrink-0 max-w-[120px]'
+                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSegmentClick(part.fullPath);
+                  }}
+                  title={part.fullPath}
+                >
+                  {part.label}
+                </span>
               </span>
-            </span>
-          ))}
+            );
+          })}
           <span className="w-1 flex-shrink-0" />
         </div>
       )}
 
-      {/* Open in Explorer 按钮 — 始终可见 */}
+      {/* Open in Explorer */}
       <button
         className="flex-shrink-0 px-1.5 py-0.5 text-text-muted hover:text-accent hover:bg-accent/10 rounded text-xs transition-colors"
         onClick={() => {
