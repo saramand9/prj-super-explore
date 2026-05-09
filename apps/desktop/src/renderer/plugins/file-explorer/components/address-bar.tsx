@@ -1,5 +1,5 @@
 import { useCallback, useState, useRef, useEffect } from 'react';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Home } from 'lucide-react';
 import { useFileStore } from '../store';
 import { useLayoutStore } from '../../../framework/store/layout-store';
 import { ipc } from '../../../framework/bridge/ipc-client';
@@ -155,7 +155,7 @@ export function AddressBar({ side }: AddressBarProps) {
           onClick={() => handleNavigate(initialPath)}
           title={`起点: ${initialPath}`}
         >
-          <span>🏠</span>
+          <span><Home className="w-3.5 h-3.5" /></span>
           <span className="truncate max-w-[100px]">{naturalName(initialPath)}</span>
         </button>
       )}

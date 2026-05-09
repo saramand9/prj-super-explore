@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useState } from 'react';
-import { FolderOpen, Dot } from 'lucide-react';
+import { FolderOpen } from 'lucide-react';
 import { SplitPane, useLayoutStore } from './framework/layout';
 import { pluginManager } from './framework/plugin-system';
 import { setNotificationHandler } from './framework/plugin-system/plugin-context';
@@ -59,7 +59,9 @@ function MainApp() {
     for (const [key, value] of Object.entries(t.vars)) {
       document.documentElement.style.setProperty(key, value);
     }
-    document.body.classList.toggle('anime-bg', theme === 'sakura');
+    const prev = Object.values(themes).map((x) => x.className).filter(Boolean);
+    document.body.classList.remove(...prev);
+    if (t.className) document.body.classList.add(t.className);
   }, [theme]);
 
   // 启动时恢复固定标签，打开第一个标签或默认目录
@@ -366,15 +368,14 @@ function PanelSlot({
       onClick={onClick}
     >
       {/* Tab Bar + Panel Header — 统一背景 */}
+      <div className={`flex-shrink-0 ${isActive ? 'bg-surface-lighter' : 'bg-surface'}`}>
       <ErrorBoundary name={`TabBar-${side}`}>
         {pluginId === 'file-explorer' && <TabBar side={side} />}
       </ErrorBoundary>
 
       {/* Panel Header — 地址栏区 */}
       <div
-        className={`flex-shrink-0 h-8 flex items-center px-2 text-sm border-b border-border/30 relative gap-1.5 ${
-          isActive ? 'bg-surface-lighter' : 'bg-surface'
-        }`}
+        className="h-8 flex items-center px-2 text-sm border-b border-border/30"
       >
         {/* 地址栏 / 路径面包屑 */}
         {pluginId === 'file-explorer' && panel.path && (
@@ -398,11 +399,10 @@ function PanelSlot({
           </button>
 
           {isActive && (
-            <span className="text-[10px] text-accent/70 font-medium flex items-center gap-0.5">
-              <Dot className="w-3 h-3" /> Active
-            </span>
+            <div className="active-dot" title="Active panel" />
           )}
         </div>
+      </div>
       </div>
 
       {/* Panel Content */}

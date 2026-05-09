@@ -1,6 +1,10 @@
 import { memo, useCallback } from 'react';
 import type { FileEntry } from '@explore/shared';
 import { highlightMatches } from '../store';
+import {
+  Folder, File, FileCode, FileJson, FileText, FileImage,
+  FileArchive, Cog, Palette, Globe, EyeOff, Lock,
+} from 'lucide-react';
 
 interface FileRowProps {
   entry: FileEntry;
@@ -50,7 +54,8 @@ export const FileRow = memo(function FileRow({
     [onClick],
   );
 
-  const icon = entry.isDirectory ? '📁' : getFileIcon(entry.name);
+  const Icon = entry.isDirectory ? Folder : getFileIcon(entry.name);
+  const iconColor = entry.isDirectory ? 'text-accent/70' : 'text-text-muted';
   const sizeStr = formatSize(entry.size);
   const segments = highlightMatches(entry.name, highlight ?? '');
 
@@ -62,9 +67,9 @@ export const FileRow = memo(function FileRow({
           : isActive
             ? 'bg-accent/20'
             : dragOver
-              ? 'bg-green-500/30 ring-1 ring-green-500/50'
+              ? 'bg-green/30 ring-1 ring-accent/50'
               : dropFlash
-                ? 'bg-green-500/50'
+                ? 'bg-green/50'
                 : disableHover
                   ? ''
                   : 'hover:bg-surface-lighter'
@@ -80,11 +85,13 @@ export const FileRow = memo(function FileRow({
       draggable
       role="row"
     >
-      <span className="w-5 text-center flex-shrink-0">{icon}</span>
+      <span className="w-5 text-center flex-shrink-0">
+        <Icon className={`w-4 h-4 inline-block ${iconColor}`} />
+      </span>
       <span className="flex-1 truncate ml-1" title={entry.name}>
         {segments.map((seg, i) =>
           seg.match ? (
-            <span key={i} className="text-yellow-400 font-bold">
+            <span key={i} className="text-green font-bold">
               {seg.text}
             </span>
           ) : (
@@ -104,39 +111,26 @@ export const FileRow = memo(function FileRow({
   );
 });
 
-// ── helpers ──
-
-const FILE_ICONS: Record<string, string> = {
-  '.ts': '🔷',
-  '.tsx': '⚛️',
-  '.js': '🟨',
-  '.jsx': '⚛️',
-  '.json': '📋',
-  '.md': '📝',
-  '.css': '🎨',
-  '.html': '🌐',
-  '.png': '🖼️',
-  '.jpg': '🖼️',
-  '.jpeg': '🖼️',
-  '.gif': '🖼️',
-  '.svg': '🖼️',
-  '.pdf': '📄',
-  '.zip': '📦',
-  '.gz': '📦',
-  '.tar': '📦',
-  '.exe': '⚙️',
-  '.dll': '🔧',
-  '.py': '🐍',
-  '.rs': '🦀',
-  '.go': '🔵',
-  '.java': '☕',
-  '.gitignore': '🙈',
-  '.env': '🔒',
+const FILE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  '.ts': FileCode, '.tsx': FileCode, '.js': FileCode, '.jsx': FileCode,
+  '.json': FileJson,
+  '.md': FileText,
+  '.css': Palette,
+  '.html': Globe, '.htm': Globe,
+  '.png': FileImage, '.jpg': FileImage, '.jpeg': FileImage,
+  '.gif': FileImage, '.svg': FileImage, '.webp': FileImage,
+  '.pdf': FileText,
+  '.zip': FileArchive, '.gz': FileArchive, '.tar': FileArchive,
+  '.rar': FileArchive, '.7z': FileArchive,
+  '.exe': Cog, '.dll': Cog, '.so': Cog,
+  '.py': FileCode, '.rs': FileCode, '.go': FileCode,
+  '.java': FileCode, '.rb': FileCode, '.php': FileCode,
+  '.gitignore': EyeOff, '.env': Lock,
 };
 
-function getFileIcon(name: string): string {
+function getFileIcon(name: string): React.ComponentType<{ className?: string }> {
   const ext = name.slice(name.lastIndexOf('.')).toLowerCase();
-  return FILE_ICONS[ext] ?? '📄';
+  return FILE_ICONS[ext] ?? File;
 }
 
 function formatSize(bytes: number): string {

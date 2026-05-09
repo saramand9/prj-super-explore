@@ -90,6 +90,145 @@ body.anime-bg::before {
   background: var(--scrollbar-thumb-hover);
 }
 
+/* Pulsing active indicator */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 4px var(--green); }
+  50% { opacity: 0.4; box-shadow: 0 0 10px var(--green); }
+}
+.active-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: pulse-dot 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+/* ── Glass Morphism Theme ── */
+
+.theme-glass .\\!bg-surface,
+.theme-glass [class*="bg-surface"] {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-color: var(--border-color);
+}
+
+.theme-glass .\\!bg-surface-light,
+.theme-glass .bg-surface-light {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.theme-glass .\\!bg-surface-lighter,
+.theme-glass .bg-surface-lighter {
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+/* Glass theme — panel header elevated feel */
+.theme-glass [class*="border-b"] {
+  border-color: rgba(255,255,255,0.06);
+}
+
+/* Glass theme — menu bar glassy */
+.theme-glass .bg-surface-light.flex.items-center.h-7 {
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  background: rgba(15,15,30,0.5);
+  border-color: rgba(255,255,255,0.06);
+}
+
+/* Glass theme — status bar */
+.theme-glass [class*="h-6"][class*="bg-surface-light"] {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  background: rgba(15,15,30,0.5);
+  border-color: rgba(255,255,255,0.06);
+}
+
+/* Glass theme — activity bar */
+.theme-glass .w-10.flex-shrink-0 {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-color: rgba(255,255,255,0.06);
+}
+
+/* Glass theme — dialogs / search overlays */
+.theme-glass [class*="z-50"].bg-surface-light,
+.theme-glass [class*="z-50"][class*="bg-surface"],
+.theme-glass [class*="z-[100]"].bg-surface-light,
+.theme-glass [class*="z-[200]"].bg-surface-light {
+  backdrop-filter: blur(24px) saturate(1.5);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  background: rgba(25,25,50,0.85);
+  border-color: rgba(255,255,255,0.10);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05);
+}
+
+/* Glass theme — tab active state */
+.theme-glass [class*="bg-surface-light"][class*="rounded-t"] {
+  background: rgba(30,30,60,0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Glass theme — subtle glow on accent elements */
+.theme-glass .text-accent {
+  text-shadow: 0 0 8px rgba(153,165,201,0.25);
+}
+
+/* Glass theme — glow on selected rows */
+.theme-glass [class*="bg-accent/"] {
+  box-shadow: inset 0 0 16px rgba(153,165,201,0.08);
+}
+
+/* Glass theme — split pane handle */
+.theme-glass [class*="bg-border-strong"] {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* ── Neon Cyber Theme ── */
+
+.theme-neon .text-accent {
+  text-shadow: 0 0 8px rgba(0,212,255,0.5);
+}
+
+.theme-neon [class*="bg-accent/"] {
+  box-shadow: inset 0 0 20px rgba(0,212,255,0.1);
+}
+
+.theme-neon [class*="border"]:not([class*="border-b"]) {
+  border-color: rgba(0,212,255,0.08);
+}
+
+.theme-neon .active-dot {
+  box-shadow: 0 0 8px var(--green), 0 0 16px var(--green);
+}
+
+/* ── Aurora Theme ── */
+
+.theme-aurora [class*="bg-surface"] {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ── Mecha Theme ── */
+
+.theme-mecha [class*="border-l-"] {
+  border-left-width: 2px;
+}
+
+.theme-mecha .active-dot {
+  border-radius: 2px;
+  animation: none;
+  box-shadow: 0 0 6px var(--green);
+}
+
+.theme-mecha [class*="bg-accent/"] {
+  border-left: 2px solid var(--accent);
+}
+
 /* Focus — thinner ring */
 :focus-visible {
   outline: 2px solid var(--accent);

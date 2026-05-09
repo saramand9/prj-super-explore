@@ -29,7 +29,7 @@ function highlightMatch(text: string, query: string): React.ReactNode {
       }
       if (match[0].length > 0) {
         parts.push(
-          <span key={match.index} className="text-yellow-400 font-bold">
+          <span key={match.index} className="text-green font-bold">
             {match[0]}
           </span>,
         );
@@ -49,7 +49,7 @@ function highlightMatch(text: string, query: string): React.ReactNode {
         parts.push(<span key={cursor}>{text.slice(cursor, idx)}</span>);
       }
       parts.push(
-        <span key={idx} className="text-yellow-400 font-bold">
+        <span key={idx} className="text-green font-bold">
           {text.slice(idx, idx + q.length)}
         </span>,
       );

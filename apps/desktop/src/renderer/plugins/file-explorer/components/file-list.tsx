@@ -6,6 +6,7 @@ import { FileRow } from './file-row';
 import { ipc } from '../../../framework/bridge/ipc-client';
 import { useLayoutStore } from '../../../framework/store/layout-store';
 import { pluginManager } from '../../../framework/plugin-system';
+import { FolderOpen, FolderPlus, RefreshCw, Trash2, Copy, ArrowRightLeft, Pencil, File, Folder, Clipboard, ClipboardCheck } from 'lucide-react';
 
 interface FileListProps {
   side: 'left' | 'right';
@@ -697,44 +698,45 @@ export function FileList({ side }: FileListProps) {
           {/* 空白区域 */}
           {contextMenu.count === 0 && (
             <>
-              <MenuBtn onClick={handleOpenFolder}>📂 Open folder...</MenuBtn>
-              <MenuBtn onClick={ctxNewFolder}>📁 New folder</MenuBtn>
+              <MenuBtn onClick={handleOpenFolder}><FolderOpen className="w-3.5 h-3.5" /> Open folder...</MenuBtn>
+              <MenuBtn onClick={ctxNewFolder}><FolderPlus className="w-3.5 h-3.5" /> New folder</MenuBtn>
               <MenuSep />
-              <MenuBtn onClick={ctxRefresh}>🔄 Refresh</MenuBtn>
+              <MenuBtn onClick={ctxRefresh}><RefreshCw className="w-3.5 h-3.5" /> Refresh</MenuBtn>
               <MenuSep />
-              <MenuBtn onClick={ctxEmptyFolder}>🗑 Empty folder</MenuBtn>
+              <MenuBtn onClick={ctxEmptyFolder}><Trash2 className="w-3.5 h-3.5" /> Empty folder</MenuBtn>
             </>
           )}
           {/* 单个文件或文件夹 */}
           {contextMenu.single && (
             <>
               <MenuBtn onClick={ctxOpen}>
-                {contextMenu.single.isDirectory ? '📂' : '📄'} {contextMenu.single.isDirectory ? 'Open' : 'Open file'}
+                {contextMenu.single.isDirectory ? <Folder className="w-3.5 h-3.5" /> : <File className="w-3.5 h-3.5" />}
+                {' '}{contextMenu.single.isDirectory ? 'Open' : 'Open file'}
               </MenuBtn>
               {contextMenu.single.isDirectory && (
                 <MenuBtn onClick={ctxOpenOther}>↗️ Open in other panel</MenuBtn>
               )}
               <MenuSep />
-              <MenuBtn onClick={ctxCopy}>📋 Copy to other panel</MenuBtn>
-              <MenuBtn onClick={ctxMove}>📦 Move to other panel</MenuBtn>
+              <MenuBtn onClick={ctxCopy}><Copy className="w-3.5 h-3.5" /> Copy to other panel</MenuBtn>
+              <MenuBtn onClick={ctxMove}><ArrowRightLeft className="w-3.5 h-3.5" /> Move to other panel</MenuBtn>
               <MenuSep />
-              <MenuBtn onClick={ctxRename}>✏️ Rename</MenuBtn>
-              <MenuBtn onClick={ctxDelete}>🗑 Delete</MenuBtn>
+              <MenuBtn onClick={ctxRename}><Pencil className="w-3.5 h-3.5" /> Rename</MenuBtn>
+              <MenuBtn onClick={ctxDelete}><Trash2 className="w-3.5 h-3.5" /> Delete</MenuBtn>
               <MenuSep />
-              <MenuBtn onClick={ctxCopyName}>📄 Copy filename</MenuBtn>
-              <MenuBtn onClick={ctxCopyPath}>📁 Copy path</MenuBtn>
+              <MenuBtn onClick={ctxCopyName}><Clipboard className="w-3.5 h-3.5" /> Copy filename</MenuBtn>
+              <MenuBtn onClick={ctxCopyPath}><ClipboardCheck className="w-3.5 h-3.5" /> Copy path</MenuBtn>
             </>
           )}
           {/* 多个选中 */}
           {contextMenu.count > 1 && !contextMenu.single && (
             <>
-              <MenuBtn onClick={ctxCopy}>📋 Copy {contextMenu.count} items to other panel</MenuBtn>
-              <MenuBtn onClick={ctxMove}>📦 Move {contextMenu.count} items to other panel</MenuBtn>
+              <MenuBtn onClick={ctxCopy}><Copy className="w-3.5 h-3.5" /> Copy {contextMenu.count} items to other panel</MenuBtn>
+              <MenuBtn onClick={ctxMove}><ArrowRightLeft className="w-3.5 h-3.5" /> Move {contextMenu.count} items to other panel</MenuBtn>
               <MenuSep />
-              <MenuBtn onClick={ctxDelete}>🗑 Delete {contextMenu.count} items</MenuBtn>
+              <MenuBtn onClick={ctxDelete}><Trash2 className="w-3.5 h-3.5" /> Delete {contextMenu.count} items</MenuBtn>
               <MenuSep />
-              <MenuBtn onClick={ctxCopyName}>📄 Copy filenames</MenuBtn>
-              <MenuBtn onClick={ctxCopyPath}>📁 Copy paths</MenuBtn>
+              <MenuBtn onClick={ctxCopyName}><Clipboard className="w-3.5 h-3.5" /> Copy filenames</MenuBtn>
+              <MenuBtn onClick={ctxCopyPath}><ClipboardCheck className="w-3.5 h-3.5" /> Copy paths</MenuBtn>
             </>
           )}
         </div>
