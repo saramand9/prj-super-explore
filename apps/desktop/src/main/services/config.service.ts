@@ -1,12 +1,13 @@
 import { app } from 'electron';
 import { join } from 'path';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
-import type { AppSettings, Bookmark } from '@explore/shared';
+import type { AppSettings, Bookmark, Space } from '@explore/shared';
 import type { Service, ServiceContainer } from '../service-container';
 
 const CONFIG_FILENAME = 'config.json';
 const BOOKMARKS_FILENAME = 'bookmarks.json';
 const PINNED_TABS_FILENAME = 'pinned-tabs.json';
+const SPACES_FILENAME = 'spaces.json';
 
 interface PinnedTabsData {
   left: { path: string; label: string }[];
@@ -39,6 +40,7 @@ export class ConfigService implements Service {
   private settings!: AppSettings;
   private bookmarks!: Bookmark[];
   private pinnedTabs!: PinnedTabsData;
+  private spaces!: Space[];
 
   init(): void {
     this.configDir = join(app.getPath('userData'), 'config');
@@ -48,6 +50,7 @@ export class ConfigService implements Service {
     this.settings = this.loadJSON('config.json', DEFAULT_SETTINGS);
     this.bookmarks = this.loadJSON('bookmarks.json', []);
     this.pinnedTabs = this.loadJSON(PINNED_TABS_FILENAME, { left: [], right: [] });
+    this.spaces = this.loadJSON(SPACES_FILENAME, []);
 
     // 首次运行：填充默认索引路径
     if (this.settings.indexPaths.length === 0) {
@@ -93,6 +96,15 @@ export class ConfigService implements Service {
   savePinnedTabs(side: 'left' | 'right', tabs: { path: string; label: string }[]): void {
     this.pinnedTabs[side] = tabs;
     this.saveJSON(PINNED_TABS_FILENAME, this.pinnedTabs);
+  }
+
+  getSpaces(): Space[] {
+    return this.spaces;
+  }
+
+  saveSpaces(spaces: Space[]): void {
+    this.spaces = spaces;
+    this.saveJSON(SPACES_FILENAME, this.spaces);
   }
 
   private loadJSON<T>(filename: string, fallback: T): T {

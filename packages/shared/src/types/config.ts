@@ -7,6 +7,22 @@ export interface Bookmark {
   sortOrder: number;
 }
 
+/** 工作区 */
+export interface Space {
+  id: string;
+  name: string;
+  left: {
+    tabs: { path: string; label: string; initialPath: string; pinned: boolean }[];
+    activeTabId: string | null;
+    path: string | null;
+  };
+  right: {
+    tabs: { path: string; label: string; initialPath: string; pinned: boolean }[];
+    activeTabId: string | null;
+    path: string | null;
+  };
+}
+
 /** 面板配置 */
 export interface PanelConfig {
   id: string;

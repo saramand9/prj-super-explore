@@ -8,6 +8,7 @@ import { ActivityBar } from './components/activity-bar';
 import { PluginManagerDialog } from './components/plugin-manager-dialog';
 import { Launcher } from './plugins/quick-launcher';
 import { useFileStore, TabBar, AddressBar } from './plugins/file-explorer';
+import { useSpaceStore } from './plugins/file-explorer/space-store';
 import type { Tab } from './plugins/file-explorer/store';
 import { FileSearch } from './plugins/file-explorer/components/file-search';
 import { TabSearch } from './plugins/file-explorer/components/tab-search';
@@ -53,6 +54,7 @@ function MainApp() {
   useEffect(() => {
     async function init() {
       await useFileStore.getState().loadPinnedTabs();
+      await useSpaceStore.getState().loadSpaces();
 
       const currentLayout = useLayoutStore.getState().layout;
       const fileStore = useFileStore.getState();

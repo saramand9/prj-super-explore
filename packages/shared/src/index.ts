@@ -29,6 +29,7 @@ export type {
 } from './types/plugin';
 export type {
   Bookmark,
+  Space,
   PanelConfig,
   LayoutConfig,
   AppSettings,

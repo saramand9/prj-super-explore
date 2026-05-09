@@ -7,6 +7,7 @@
 
 import type { FileEntry, FileOpResult, FileStat, SortConfig } from './file';
 import type { Bookmark } from './config';
+import type { Space } from './config';
 import type { PluginInfo, PluginManifest } from './plugin';
 
 // ── 请求-响应 channels ──────────────────────────
@@ -123,6 +124,16 @@ export interface IpcChannels {
   };
   'tabs:save': {
     req: { side: 'left' | 'right'; tabs: { path: string; label: string; initialPath: string }[] };
+    res: void;
+  };
+
+  // Spaces
+  'space:list': {
+    req: void;
+    res: Space[];
+  };
+  'space:save': {
+    req: { spaces: Space[] };
     res: void;
   };
 

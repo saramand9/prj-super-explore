@@ -171,6 +171,17 @@ export function registerIpcHandlers(container: ServiceContainer): void {
     },
   );
 
+  // ── Spaces ──
+
+  ipcMain.handle('space:list', () => config.getSpaces());
+
+  ipcMain.handle(
+    'space:save',
+    (_e, payload: IpcChannels['space:save']['req']) => {
+      config.saveSpaces(payload.spaces);
+    },
+  );
+
   // ── Window ──
 
   ipcMain.handle('window:toggleLauncher', () => {

@@ -1,6 +1,7 @@
 import { useCallback, useState, useRef, useEffect, useMemo } from 'react';
 import { useFileStore, type Tab, type TabGroup, computeGroups } from '../store';
 import { useLayoutStore } from '../../../framework/store/layout-store';
+import { SpaceDropdown } from './space-dropdown';
 
 interface TabBarProps {
   side: 'left' | 'right';
@@ -138,7 +139,16 @@ export function TabBar({ side }: TabBarProps) {
     return items;
   }, [tabs, collapsedGroups]);
 
-  if (tabs.length === 0) return null;
+  if (tabs.length === 0 && side !== 'left') return null;
+
+  if (tabs.length === 0 && side === 'left') {
+    return (
+      <div className="flex items-center text-sm border-b border-border/40 px-1 flex-shrink-0 bg-[#2a2a35]">
+        <SpaceDropdown />
+        <span className="flex-1" />
+      </div>
+    );
+  }
 
   function tabClass(isActive: boolean, isPinned: boolean) {
     const base = 'flex items-center gap-1 px-2 py-0.5 rounded-t cursor-pointer select-none whitespace-nowrap border-l-2 text-sm ';
@@ -250,6 +260,7 @@ export function TabBar({ side }: TabBarProps) {
 
   return (
     <div ref={containerRef} className="flex items-center text-sm overflow-x-auto scrollbar-none border-b border-border/40 px-1 flex-shrink-0 bg-[#2a2a35]">
+      {side === 'left' && <SpaceDropdown />}
       {layout.map((item) => {
         if (item.kind === 'group') return renderGroupHeader(item.group);
         return renderTab(item.tab);
