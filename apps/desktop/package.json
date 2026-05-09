@@ -8,7 +8,27 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "pack": "electron-vite build && electron-builder --win"
+  },
+  "build": {
+    "appId": "com.explore.app",
+    "productName": "Explore",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": null
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ]
   },
   "dependencies": {
     "@explore/shared": "workspace:*",

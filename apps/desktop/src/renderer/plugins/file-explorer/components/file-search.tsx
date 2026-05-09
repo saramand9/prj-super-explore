@@ -39,12 +39,10 @@ function highlightMatch(text: string, query: string): React.ReactNode {
   } else {
     const lower = text.toLowerCase();
     const q = query.toLowerCase();
+    let cursor = 0;
     while (cursor < text.length) {
       const idx = lower.indexOf(q, cursor);
-      if (idx === -1) {
-        parts.push(<span key={cursor}>{text.slice(cursor)}</span>);
-        break;
-      }
+      if (idx === -1) break;
       if (idx > cursor) {
         parts.push(<span key={cursor}>{text.slice(cursor, idx)}</span>);
       }
@@ -60,7 +58,7 @@ function highlightMatch(text: string, query: string): React.ReactNode {
   if (cursor < text.length) {
     parts.push(<span key={cursor}>{text.slice(cursor)}</span>);
   }
-  return parts;
+  return <>{parts}</>;
 }
 
 interface FileSearchProps {
@@ -218,7 +216,7 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
                 <span className="flex-shrink-0">{entry.isDirectory ? '📁' : '📄'}</span>
                 <span className="truncate">{highlightMatch(entry.name, query)}</span>
                 <span className="text-text-muted text-xs truncate ml-auto flex-shrink-0 max-w-[40%]">
-                  {entry.path}
+                  {entry.path.slice(0, entry.path.length - entry.name.length - 1)}
                 </span>
               </div>
             );

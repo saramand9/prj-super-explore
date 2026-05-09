@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useFileStore, type Tab } from '../store';
 import { useLayoutStore } from '../../../framework/store/layout-store';
 import { pinyin } from 'pinyin-pro';
+import { Pin } from 'lucide-react';
 
 function matchPinyin(text: string, query: string): boolean {
   if (!text || !query) return false;
@@ -130,12 +131,10 @@ export function TabSearch({ open, onClose, side }: TabSearchProps) {
                   onClick={() => handleSelect(tab)}
                   onMouseEnter={() => setSelectedIdx(idx)}
                 >
-                  <span
-                    className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                      isActive ? 'bg-green' : 'bg-transparent'
-                    }`}
-                  />
-                  <span className={`truncate ${isActive ? 'text-green font-semibold' : ''}`}>
+                  {tab.pinned && (
+                    <Pin className="w-3 h-3 flex-shrink-0 text-accent/60" />
+                  )}
+                  <span className={`truncate ${isActive ? 'text-accent font-medium' : ''}`}>
                     {tab.label}
                   </span>
                   {tab.groupName && (
@@ -143,9 +142,11 @@ export function TabSearch({ open, onClose, side }: TabSearchProps) {
                       {tab.groupName}/
                     </span>
                   )}
-                  {tab.pinned && (
-                    <span className="text-[10px] flex-shrink-0">📍</span>
-                  )}
+                  <span
+                    className={`rounded-full flex-shrink-0 ${
+                      isActive ? 'active-dot' : 'w-2 h-2 bg-transparent'
+                    }`}
+                  />
                 </div>
               );
             })
