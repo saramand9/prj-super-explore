@@ -1,5 +1,5 @@
 import { useCallback, useState, useRef, useEffect, useMemo } from 'react';
-import { Pin, PinOff, X, Pencil, Copy, ChevronRight, ChevronDown } from 'lucide-react';
+import { Pin, PinOff, X, Pencil, Copy, ChevronRight, ChevronDown, Folder } from 'lucide-react';
 import { useFileStore, type Tab, type TabGroup, computeGroups } from '../store';
 import { useLayoutStore } from '../../../framework/store/layout-store';
 import { SpaceDropdown } from './space-dropdown';
@@ -115,11 +115,11 @@ export function TabBar({ side }: TabBarProps) {
     const groups = computeGroups(tabs);
     const groupedTabIds = new Set(groups.flatMap((g) => g.tabIds));
     const items: Array<
-      | { kind: 'tab'; tab: Tab }
+      | { kind: 'tab'; tab: Tab; grouped: boolean }
       | { kind: 'group'; group: TabGroup }
     > = [];
     for (const tab of tabs) {
-      if (tab.pinned) items.push({ kind: 'tab', tab });
+      if (tab.pinned) items.push({ kind: 'tab', tab, grouped: false });
     }
     for (const group of groups) {
       const isCollapsed = collapsedGroups.includes(group.path);
@@ -127,13 +127,13 @@ export function TabBar({ side }: TabBarProps) {
       if (!isCollapsed) {
         for (const tabId of group.tabIds) {
           const tab = tabs.find((t) => t.id === tabId);
-          if (tab) items.push({ kind: 'tab', tab });
+          if (tab) items.push({ kind: 'tab', tab, grouped: true });
         }
       }
     }
     for (const tab of tabs) {
       if (!tab.pinned && !groupedTabIds.has(tab.id)) {
-        items.push({ kind: 'tab', tab });
+        items.push({ kind: 'tab', tab, grouped: false });
       }
     }
     return items;
@@ -150,13 +150,15 @@ export function TabBar({ side }: TabBarProps) {
     );
   }
 
-  const renderTab = (tab: Tab) => {
+  const renderTab = (tab: Tab, indented = false) => {
     const isActive = tab.id === activeTabId;
     const isPinned = tab.pinned;
     return (
       <div
         key={tab.id}
-        className={`group flex items-center gap-1.5 px-3 py-1 cursor-pointer select-none whitespace-nowrap text-xs transition-colors duration-150 border-t border-x rounded-t -mb-px ${
+        className={`group flex items-center gap-1.5 py-1 cursor-pointer select-none text-xs transition-colors duration-150 border-t border-x rounded-t -mb-px min-w-[60px] max-w-[180px] ${
+          indented ? 'pl-6 pr-3' : 'px-3'
+        } ${
           isActive
             ? 'text-text-primary bg-surface-light border-border font-medium'
             : 'text-text-muted hover:text-text-secondary hover:bg-surface-lighter border-transparent'
@@ -187,7 +189,7 @@ export function TabBar({ side }: TabBarProps) {
             onClick={(e) => e.stopPropagation()}
           />
         ) : (
-          <span className="truncate max-w-[140px]">{tab.label}</span>
+          <span className="truncate min-w-0">{tab.label}</span>
         )}
         {!tab.pinned && (
           <span
@@ -230,15 +232,16 @@ export function TabBar({ side }: TabBarProps) {
       <div
         key={`group-${group.path}`}
         className={`flex items-center gap-1 px-3 py-1 cursor-pointer select-none whitespace-nowrap text-xs transition-colors duration-150 ${
-          hasActiveChild && isCollapsed
-            ? 'text-accent font-medium'
-            : 'text-text-muted hover:text-text-secondary'
+          hasActiveChild
+            ? 'text-accent bg-accent/5 font-medium'
+            : 'text-text-secondary bg-surface-lighter/50 hover:text-text-primary'
         }`}
         onClick={() => toggleGroupCollapse(group.path)}
         title={`${group.path} (${group.tabIds.length} tabs)`}
       >
-        {isCollapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-        <span className="truncate max-w-[100px]">{group.name}</span>
+        {isCollapsed ? <ChevronRight className="w-3 h-3 flex-shrink-0" /> : <ChevronDown className="w-3 h-3 flex-shrink-0" />}
+        <Folder className="w-3 h-3 flex-shrink-0 text-accent/60" />
+        <span className="truncate max-w-[120px]">{group.name}</span>
         <span className="text-text-muted/50">· {group.tabIds.length}</span>
       </div>
     );
@@ -249,7 +252,7 @@ export function TabBar({ side }: TabBarProps) {
       {side === 'left' && <SpaceDropdown />}
       {layout.map((item) => {
         if (item.kind === 'group') return renderGroupHeader(item.group);
-        return renderTab(item.tab);
+        return renderTab(item.tab, item.grouped);
       })}
 
       {hoveredTabId && tooltipPos && (
