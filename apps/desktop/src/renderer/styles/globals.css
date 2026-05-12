@@ -229,6 +229,240 @@ body.anime-bg::before {
   border-left: 2px solid var(--accent);
 }
 
+/* ── Quantum Theme ── 量子 — 顶尖炫技风格 */
+
+/* 宇宙深层背景图案 */
+body.theme-quantum::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--bg-pattern);
+}
+
+/* 全界面玻璃态 */
+.theme-quantum [class*="bg-surface"] {
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  border-color: var(--border-color);
+}
+
+.theme-quantum .bg-surface-light,
+.theme-quantum [class*="bg-surface-light"] {
+  backdrop-filter: blur(28px) saturate(1.4);
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
+}
+
+.theme-quantum .bg-surface-lighter,
+.theme-quantum [class*="bg-surface-lighter"] {
+  backdrop-filter: blur(32px) saturate(1.5);
+  -webkit-backdrop-filter: blur(32px) saturate(1.5);
+}
+
+/* 工具栏 / 菜单栏 */
+.theme-quantum .bg-surface-light.flex.items-center.h-7 {
+  backdrop-filter: blur(28px) saturate(1.6);
+  -webkit-backdrop-filter: blur(28px) saturate(1.6);
+  background: rgba(12,10,28,0.55);
+  border-bottom: 1px solid rgba(139,108,255,0.08);
+}
+
+/* 状态栏 */
+.theme-quantum [class*="h-6"][class*="bg-surface-light"] {
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  background: rgba(12,10,28,0.55);
+  border-top: 1px solid rgba(139,108,255,0.08);
+}
+
+/* 活动栏 */
+.theme-quantum .w-10.flex-shrink-0 {
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  border-right: 1px solid rgba(139,108,255,0.06);
+}
+
+/* 对话框 / 搜索面板 / 弹窗 — 极致玻璃+发光边框 */
+.theme-quantum [class*="z-50"].bg-surface-light,
+.theme-quantum [class*="z-50"][class*="bg-surface"],
+.theme-quantum [class*="z-[100]"].bg-surface-light,
+.theme-quantum [class*="z-[200]"].bg-surface-light {
+  backdrop-filter: blur(36px) saturate(1.6);
+  -webkit-backdrop-filter: blur(36px) saturate(1.6);
+  background: rgba(18,16,40,0.88);
+  border: 1px solid rgba(139,108,255,0.12);
+  box-shadow:
+    0 8px 48px rgba(80,40,200,0.25),
+    0 0 0 1px rgba(139,108,255,0.08),
+    inset 0 1px 0 rgba(255,255,255,0.02);
+}
+
+/* 激活标签页 */
+.theme-quantum [class*="bg-surface-light"][class*="rounded-t"] {
+  background: rgba(24,22,52,0.85);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  border-bottom: 2px solid var(--accent);
+  box-shadow: 0 -2px 12px rgba(139,108,255,0.06);
+}
+
+/* 面板头地址栏区 */
+.theme-quantum [class*="border-b"][class*="border-border/30"] {
+  border-color: rgba(139,108,255,0.08);
+}
+
+/* Accent 文字发光 */
+.theme-quantum .text-accent {
+  text-shadow: 0 0 12px rgba(139,108,255,0.4), 0 0 24px rgba(139,108,255,0.15);
+}
+
+/* 选中行 / 高亮元素 */
+.theme-quantum [class*="bg-accent/"] {
+  box-shadow:
+    inset 0 0 24px rgba(139,108,255,0.1),
+    0 0 2px rgba(139,108,255,0.08);
+}
+
+/* Active dot — 电光紫脉冲 */
+.theme-quantum .active-dot {
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent), 0 0 20px rgba(139,108,255,0.5);
+  animation: quantum-pulse 2s ease-in-out infinite;
+}
+
+@keyframes quantum-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--accent), 0 0 16px rgba(139,108,255,0.4); }
+  50% { opacity: 0.5; box-shadow: 0 0 14px var(--accent), 0 0 32px rgba(139,108,255,0.7); }
+}
+
+/* 分割线把手 */
+.theme-quantum [class*="bg-border-strong"] {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  background: rgba(139,108,255,0.08);
+}
+
+/* 按钮 hover 微光 */
+.theme-quantum button:hover:not([disabled]) {
+  transition: all 0.2s ease;
+}
+
+/* 输入框聚焦发光 */
+.theme-quantum input:focus,
+.theme-quantum [contenteditable]:focus {
+  box-shadow: 0 0 0 1px rgba(139,108,255,0.3), 0 0 16px rgba(139,108,255,0.08);
+}
+
+/* 选中文本 */
+.theme-quantum ::selection {
+  background: rgba(139,108,255,0.35);
+  color: #ffffff;
+}
+
+/* 滚动条 */
+.theme-quantum ::-webkit-scrollbar-thumb {
+  background: rgba(139,108,255,0.12);
+  border-radius: 3px;
+}
+
+.theme-quantum ::-webkit-scrollbar-thumb:hover {
+  background: rgba(139,108,255,0.25);
+}
+
+/* 文件列表选中项 */
+.theme-quantum [class*="bg-accent-subtle"] {
+  background: rgba(139,108,255,0.1);
+  border-left: 2px solid rgba(139,108,255,0.4);
+}
+
+/* ── Grafana Theme ── 专业数据仪表盘风格 */
+
+/* 面板头地址栏区 — 更清晰的底部边框 */
+.theme-grafana [class*="border-b"][class*="border-border/30"] {
+  border-bottom-width: 1px;
+  border-color: var(--border-color);
+}
+
+/* 激活标签页 — 橙色底部指示 */
+.theme-grafana [class*="bg-surface-light"][class*="rounded-t"] {
+  border-bottom: 2px solid var(--accent);
+  background: var(--bg-surface-elevated);
+}
+
+/* 标签页 hover */
+.theme-grafana [class*="bg-surface-light"][class*="rounded-t"]:hover {
+  background: var(--bg-surface-hover);
+}
+
+/* Active dot — 沉稳橙色脉冲 */
+.theme-grafana .active-dot {
+  background: var(--accent);
+  box-shadow: 0 0 4px var(--accent);
+  animation: grafana-pulse 3s ease-in-out infinite;
+}
+
+@keyframes grafana-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* 分割线把手 */
+.theme-grafana [class*="bg-border-strong"] {
+  background: var(--border-color-strong);
+}
+
+/* 对话框 / 搜索面板 */
+.theme-grafana [class*="z-50"].bg-surface-light,
+.theme-grafana [class*="z-50"][class*="bg-surface"],
+.theme-grafana [class*="z-[100]"].bg-surface-light,
+.theme-grafana [class*="z-[200]"].bg-surface-light {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-color-strong);
+  box-shadow: var(--shadow-lg);
+}
+
+/* 文件列表 hover 行 — 仅限全宽行，不误伤面包屑 */
+.theme-grafana [class*="w-full"][class*="bg-accent/"],
+.theme-grafana [class*="cursor-pointer"][class*="flex"][class*="items-center"][class*="px-"]:hover {
+  border-left: 2px solid var(--accent);
+}
+
+/* 选中文本 */
+.theme-grafana ::selection {
+  background: rgba(255,152,48,0.25);
+  color: #ffffff;
+}
+
+/* 滚动条 Grafana 风格 */
+.theme-grafana ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.theme-grafana ::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.theme-grafana ::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* 文件列表选中项（当前焦点行） */
+.theme-grafana [class*="bg-accent-subtle"] {
+  background: rgba(255,152,48,0.08);
+}
+
+/* 输入框聚焦 */
+.theme-grafana input:focus,
+.theme-grafana [contenteditable]:focus {
+  box-shadow: 0 0 0 1px var(--accent);
+  border-color: var(--accent);
+}
+
 /* Focus — thinner ring */
 :focus-visible {
   outline: 2px solid var(--accent);
