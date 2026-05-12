@@ -14,11 +14,15 @@ export interface Space {
   left: {
     tabs: { path: string; label: string; initialPath: string; pinned: boolean }[];
     activeTabId: string | null;
+    /** 活跃标签的 path，用于恢复时匹配（id 在恢复时会重新生成） */
+    activeTabPath?: string | null;
     path: string | null;
   };
   right: {
     tabs: { path: string; label: string; initialPath: string; pinned: boolean }[];
     activeTabId: string | null;
+    /** 活跃标签的 path，用于恢复时匹配（id 在恢复时会重新生成） */
+    activeTabPath?: string | null;
     path: string | null;
   };
 }

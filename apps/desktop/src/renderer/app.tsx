@@ -14,6 +14,7 @@ import { useSpaceStore } from './plugins/file-explorer/space-store';
 import type { Tab } from './plugins/file-explorer/store';
 import { FileSearch } from './plugins/file-explorer/components/file-search';
 import { TabSearch } from './plugins/file-explorer/components/tab-search';
+import { SpaceSearch } from './plugins/file-explorer/components/space-search';
 import { useSearchStore } from './plugins/fulltext-search';
 import { ipc } from './framework/bridge/ipc-client';
 
@@ -37,6 +38,7 @@ function MainApp() {
   const fontScale = useLayoutStore((s) => s.fontScale);
   const theme = useLayoutStore((s) => s.theme);
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'warn' | 'error' } | null>(null);
+  const [showSpaceSearch, setShowSpaceSearch] = useState(false);
 
   const notify = useCallback((message: string, type: 'info' | 'warn' | 'error' = 'info') => {
     setToast({ message, type });
@@ -140,6 +142,18 @@ function MainApp() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handlePluginChange]);
 
+  // Ctrl+W: 快速搜索/切换工作区
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'w' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+        e.preventDefault();
+        setShowSpaceSearch((s) => !s);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   return (
     <div className="h-full flex flex-col bg-surface">
       <MenuBar />
@@ -185,6 +199,7 @@ function MainApp() {
         <span>F6 Move</span>
         <span>F7 New Folder</span>
         <span>F8 Delete</span>
+        <span>Ctrl+W Workspace</span>
         <span>Ctrl+Shift+F Search</span>
       </div>
 
@@ -202,6 +217,7 @@ function MainApp() {
       )}
 
       <PluginManagerDialog />
+      <SpaceSearch open={showSpaceSearch} onClose={() => setShowSpaceSearch(false)} />
     </div>
   );
 }

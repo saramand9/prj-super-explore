@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { Space } from '@explore/shared';
 import { ipc } from '../../framework/bridge/ipc-client';
-import { useFileStore } from './store';
+import { useFileStore, type Tab } from './store';
 import { useLayoutStore } from '../../framework/store/layout-store';
 
 function nextId(): string {
@@ -10,6 +10,8 @@ function nextId(): string {
 
 function snapshotState(side: 'left' | 'right'): Space['left'] {
   const panel = useFileStore.getState()[side];
+  // 保存活跃标签的 path（而不是 id，因为恢复时 id 会重新生成）
+  const activeTab = panel.tabs.find((t) => t.id === panel.activeTabId);
   return {
     tabs: panel.tabs.map((t) => ({
       path: t.path,
@@ -18,43 +20,55 @@ function snapshotState(side: 'left' | 'right'): Space['left'] {
       pinned: t.pinned,
     })),
     activeTabId: panel.activeTabId,
+    activeTabPath: activeTab?.path ?? panel.path,
     path: panel.path,
   };
 }
 
-function restoreState(side: 'left' | 'right', snap: Space['left']): void {
-  const store = useFileStore.getState();
-  const panel = store[side];
+function buildTabs(snap: Space['left']): { tabs: Tab[]; activeTabId: string | null } {
+  const tabs: Tab[] = [];
+  let activeTabId: string | null = null;
+  let seq = 0;
 
-  // 清空所有现有标签
-  const allTabs = [...panel.tabs];
-  for (const tab of allTabs.reverse()) {
-    store.closeTab(side, tab.id);
-  }
-
-  // 恢复标签：先用 addTab 创建，再修正 label
   for (const t of snap.tabs) {
-    store.addTab(side, t.path);
-    const defaultLabel = t.path.split(/[/\\]/).pop() || t.path;
-    if (t.label !== defaultLabel) {
-      const tab = store[side].tabs.find((x) => x.path === t.path);
-      if (tab) store.renameTab(side, tab.id, t.label);
+    const id = `tab-${Date.now()}-${++seq}`;
+    const tab = { id, path: t.path, label: t.label, pinned: t.pinned, initialPath: t.initialPath || t.path };
+    tabs.push(tab);
+    // 用路径匹配活跃标签（snap.activeTabPath 是快照时活跃标签的 path）
+    if (snap.activeTabPath && t.path === snap.activeTabPath) {
+      activeTabId = id;
     }
   }
 
-  // 恢复 active tab
-  if (snap.activeTabId) {
-    const tab = store[side].tabs.find((t) => t.path === snap.activeTabId);
-    if (tab) store.activateTab(side, tab.id);
-    else if (store[side].tabs.length > 0) {
-      store.activateTab(side, store[side].tabs[0].id);
-    }
+  // fallback: 如果没匹配到活跃标签但有标签，激活最后一个
+  if (!activeTabId && tabs.length > 0) {
+    activeTabId = tabs[tabs.length - 1].id;
   }
 
-  // 恢复路径
+  return { tabs, activeTabId };
+}
+
+async function restoreState(side: 'left' | 'right', snap: Space['left']): Promise<void> {
+  // 构建新标签列表 + 活跃标签 ID（单次 setState 避免逐个 closeTab/addTab 的中间渲染）
+  const { tabs, activeTabId } = buildTabs(snap);
+
+  useFileStore.setState((s) => ({
+    [side]: {
+      ...s[side],
+      tabs,
+      activeTabId,
+      loading: true,
+      filterText: '',
+      selected: new Set(),
+      backStack: [],
+      forwardStack: [],
+    },
+  }));
+
+  // 恢复路径（异步加载目录内容）
   if (snap.path) {
     useLayoutStore.getState().setPanelPath(side, snap.path);
-    store.navigateTo(side, snap.path, false);
+    await useFileStore.getState().navigateTo(side, snap.path, false);
   }
 }
 
@@ -87,11 +101,11 @@ export const useSpaceStore = create<{
       return s;
     });
 
-    // 恢复目标 Space
+    // 恢复目标 Space（await 确保目录加载完成）
     const target = updated.find((s) => s.id === id);
     if (target) {
-      restoreState('left', target.left);
-      restoreState('right', target.right);
+      await restoreState('left', target.left);
+      await restoreState('right', target.right);
     }
 
     set({ spaces: updated, activeSpaceId: id });
