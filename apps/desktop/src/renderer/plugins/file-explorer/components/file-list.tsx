@@ -26,6 +26,8 @@ export function FileList({ side }: FileListProps) {
   const selectSingle = useFileStore((s) => s.selectSingle);
   const selectAll = useFileStore((s) => s.selectAll);
   const setFilter = useFileStore((s) => s.setFilter);
+  const pinTab = useFileStore((s) => s.pinTab);
+  const unpinTab = useFileStore((s) => s.unpinTab);
   const refresh = useFileStore((s) => s.refresh);
 
   const lastSelectedRef = useRef<string | null>(null);
@@ -426,6 +428,21 @@ export function FileList({ side }: FileListProps) {
           }
           break;
         }
+
+        case 'p':
+        case 'P':
+          if (e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey) {
+            e.preventDefault();
+            const activeTabId = useFileStore.getState()[side].activeTabId;
+            if (!activeTabId) break;
+            const activeTab = useFileStore.getState()[side].tabs.find((t) => t.id === activeTabId);
+            if (activeTab?.pinned) {
+              unpinTab(side, activeTabId);
+            } else {
+              pinTab(side, activeTabId);
+            }
+          }
+          break;
 
         case 'F5': {
           const targetSide = side === 'left' ? 'right' : 'left';

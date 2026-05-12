@@ -199,6 +199,7 @@ function MainApp() {
         <span>F6 Move</span>
         <span>F7 New Folder</span>
         <span>F8 Delete</span>
+        <span>Ctrl+Shift+P Pin</span>
         <span>Ctrl+W Workspace</span>
         <span>Ctrl+Shift+F Search</span>
       </div>

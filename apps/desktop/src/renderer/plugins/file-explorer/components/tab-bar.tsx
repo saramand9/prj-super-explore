@@ -118,21 +118,22 @@ export function TabBar({ side }: TabBarProps) {
       | { kind: 'tab'; tab: Tab; grouped: boolean }
       | { kind: 'group'; group: TabGroup }
     > = [];
+    const renderedTabs = new Set<string>();
     for (const tab of tabs) {
-      if (tab.pinned) items.push({ kind: 'tab', tab, grouped: false });
-    }
-    for (const group of groups) {
-      const isCollapsed = collapsedGroups.includes(group.path);
-      items.push({ kind: 'group', group });
-      if (!isCollapsed) {
-        for (const tabId of group.tabIds) {
-          const tab = tabs.find((t) => t.id === tabId);
-          if (tab) items.push({ kind: 'tab', tab, grouped: true });
+      if (renderedTabs.has(tab.id)) continue;
+      if (groupedTabIds.has(tab.id)) {
+        const group = groups.find((g) => g.tabIds.includes(tab.id));
+        if (group) {
+          const isCollapsed = collapsedGroups.includes(group.path);
+          items.push({ kind: 'group', group });
+          if (!isCollapsed) {
+            for (const tabId of group.tabIds) {
+              const t = tabs.find((x) => x.id === tabId);
+              if (t) { items.push({ kind: 'tab', tab: t, grouped: true }); renderedTabs.add(t.id); }
+            }
+          }
         }
-      }
-    }
-    for (const tab of tabs) {
-      if (!tab.pinned && !groupedTabIds.has(tab.id)) {
+      } else {
         items.push({ kind: 'tab', tab, grouped: false });
       }
     }
