@@ -149,37 +149,34 @@ export function TextViewer({ side }: { side: 'left' | 'right' }) {
     );
   }
 
-  const langName = lang ?? (isCsvFile ? 'csv' : 'plain text');
   const showPreview = isMarkdown && preview;
 
   return (
     <div className="h-full flex flex-col bg-surface">
-      <div className="flex-shrink-0 px-3 py-1 border-b border-border text-xs text-text-muted flex items-center gap-2">
-        <span className="truncate">{filePath}</span>
-        <span className="text-text-muted/50 text-[10px] uppercase tracking-wider">{langName}</span>
-        <span className="flex-1" />
-        {isMarkdown && (
-          <button
-            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] transition-colors ${
-              showPreview
-                ? 'bg-accent/20 text-accent'
-                : 'text-text-muted hover:text-text-primary hover:bg-white/5'
-            }`}
-            onClick={() => setPreview((v) => !v)}
-            title={showPreview ? 'Show source' : 'Show preview'}
-          >
-            {showPreview ? (
-              <><Code2 className="w-3 h-3" /> Source</>
-            ) : (
-              <><Eye className="w-3 h-3" /> Preview</>
-            )}
-          </button>
-        )}
-      </div>
       <div
         ref={containerRef}
-        className="flex-1 overflow-auto"
+        className="flex-1 overflow-auto relative"
       >
+        {/* Markdown toggle — floating */}
+        {isMarkdown && (
+          <div className="absolute top-2 right-2 z-10">
+            <button
+              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] transition-colors shadow-md ${
+                showPreview
+                  ? 'bg-accent/40 text-white'
+                  : 'bg-surface-light/90 text-text-muted hover:text-text-primary border border-border/30'
+              }`}
+              onClick={() => setPreview((v) => !v)}
+              title={showPreview ? 'Show source' : 'Show preview'}
+            >
+              {showPreview ? (
+                <><Code2 className="w-3 h-3" /> Source</>
+              ) : (
+                <><Eye className="w-3 h-3" /> Preview</>
+              )}
+            </button>
+          </div>
+        )}
         {showPreview ? (
           <div
             className="p-6 text-sm text-text-primary select-text leading-relaxed markdown-body"

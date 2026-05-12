@@ -406,7 +406,15 @@ function PanelSlot({
       {/* Tab Bar + Panel Header — 统一背景 */}
       <div className={`flex-shrink-0 ${isActive ? 'bg-surface-lighter' : 'bg-surface'}`}>
       <ErrorBoundary name={`TabBar-${side}`}>
-        {pluginId === 'file-explorer' && <TabBar side={side} />}
+        {pluginId === 'file-explorer' ? (
+          <TabBar side={side} />
+        ) : (
+          <div className="h-8 flex items-center px-3 text-[11px] text-text-muted/50 select-none">
+            {pluginId === 'fulltext-search' && 'Search'}
+            {pluginId === 'viewer' && 'File Viewer'}
+            {pluginId === 'bookmarks' && 'Bookmarks'}
+          </div>
+        )}
       </ErrorBoundary>
 
       {/* Panel Header — 地址栏区 */}
@@ -417,7 +425,10 @@ function PanelSlot({
         {pluginId === 'file-explorer' && panel.path && (
           <AddressBar side={side} />
         )}
-        {((!pluginId || pluginId !== 'file-explorer' || !panel.path)) && (
+        {pluginId !== 'file-explorer' && panel.path && (
+          <span className="flex-1 text-text-muted truncate text-[11px]">{panel.path}</span>
+        )}
+        {!panel.path && (
           <span className="flex-1" />
         )}
 
