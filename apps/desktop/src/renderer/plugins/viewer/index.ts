@@ -22,10 +22,15 @@ const manifest = {
     fileHandlers: [
       {
         extensions: [
-          '.txt', '.md', '.log', '.csv', '.json', '.xml', '.yaml', '.yml',
+          '.txt', '.md', '.log', '.csv',
+          '.json', '.jsonc', '.xml', '.svg', '.yaml', '.yml',
           '.toml', '.ini', '.cfg', '.conf', '.env', '.gitignore',
-          '.ts', '.tsx', '.js', '.jsx', '.py', '.rs', '.go', '.java',
-          '.html', '.css', '.scss', '.less',
+          '.ts', '.tsx', '.js', '.jsx', '.mjs',
+          '.py', '.rs', '.go', '.java', '.rb', '.php',
+          '.c', '.h', '.cpp', '.cc', '.cxx', '.hpp',
+          '.html', '.htm', '.css', '.scss', '.less',
+          '.sql', '.sh', '.bash', '.zsh',
+          '.diff', '.patch',
         ],
         name: 'Text Viewer',
         handler: 'text',
