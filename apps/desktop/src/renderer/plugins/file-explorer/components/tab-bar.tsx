@@ -113,12 +113,22 @@ export function TabBar({ side }: TabBarProps) {
     setContextMenu(null);
   }, [contextMenu, side, activeTabId, closeTab, unpinTab, navigateTo, persistPinnedTabs]);
 
-  const handleFork = useCallback(() => {
-    if (contextMenu) {
-      forkTab(side, contextMenu.tab.id);
+  const handleFork = useCallback(async () => {
+    if (!contextMenu) return;
+    const tab = contextMenu.tab;
+    forkTab(side, tab.id);
+    const confirmed = await ipc.invoke('dialog:confirm', {
+      message: `Pin the cloned tab "${tab.label}"?\n\nPinned tabs persist across sessions and always open at their initial path.`,
+    });
+    if (confirmed) {
+      const newActiveId = useFileStore.getState()[side].activeTabId;
+      if (newActiveId) {
+        pinTab(side, newActiveId);
+        persistPinnedTabs(side);
+      }
     }
     setContextMenu(null);
-  }, [contextMenu, side, forkTab]);
+  }, [contextMenu, side, forkTab, pinTab, persistPinnedTabs]);
 
   const handleRename = useCallback(() => {
     if (contextMenu) {
