@@ -484,25 +484,13 @@ function PanelSlot({
 const SEP_REGEX = /[/\\]/g;
 
 function PathBreadcrumb({ path }: { path: string }) {
-  const parts = path.split(SEP_REGEX).filter(Boolean);
-  if (parts.length === 0) return <span className="flex-1" />;
-
-  const last = parts[parts.length - 1];
-  const parents = parts.slice(0, -1);
-
   return (
-    <div className="flex items-center gap-0.5 flex-1 min-w-0 text-[11px]">
-      {parents.length > 0 && (
-        <span className="text-text-muted/50 truncate max-w-[120px]" title={parents.join('\\')}>
-          {parents.join('\\')}
-        </span>
-      )}
-      {parents.length > 0 && (
-        <span className="text-text-muted/50 flex-shrink-0">\</span>
-      )}
-      <span className="text-text-muted flex-shrink-0" title={last}>
-        {last}
-      </span>
-    </div>
+    <span
+      className="flex-1 min-w-0 text-[11px] text-text-muted truncate select-text"
+      style={{ direction: 'rtl', textAlign: 'left' }}
+      title={path}
+    >
+      {path}
+    </span>
   );
 }

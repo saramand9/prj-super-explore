@@ -175,61 +175,118 @@ export function AddressBar({ side }: AddressBarProps) {
           className="flex-1 bg-surface-lighter border border-accent rounded px-2 py-0.5 text-sm text-text-primary outline-none min-w-0"
           spellCheck={false}
         />
-      ) : (
+      ) : (() => {
+          const lastParts = displayParts.slice(-KEEP_LAST);
+          const prefixParts = displayParts.slice(0, -KEEP_LAST);
+
+          // 渲染单个面包屑段
+          const renderSegment = (
+            part: { label: string; fullPath: string },
+            idx: number,
+            isLast: boolean,
+          ) => (
+            <span key={part.fullPath} className="flex items-center gap-0.5">
+              {idx > 0 && (
+                <span className="text-text-muted/40 shrink-0">{sep}</span>
+              )}
+              <span
+                className={`hover:text-accent hover:bg-accent/10 rounded px-0.5 cursor-pointer ${
+                  isLast
+                    ? 'text-text-primary font-medium shrink-0'
+                    : 'text-text-secondary shrink min-w-0 truncate inline-block max-w-full align-bottom'
+                }`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSegmentClick(part.fullPath);
+                }}
+                title={part.fullPath}
+              >
+                {part.label}
+              </span>
+            </span>
+          );
+
+          return (
         <div
           ref={containerRef}
-          className={`flex items-center gap-0.5 cursor-text flex-1 min-w-0 ${
-            expanded ? 'flex-wrap' : 'overflow-hidden whitespace-nowrap'
-          }`}
+          className="flex items-center gap-0.5 cursor-text flex-1 min-w-0 overflow-hidden"
           onClick={startEdit}
           title="Click to edit path"
         >
-          {displayParts.map((part, i) => {
-            const isFirst = i === 0;
-            const isLast = i === displayParts.length - 1;
-            const showCollapse = !expanded && isCollapsed && i === KEEP_FIRST;
-
-            return (
-              <span key={part.fullPath} className="flex items-center gap-0.5 min-w-0">
-                {/* 分隔符（第一段前不显示） */}
-                {!isFirst && (
-                  <span className="text-text-muted/40 flex-shrink-0">{sep}</span>
-                )}
-
-                {/* 折叠按钮 */}
-                {showCollapse && (
-                  <span className="flex-shrink-0 flex items-center gap-0.5">
-                    <span
-                      className="text-xs text-accent hover:bg-accent/20 rounded px-0.5 cursor-pointer"
-                      onClick={handleToggleExpand}
-                      title="Click to expand full path"
-                    >
-                      ...
-                    </span>
-                    <span className="text-text-muted/40 flex-shrink-0">{sep}</span>
+          {expanded ? (
+            /* 展开模式 — 所有段自然换行 */
+            <div className="flex items-center gap-0.5 flex-wrap min-w-0">
+              {displayParts.map((part, i) =>
+                renderSegment(part, i, i === displayParts.length - 1),
+              )}
+            </div>
+          ) : (
+            /* 正常模式 — 前缀可压缩，末2段永不截断 */
+            <>
+              {prefixParts.map((part, i) => (
+                <span key={part.fullPath} className="flex items-center gap-0.5">
+                  {i > 0 && (
+                    <span className="text-text-muted/40 shrink-0">{sep}</span>
+                  )}
+                  <span
+                    className="text-text-secondary hover:text-accent hover:bg-accent/10 rounded px-0.5 cursor-pointer shrink min-w-0 truncate"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSegmentClick(part.fullPath);
+                    }}
+                    title={part.fullPath}
+                  >
+                    {part.label}
                   </span>
-                )}
-
-                <span
-                  className={`hover:text-accent hover:bg-accent/10 rounded px-0.5 cursor-pointer truncate ${
-                    isLast
-                      ? 'text-text-primary font-medium flex-shrink-0 max-w-[200px]'
-                      : 'text-text-secondary flex-shrink-0 max-w-[120px]'
-                  }`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSegmentClick(part.fullPath);
-                  }}
-                  title={part.fullPath}
-                >
-                  {part.label}
                 </span>
-              </span>
-            );
-          })}
-          <span className="w-1 flex-shrink-0" />
+              ))}
+
+              {/* 折叠省略号 — 在前缀段和末段之间，始终可见 */}
+              {isCollapsed && (
+                <span className="shrink-0 flex items-center gap-0.5">
+                  <span className="text-text-muted/40 shrink-0">{sep}</span>
+                  <span
+                    className="text-xs text-accent hover:bg-accent/20 rounded px-0.5 cursor-pointer"
+                    onClick={handleToggleExpand}
+                    title="Click to expand full path"
+                  >
+                    ...
+                  </span>
+                </span>
+              )}
+
+              {/* 末 KEEP_LAST 段 — 永不截断 */}
+              {lastParts.map((part, i) => {
+                // 不需要前导分隔符：是第一个末段 且 前面没有任何段（无前缀 + 未折叠）
+                const skipSep = i === 0 && prefixParts.length === 0 && !isCollapsed;
+                return (
+                  <span key={part.fullPath} className="flex items-center gap-0.5">
+                    {!skipSep && (
+                      <span className="text-text-muted/40 shrink-0">{sep}</span>
+                    )}
+                    <span
+                      className={`hover:text-accent hover:bg-accent/10 rounded px-0.5 cursor-pointer shrink-0 ${
+                        i === lastParts.length - 1
+                          ? 'text-text-primary font-medium'
+                          : 'text-text-secondary'
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSegmentClick(part.fullPath);
+                      }}
+                      title={part.fullPath}
+                    >
+                      {part.label}
+                    </span>
+                  </span>
+                );
+              })}
+            </>
+          )}
+          <span className="w-1 shrink-0" />
         </div>
-      )}
+          );
+        })()}
 
       {/* Open in Explorer */}
       <button
