@@ -40,7 +40,7 @@ export const useLayoutStore = create<{
       panelId: 'browser',
     },
   },
-  fontScale: 160,
+  fontScale: 130,
   theme: 'linear',
 
   setActivePanel: (id) => set((s) => ({ layout: { ...s.layout, id } })),
