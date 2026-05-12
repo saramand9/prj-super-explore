@@ -99,6 +99,14 @@ export function registerIpcHandlers(container: ServiceContainer): void {
     },
   );
 
+  // ── Directory Sizes (batch, with cache) ──
+
+  ipcMain.handle(
+    'file:dirSizes',
+    (_e, payload: IpcChannels['file:dirSizes']['req']) =>
+      file.getDirSizes(payload.paths),
+  );
+
   // ── Search ──
 
   ipcMain.handle(

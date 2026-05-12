@@ -19,6 +19,8 @@ export function FileList({ side }: FileListProps) {
   const selected = useFileStore((s) => s[side].selected);
   const filterText = useFileStore((s) => s[side].filterText);
   const loading = useFileStore((s) => s[side].loading);
+  const dirSizeMap = useFileStore((s) => s.dirSizeMap);
+  const setDirSizes = useFileStore((s) => s.setDirSizes);
 
   const navigateTo = useFileStore((s) => s.navigateTo);
   const toggleSelect = useFileStore((s) => s.toggleSelect);
@@ -247,6 +249,15 @@ export function FileList({ side }: FileListProps) {
     estimateSize: () => 30,
     overscan: 10,
   });
+
+  // 加载目录大小
+  useEffect(() => {
+    const dirs = entries.filter((e) => e.isDirectory).map((e) => e.path);
+    if (dirs.length === 0) return;
+    ipc.invoke('file:dirSizes', { paths: dirs }).then((sizes) => {
+      setDirSizes(sizes);
+    });
+  }, [entries, setDirSizes]);
 
   // ── 将导航同步到 LayoutStore ──
 
@@ -568,8 +579,9 @@ export function FileList({ side }: FileListProps) {
         setContextMenu({ x: e.clientX, y: e.clientY, count: 0 });
       }
     }}>
+      <SortHeader side={side} />
       {filterText && (
-        <div className="sticky top-0 z-10 px-2 py-0.5 bg-accent/80 text-white text-xs">
+        <div className="sticky top-7 z-10 px-2 py-0.5 bg-accent/80 text-white text-xs">
           Filter: "{filterText}" ({entries.length} items)
         </div>
       )}
@@ -596,6 +608,7 @@ export function FileList({ side }: FileListProps) {
                 isActive={idx === focusIdx}
                 disableHover={disableHover}
                 highlight={filterText}
+                dirSize={dirSizeMap[entry.path]}
                 onClick={(e: React.MouseEvent) => {
                   if (e.ctrlKey || e.metaKey) {
                     toggleSelect(side, entry.path);
@@ -795,4 +808,40 @@ function MenuBtn({ onClick, children }: { onClick: () => void; children: React.R
 
 function MenuSep() {
   return <div className="border-t border-border/50 my-0.5" />;
+}
+
+// ── 列头排序 ──
+
+const SORT_COLS: { key: import('@explore/shared').SortKey; label: string; className: string }[] = [
+  { key: 'name', label: 'Name', className: 'flex-1 ml-1' },
+  { key: 'size', label: 'Size', className: 'w-20 text-right ml-2' },
+  { key: 'modifiedAt', label: 'Modified', className: 'w-36 text-right ml-2' },
+];
+
+function SortHeader({ side }: { side: 'left' | 'right' }) {
+  const sort = useFileStore((s) => s[side].sort);
+  const setSort = useFileStore((s) => s.setSort);
+
+  return (
+    <div className="sticky top-0 z-10 flex items-center h-7 px-2 border-b border-border/30 bg-surface text-xs text-text-muted select-none">
+      <span className="w-5 flex-shrink-0" />
+      {SORT_COLS.map((col) => {
+        const active = sort.key === col.key;
+        return (
+          <span
+            key={col.key}
+            className={`${col.className} cursor-pointer hover:text-text-primary transition-colors ${
+              active ? 'text-text-primary font-medium' : ''
+            }`}
+            onClick={() => setSort(side, col.key)}
+          >
+            {col.label}
+            {active && (
+              <span className="ml-0.5">{sort.direction === 'asc' ? '▲' : '▼'}</span>
+            )}
+          </span>
+        );
+      })}
+    </div>
+  );
 }

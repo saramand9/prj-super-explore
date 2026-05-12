@@ -12,6 +12,7 @@ interface FileRowProps {
   isActive: boolean;
   disableHover?: boolean;
   highlight?: string;
+  dirSize?: number;
   onClick: (e: React.MouseEvent) => void;
   onDoubleClick: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
@@ -29,6 +30,7 @@ export const FileRow = memo(function FileRow({
   isActive,
   disableHover,
   highlight,
+  dirSize,
   onClick,
   onDoubleClick,
   onContextMenu,
@@ -56,7 +58,7 @@ export const FileRow = memo(function FileRow({
 
   const Icon = entry.isDirectory ? Folder : getFileIcon(entry.name);
   const iconColor = entry.isDirectory ? 'text-accent/70' : 'text-text-muted';
-  const sizeStr = formatSize(entry.size);
+  const sizeStr = formatSize(entry.isDirectory ? (dirSize ?? 0) : entry.size);
   const segments = highlightMatches(entry.name, highlight ?? '');
 
   return (
@@ -99,11 +101,11 @@ export const FileRow = memo(function FileRow({
           ),
         )}
       </span>
-      {!entry.isDirectory && (
-        <span className="w-20 text-right text-text-muted flex-shrink-0 ml-2">
-          {sizeStr}
-        </span>
-      )}
+      <span className="w-20 text-right text-text-muted flex-shrink-0 ml-2">
+        {entry.isDirectory
+          ? (dirSize === undefined ? <span className="text-text-muted/40">...</span> : sizeStr)
+          : sizeStr}
+      </span>
       <span className="w-36 text-right text-text-muted flex-shrink-0 ml-2">
         {formatDate(entry.modifiedAt)}
       </span>

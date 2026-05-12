@@ -41,7 +41,7 @@ export const useLayoutStore = create<{
     },
   },
   fontScale: 130,
-  theme: 'linear',
+  theme: 'grafana',
 
   setActivePanel: (id) => set((s) => ({ layout: { ...s.layout, id } })),
 

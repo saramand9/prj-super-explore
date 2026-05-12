@@ -28,6 +28,7 @@ interface PanelFileState {
 interface FileExplorerState {
   left: PanelFileState;
   right: PanelFileState;
+  dirSizeMap: Record<string, number>;
 
   navigateTo: (side: 'left' | 'right', path: string, addToHistory?: boolean) => Promise<void>;
   goBack: (side: 'left' | 'right') => Promise<void>;
@@ -39,6 +40,7 @@ interface FileExplorerState {
   clearSelection: (side: 'left' | 'right') => void;
   selectSingle: (side: 'left' | 'right', path: string) => void;
   selectAll: (side: 'left' | 'right') => void;
+  setDirSizes: (sizes: Record<string, number>) => void;
   setSort: (side: 'left' | 'right', key: SortConfig['key']) => void;
   toggleHidden: (side: 'left' | 'right') => void;
   pinTab: (side: 'left' | 'right', tabId: string) => void;
@@ -93,6 +95,7 @@ async function loadDir(
 export const useFileStore = create<FileExplorerState>((set, get) => ({
   left: defaultPanel(),
   right: defaultPanel(),
+  dirSizeMap: {},
 
   navigateTo: async (side, path, addToHistory = true) => {
     const panel = get()[side];
@@ -201,6 +204,9 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
     set((s) => ({
       [side]: { ...s[side], selected: new Set(s[side].entries.map((e) => e.path)) },
     })),
+
+  setDirSizes: (sizes) =>
+    set((s) => ({ dirSizeMap: { ...s.dirSizeMap, ...sizes } })),
 
   setSort: (side, key) => {
     const panel = get()[side];

@@ -75,6 +75,12 @@ export interface IpcChannels {
     res: FileEntry[];
   };
 
+  // 批量目录大小计算（递归，带缓存）
+  'file:dirSizes': {
+    req: { paths: string[] };
+    res: Record<string, number>;
+  };
+
   // Search
   'search:fulltext': {
     req: { dir: string; query: string; filePattern?: string; maxResults?: number };
