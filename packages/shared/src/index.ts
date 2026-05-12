@@ -4,6 +4,7 @@ export type {
   IpcEvents,
   FulltextMatch,
   IndexResult,
+  DirSizeResult,
 } from './types/ipc';
 export type {
   PluginManifest,

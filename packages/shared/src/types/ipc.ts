@@ -78,7 +78,7 @@ export interface IpcChannels {
   // 批量目录大小计算（递归，带缓存）
   'file:dirSizes': {
     req: { paths: string[] };
-    res: Record<string, number>;
+    res: Record<string, DirSizeResult>;
   };
 
   // Search
@@ -216,9 +216,20 @@ export interface IpcEvents {
   };
   'launcher:show': void;
   'launcher:hide': void;
+  'file:dirSizeUpdate': {
+    path: string;
+    size: number;
+    partial?: boolean;
+  };
 }
 
 // ── 内联子类型 ──────────────────────────────────
+
+export interface DirSizeResult {
+  size: number;
+  partial?: boolean;
+  fileCount?: number;
+}
 
 export interface FulltextMatch {
   filePath: string;

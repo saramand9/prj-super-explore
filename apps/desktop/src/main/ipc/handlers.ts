@@ -103,8 +103,34 @@ export function registerIpcHandlers(container: ServiceContainer): void {
 
   ipcMain.handle(
     'file:dirSizes',
-    (_e, payload: IpcChannels['file:dirSizes']['req']) =>
-      file.getDirSizes(payload.paths),
+    async (_e, payload: IpcChannels['file:dirSizes']['req']) => {
+      const result = await file.getDirSizes(payload.paths);
+
+      // 提前终止但未触及上限的目录，后台静默补算
+      const partialDirs = Object.entries(result)
+        .filter(([, r]) => r.partial && (r.fileCount ?? 0) < 50000)
+        .map(([p]) => p);
+
+      if (partialDirs.length > 0) {
+        setImmediate(async () => {
+          for (const dirPath of partialDirs) {
+            try {
+              const r = await file.computeDirSizeBackground(dirPath);
+              const win = BrowserWindow.getAllWindows()[0];
+              if (win && !win.isDestroyed()) {
+                win.webContents.send('file:dirSizeUpdate', {
+                  path: dirPath,
+                  size: r.size,
+                  partial: r.partial,
+                });
+              }
+            } catch { /* skip */ }
+          }
+        });
+      }
+
+      return result;
+    },
   );
 
   // ── Search ──

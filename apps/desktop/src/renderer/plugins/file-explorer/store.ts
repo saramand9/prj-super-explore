@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { FileEntry, SortConfig } from '@explore/shared';
+import type { FileEntry, SortConfig, DirSizeResult } from '@explore/shared';
 import { pinyin } from 'pinyin-pro';
 import { ipc } from '../../framework/bridge/ipc-client';
 
@@ -28,7 +28,7 @@ interface PanelFileState {
 interface FileExplorerState {
   left: PanelFileState;
   right: PanelFileState;
-  dirSizeMap: Record<string, number>;
+  dirSizeMap: Record<string, DirSizeResult>;
 
   navigateTo: (side: 'left' | 'right', path: string, addToHistory?: boolean) => Promise<void>;
   goBack: (side: 'left' | 'right') => Promise<void>;
@@ -40,7 +40,7 @@ interface FileExplorerState {
   clearSelection: (side: 'left' | 'right') => void;
   selectSingle: (side: 'left' | 'right', path: string) => void;
   selectAll: (side: 'left' | 'right') => void;
-  setDirSizes: (sizes: Record<string, number>) => void;
+  setDirSizes: (sizes: Record<string, DirSizeResult>) => void;
   setSort: (side: 'left' | 'right', key: SortConfig['key']) => void;
   toggleHidden: (side: 'left' | 'right') => void;
   pinTab: (side: 'left' | 'right', tabId: string) => void;

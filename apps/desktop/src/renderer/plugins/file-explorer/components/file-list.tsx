@@ -250,7 +250,7 @@ export function FileList({ side }: FileListProps) {
     overscan: 10,
   });
 
-  // 加载目录大小
+  // 加载目录大小（首次请求 + 后台补算监听）
   useEffect(() => {
     const dirs = entries.filter((e) => e.isDirectory).map((e) => e.path);
     if (dirs.length === 0) return;
@@ -258,6 +258,14 @@ export function FileList({ side }: FileListProps) {
       setDirSizes(sizes);
     });
   }, [entries, setDirSizes]);
+
+  // 后台补算结果推送
+  useEffect(() => {
+    const unsub = ipc.on('file:dirSizeUpdate', (payload) => {
+      setDirSizes({ [payload.path]: { size: payload.size, partial: payload.partial } });
+    });
+    return unsub;
+  }, [setDirSizes]);
 
   // ── 将导航同步到 LayoutStore ──
 

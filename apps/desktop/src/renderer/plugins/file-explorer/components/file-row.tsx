@@ -1,5 +1,5 @@
 import { memo, useCallback } from 'react';
-import type { FileEntry } from '@explore/shared';
+import type { FileEntry, DirSizeResult } from '@explore/shared';
 import { highlightMatches } from '../store';
 import {
   Folder, File, FileCode, FileJson, FileText, FileImage,
@@ -12,7 +12,7 @@ interface FileRowProps {
   isActive: boolean;
   disableHover?: boolean;
   highlight?: string;
-  dirSize?: number;
+  dirSize?: DirSizeResult;
   onClick: (e: React.MouseEvent) => void;
   onDoubleClick: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
@@ -58,7 +58,8 @@ export const FileRow = memo(function FileRow({
 
   const Icon = entry.isDirectory ? Folder : getFileIcon(entry.name);
   const iconColor = entry.isDirectory ? 'text-accent/70' : 'text-text-muted';
-  const sizeStr = formatSize(entry.isDirectory ? (dirSize ?? 0) : entry.size);
+  const sz = entry.isDirectory ? (dirSize?.size ?? 0) : entry.size;
+  const sizeStr = formatSize(sz);
   const segments = highlightMatches(entry.name, highlight ?? '');
 
   return (
@@ -101,9 +102,11 @@ export const FileRow = memo(function FileRow({
           ),
         )}
       </span>
-      <span className="w-20 text-right text-text-muted flex-shrink-0 ml-2">
+      <span className="w-20 text-right text-text-muted flex-shrink-0 ml-2 relative">
         {entry.isDirectory
-          ? (dirSize === undefined ? <span className="text-text-muted/40">...</span> : sizeStr)
+          ? (dirSize === undefined
+            ? <span className="text-text-muted/40">...</span>
+            : <>{sizeStr}{dirSize.partial && <span className="absolute -right-1.5">+</span>}</>)
           : sizeStr}
       </span>
       <span className="w-36 text-right text-text-muted flex-shrink-0 ml-2">

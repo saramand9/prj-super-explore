@@ -2,13 +2,16 @@ import { readdir, stat, copyFile, rename, unlink, rm, mkdir, access } from 'fs/p
 import { constants } from 'fs';
 import { join, basename, extname } from 'path';
 import { shell } from 'electron';
-import type { FileEntry, FileStat, FileOpResult, SortConfig } from '@explore/shared';
+import type { FileEntry, FileStat, FileOpResult, SortConfig, DirSizeResult } from '@explore/shared';
 import type { ServiceContainer } from '../service-container';
 import type { WatcherService } from './watcher.service';
 
+const DIR_SIZE_TIMEOUT = 1000; // ms
+const DIR_SIZE_MAX_FILES = 50000;
+
 export class FileService {
   private dirSizeCache = new Map<string, { size: number; ts: number }>();
-  private dirSizePending = new Map<string, Promise<number>>();
+  private dirSizePending = new Map<string, Promise<DirSizeResult>>();
 
   private get watcher(): WatcherService {
     return this.container.get<WatcherService>('watcher');
@@ -17,16 +20,16 @@ export class FileService {
   constructor(private container: ServiceContainer) {}
 
   /** 批量获取目录递归大小（带缓存，5分钟TTL） */
-  async getDirSizes(paths: string[]): Promise<Record<string, number>> {
+  async getDirSizes(paths: string[]): Promise<Record<string, DirSizeResult>> {
     const CACHE_TTL = 5 * 60 * 1000;
     const now = Date.now();
-    const result: Record<string, number> = {};
+    const result: Record<string, DirSizeResult> = {};
 
     await Promise.all(
       paths.map(async (dirPath) => {
         const cached = this.dirSizeCache.get(dirPath);
         if (cached && now - cached.ts < CACHE_TTL) {
-          result[dirPath] = cached.size;
+          result[dirPath] = { size: cached.size };
           return;
         }
         // 去重并发请求
@@ -38,11 +41,13 @@ export class FileService {
         const promise = this.computeDirSize(dirPath);
         this.dirSizePending.set(dirPath, promise);
         try {
-          const size = await promise;
-          this.dirSizeCache.set(dirPath, { size, ts: now });
-          result[dirPath] = size;
+          const r = await promise;
+          if (!r.partial) {
+            this.dirSizeCache.set(dirPath, { size: r.size, ts: now });
+          }
+          result[dirPath] = r;
         } catch {
-          result[dirPath] = 0;
+          result[dirPath] = { size: 0 };
         } finally {
           this.dirSizePending.delete(dirPath);
         }
@@ -51,27 +56,49 @@ export class FileService {
     return result;
   }
 
-  private async computeDirSize(dirPath: string): Promise<number> {
-    try {
-      const names = await readdir(dirPath);
-      const sizes = await Promise.all(
-        names.map(async (name) => {
-          try {
-            const fullPath = join(dirPath, name);
-            const st = await stat(fullPath);
-            if (st.isDirectory()) {
-              return this.computeDirSize(fullPath);
-            }
-            return st.size;
-          } catch {
-            return 0;
+  /** 后台完整计算（无时间限制，仅 maxFiles / maxDepth 兜底） */
+  async computeDirSizeBackground(dirPath: string): Promise<DirSizeResult> {
+    return this.computeDirSize(dirPath, 0);
+  }
+
+  private async computeDirSize(dirPath: string, timeout = DIR_SIZE_TIMEOUT): Promise<DirSizeResult> {
+    const start = Date.now();
+    let fileCount = 0;
+    let partial = false;
+
+    const timedOut = () => timeout > 0 && Date.now() - start > timeout;
+
+    async function walk(d: string, depth: number): Promise<number> {
+      if (depth > 8) { partial = true; return 0; }
+      try {
+        const names = await readdir(d);
+        let total = 0;
+        for (const name of names) {
+          if (timedOut() || fileCount >= DIR_SIZE_MAX_FILES) {
+            partial = true;
+            return total;
           }
-        }),
-      );
-      return sizes.reduce((a, b) => a + b, 0);
-    } catch {
-      return 0;
+          try {
+            const fullPath = join(d, name);
+            const st = await stat(fullPath);
+            fileCount++;
+            if (st.isDirectory() && !st.isSymbolicLink()) {
+              total += await walk(fullPath, depth + 1);
+            } else {
+              total += st.size;
+            }
+          } catch { /* skip */ }
+        }
+        return total;
+      } catch {
+        return 0;
+      }
     }
+
+    const size = await walk(dirPath, 1);
+    const result: DirSizeResult = { size, fileCount };
+    if (partial) result.partial = true;
+    return result;
   }
 
   /** 清除指定路径的缓存（文件变更后调用） */
