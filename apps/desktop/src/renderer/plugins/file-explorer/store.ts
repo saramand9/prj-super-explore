@@ -43,6 +43,7 @@ interface FileExplorerState {
   toggleHidden: (side: 'left' | 'right') => void;
   pinTab: (side: 'left' | 'right', tabId: string) => void;
   unpinTab: (side: 'left' | 'right', tabId: string) => void;
+  repinTab: (side: 'left' | 'right', tabId: string) => void;
   closeTab: (side: 'left' | 'right', tabId: string) => void;
   loadPinnedTabs: () => Promise<void>;
   persistPinnedTabs: (side: 'left' | 'right') => void;
@@ -237,6 +238,21 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
         tabs: s[side].tabs.map((t) => (t.id === tabId ? { ...t, pinned: false } : t)),
       },
     })),
+
+  repinTab: (side, tabId) =>
+    set((s) => {
+      const currentPath = s[side].path;
+      if (!currentPath) return {};
+      const label = tabLabel(currentPath);
+      return {
+        [side]: {
+          ...s[side],
+          tabs: s[side].tabs.map((t) =>
+            t.id === tabId ? { ...t, path: currentPath, label, initialPath: currentPath } : t,
+          ),
+        },
+      };
+    }),
 
   closeTab: (side, tabId) =>
     set((s) => {

@@ -1,7 +1,8 @@
 import { useCallback, useState, useRef, useEffect, useMemo } from 'react';
-import { Pin, PinOff, X, Pencil, Copy, ChevronRight, ChevronDown, Folder } from 'lucide-react';
+import { Pin, PinOff, X, Pencil, Copy, ChevronRight, ChevronDown, Folder, RefreshCw } from 'lucide-react';
 import { useFileStore, type Tab, type TabGroup, computeGroups } from '../store';
 import { useLayoutStore } from '../../../framework/store/layout-store';
+import { ipc } from '../../../framework/bridge/ipc-client';
 import { SpaceDropdown } from './space-dropdown';
 
 interface TabBarProps {
@@ -15,6 +16,7 @@ export function TabBar({ side }: TabBarProps) {
   const activateTab = useFileStore((s) => s.activateTab);
   const pinTab = useFileStore((s) => s.pinTab);
   const unpinTab = useFileStore((s) => s.unpinTab);
+  const repinTab = useFileStore((s) => s.repinTab);
   const closeTab = useFileStore((s) => s.closeTab);
   const forkTab = useFileStore((s) => s.forkTab);
   const renameTab = useFileStore((s) => s.renameTab);
@@ -27,6 +29,7 @@ export function TabBar({ side }: TabBarProps) {
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const editInputRef = useRef<HTMLInputElement>(null);
+  const sizerRef = useRef<HTMLSpanElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -36,6 +39,14 @@ export function TabBar({ side }: TabBarProps) {
     window.addEventListener('click', handler);
     return () => window.removeEventListener('click', handler);
   }, [contextMenu]);
+
+  // 重命名输入框自适应宽度
+  useEffect(() => {
+    if (editingTabId && editInputRef.current && sizerRef.current) {
+      const width = sizerRef.current.offsetWidth + 16; // padding
+      editInputRef.current.style.width = `${Math.max(80, width)}px`;
+    }
+  }, [editValue, editingTabId]);
 
   const handleClick = useCallback(
     (tab: Tab) => {
@@ -70,22 +81,37 @@ export function TabBar({ side }: TabBarProps) {
     setContextMenu(null);
   }, [contextMenu, side, unpinTab, persistPinnedTabs]);
 
-  const handleClose = useCallback(() => {
+  const handleRepin = useCallback(() => {
     if (contextMenu) {
-      const wasActive = contextMenu.tab.id === activeTabId;
-      closeTab(side, contextMenu.tab.id);
+      repinTab(side, contextMenu.tab.id);
       persistPinnedTabs(side);
-      if (wasActive) {
-        const remaining = useFileStore.getState()[side].tabs;
-        const next = remaining[remaining.length - 1];
-        if (next) {
-          navigateTo(side, next.path);
-          useLayoutStore.getState().setPanelPath(side, next.path);
-        }
+    }
+    setContextMenu(null);
+  }, [contextMenu, side, repinTab, persistPinnedTabs]);
+
+  const handleClose = useCallback(async () => {
+    if (!contextMenu) return;
+    const tab = contextMenu.tab;
+    if (tab.pinned) {
+      const confirmed = await ipc.invoke('dialog:confirm', {
+        message: `Close pinned tab "${tab.label}"?\n\nIt will be unpinned and closed.`,
+      });
+      if (!confirmed) { setContextMenu(null); return; }
+      unpinTab(side, tab.id);
+    }
+    const wasActive = tab.id === activeTabId;
+    closeTab(side, tab.id);
+    persistPinnedTabs(side);
+    if (wasActive) {
+      const remaining = useFileStore.getState()[side].tabs;
+      const next = remaining[remaining.length - 1];
+      if (next) {
+        navigateTo(side, next.path);
+        useLayoutStore.getState().setPanelPath(side, next.path);
       }
     }
     setContextMenu(null);
-  }, [contextMenu, side, activeTabId, closeTab, navigateTo, persistPinnedTabs]);
+  }, [contextMenu, side, activeTabId, closeTab, unpinTab, navigateTo, persistPinnedTabs]);
 
   const handleFork = useCallback(() => {
     if (contextMenu) {
@@ -126,10 +152,11 @@ export function TabBar({ side }: TabBarProps) {
         if (group) {
           const isCollapsed = collapsedGroups.includes(group.path);
           items.push({ kind: 'group', group });
-          if (!isCollapsed) {
-            for (const tabId of group.tabIds) {
+          for (const tabId of group.tabIds) {
+            renderedTabs.add(tabId);
+            if (!isCollapsed) {
               const t = tabs.find((x) => x.id === tabId);
-              if (t) { items.push({ kind: 'tab', tab: t, grouped: true }); renderedTabs.add(t.id); }
+              if (t) items.push({ kind: 'tab', tab: t, grouped: true });
             }
           }
         }
@@ -177,9 +204,17 @@ export function TabBar({ side }: TabBarProps) {
           <Pin className="w-3 h-3 flex-shrink-0 text-accent/60" />
         )}
         {editingTabId === tab.id ? (
+          <>
+          <span
+            ref={sizerRef}
+            className="px-1.5 py-0 text-xs whitespace-pre invisible fixed"
+            aria-hidden="true"
+          >
+            {editValue || ' '}
+          </span>
           <input
             ref={editInputRef}
-            className="bg-surface-lighter border border-accent/50 rounded px-1.5 py-0 text-xs text-text-primary outline-none w-[100px]"
+            className="bg-surface-lighter border border-accent/50 rounded px-1.5 py-0 text-xs text-text-primary outline-none w-[80px]"
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
             onBlur={confirmRename}
@@ -189,6 +224,7 @@ export function TabBar({ side }: TabBarProps) {
             }}
             onClick={(e) => e.stopPropagation()}
           />
+          </>
         ) : (
           <span className="truncate min-w-0">{tab.label}</span>
         )}
@@ -279,9 +315,8 @@ export function TabBar({ side }: TabBarProps) {
           {contextMenu.tab.pinned ? (
             <button
               className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
-              onClick={handleUnpin}
             >
-              <PinOff className="w-3.5 h-3.5" /> Unpin tab
+              <Pin className="w-3.5 h-3.5" /> Pin tab
             </button>
           ) : (
             <button
@@ -289,6 +324,34 @@ export function TabBar({ side }: TabBarProps) {
               onClick={handlePin}
             >
               <Pin className="w-3.5 h-3.5" /> Pin tab
+            </button>
+          )}
+          {contextMenu.tab.pinned ? (
+            <button
+              className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
+              onClick={handleUnpin}
+            >
+              <PinOff className="w-3.5 h-3.5" /> Unpin tab
+            </button>
+          ) : (
+            <button
+              className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
+            >
+              <PinOff className="w-3.5 h-3.5" /> Unpin tab
+            </button>
+          )}
+          {contextMenu.tab.pinned ? (
+            <button
+              className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
+              onClick={handleRepin}
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> Re-pin tab
+            </button>
+          ) : (
+            <button
+              className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> Re-pin tab
             </button>
           )}
           <button
@@ -303,7 +366,14 @@ export function TabBar({ side }: TabBarProps) {
           >
             <Copy className="w-3.5 h-3.5" /> Clone tab
           </button>
-          {!contextMenu.tab.pinned && (
+          {contextMenu.tab.pinned ? (
+            <button
+              className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
+              onClick={handleClose}
+            >
+              <X className="w-3.5 h-3.5" /> Close tab
+            </button>
+          ) : (
             <button
               className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
               onClick={handleClose}

@@ -28,6 +28,7 @@ export function FileList({ side }: FileListProps) {
   const setFilter = useFileStore((s) => s.setFilter);
   const pinTab = useFileStore((s) => s.pinTab);
   const unpinTab = useFileStore((s) => s.unpinTab);
+  const repinTab = useFileStore((s) => s.repinTab);
   const refresh = useFileStore((s) => s.refresh);
 
   const lastSelectedRef = useRef<string | null>(null);
@@ -440,6 +441,19 @@ export function FileList({ side }: FileListProps) {
               unpinTab(side, activeTabId);
             } else {
               pinTab(side, activeTabId);
+            }
+          }
+          break;
+
+        case 'r':
+        case 'R':
+          if (e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey) {
+            e.preventDefault();
+            const activeTabIdRepin = useFileStore.getState()[side].activeTabId;
+            if (!activeTabIdRepin) break;
+            const activeTabRepin = useFileStore.getState()[side].tabs.find((t) => t.id === activeTabIdRepin);
+            if (activeTabRepin?.pinned) {
+              repinTab(side, activeTabIdRepin);
             }
           }
           break;

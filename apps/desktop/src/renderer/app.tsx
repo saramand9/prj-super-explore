@@ -218,6 +218,7 @@ function MainApp() {
         <span>F7 New Folder</span>
         <span>F8 Delete</span>
         <span>Ctrl+Shift+P Pin</span>
+        <span>Ctrl+Shift+R Re-pin</span>
         <span>Ctrl+W Workspace</span>
         <span>Ctrl+Shift+F Search</span>
       </div>
