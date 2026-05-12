@@ -360,26 +360,36 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
 }));
 
 /** 拼音混合匹配：输入可跨越词边界，每个词可匹配前缀或跳过 */
-function matchPinyinMixed(input: string, words: string[]): boolean {
-  const memo = new Map<string, boolean>();
-  function dfs(i: number, w: number): boolean {
-    if (i >= input.length) return true;
-    if (w >= words.length) return false;
+/** 混合拼音匹配，返回匹配的 word 下标数组，null 表示不匹配 */
+function matchPinyinMixedIndices(input: string, words: string[]): number[] | null {
+  const memo = new Map<string, number[] | null>();
+  function dfs(i: number, w: number): number[] | null {
+    if (i >= input.length) return [];
+    if (w >= words.length) return null;
     const key = `${i},${w}`;
     if (memo.has(key)) return memo.get(key)!;
     const maxMatch = Math.min(words[w].length, input.length - i);
-    for (let n = maxMatch; n >= 0; n--) {
+    // 只有还未匹配任何输入时才能跳过字(i===0允许n=0)，
+    // 一旦开始匹配，必须连续匹配后续字，不能跳字
+    const minN = i === 0 ? 0 : 1;
+    for (let n = maxMatch; n >= minN; n--) {
       if (words[w].slice(0, n) === input.slice(i, i + n)) {
-        if (dfs(i + n, w + 1)) {
-          memo.set(key, true);
-          return true;
+        const rest = dfs(i + n, w + 1);
+        if (rest !== null) {
+          const result = n > 0 ? [w, ...rest] : rest;
+          memo.set(key, result);
+          return result;
         }
       }
     }
-    memo.set(key, false);
-    return false;
+    memo.set(key, null);
+    return null;
   }
   return dfs(0, 0);
+}
+
+function matchPinyinMixed(input: string, words: string[]): boolean {
+  return matchPinyinMixedIndices(input, words) !== null;
 }
 
 /** 获取指定面板筛选后的文件列表 */
@@ -389,6 +399,8 @@ export function useFilteredEntries(side: 'left' | 'right') {
   const lower = panel.filterText.toLowerCase();
   return panel.entries.filter((e) => {
     if (e.name.toLowerCase().includes(lower)) return true;
+    // 只有包含中文才做拼音匹配，避免纯英文文本被 pinyin-pro 逐字符拆分后误匹配
+    if (!/[一-鿿]/.test(e.name)) return false;
     const full = pinyin(e.name, { toneType: 'none' }).replace(/\s+/g, '').toLowerCase();
     if (full.includes(lower)) return true;
     const initials = pinyin(e.name, { pattern: 'first', toneType: 'none' }).replace(/\s+/g, '').toLowerCase();
@@ -477,10 +489,26 @@ export function highlightMatches(
     return result;
   }
 
-  // 4. 混合拼音匹配成功但无法精确定位，整体高亮
-  const words = pyArray;
-  if (matchPinyinMixed(lowerFilter, words)) {
-    return [{ text: name, match: true }];
+  // 4. 混合拼音匹配 — 用匹配到的字下标精确定位高亮
+  const matchedIndices = matchPinyinMixedIndices(lowerFilter, pyArray);
+  if (matchedIndices) {
+    const matchedSet = new Set(matchedIndices);
+    const result: { text: string; match: boolean }[] = [];
+    for (let i = 0; i < pyArray.length; i++) {
+      const char = name[i];
+      if (matchedSet.has(i)) {
+        if (result.length > 0 && result[result.length - 1].match) {
+          result[result.length - 1].text += char;
+        } else {
+          result.push({ text: char, match: true });
+        }
+      } else if (result.length > 0 && !result[result.length - 1].match) {
+        result[result.length - 1].text += char;
+      } else {
+        result.push({ text: char, match: false });
+      }
+    }
+    return result;
   }
 
   return [{ text: name, match: false }];
