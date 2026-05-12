@@ -231,15 +231,13 @@ export function FileList({ side }: FileListProps) {
     resolve: (ok: boolean) => void;
   } | null>(null);
 
-  // 筛选文本/路径变化时，同步重置焦点并选中第一项
+  // 筛选文本/路径变化时，重置焦点并清空选择
   // focusIdxRef 同步赋值避免 React setState 异步批量更新导致 Enter 时读取到旧值
   useEffect(() => {
     setFocusIdx(0);
     focusIdxRef.current = 0;
-    if (entries.length > 0) {
-      selectSingle(side, entries[0].path);
-    }
-    // entries/selectSingle 故意不放 deps，只在 filterText/path 变化时触发
+    clearSelection(side);
+    // entries/clearSelection 故意不放 deps，只在 filterText/path 变化时触发
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterText, path]);
 
