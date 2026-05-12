@@ -48,7 +48,7 @@ function buildTabs(snap: Space['left']): { tabs: Tab[]; activeTabId: string | nu
   return { tabs, activeTabId };
 }
 
-async function restoreState(side: 'left' | 'right', snap: Space['left']): Promise<void> {
+export async function restoreState(side: 'left' | 'right', snap: Space['left']): Promise<void> {
   // 构建新标签列表 + 活跃标签 ID（单次 setState 避免逐个 closeTab/addTab 的中间渲染）
   const { tabs, activeTabId } = buildTabs(snap);
 
@@ -72,6 +72,18 @@ async function restoreState(side: 'left' | 'right', snap: Space['left']): Promis
   }
 }
 
+let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** 订阅 file store 变化，防抖自动存盘 */
+export function initAutoSave(): void {
+  useFileStore.subscribe(() => {
+    if (autoSaveTimer) clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(() => {
+      useSpaceStore.getState().saveCurrentSpace();
+    }, 500);
+  });
+}
+
 export const useSpaceStore = create<{
   spaces: Space[];
   activeSpaceId: string;
@@ -79,11 +91,25 @@ export const useSpaceStore = create<{
   addSpace: (name: string) => void;
   removeSpace: (id: string) => void;
   renameSpace: (id: string, name: string) => void;
+  /** 将当前标签状态保存到活跃 Space */
+  saveCurrentSpace: () => void;
   loadSpaces: () => Promise<void>;
   persistSpaces: () => Promise<void>;
 }>((set, get) => ({
   spaces: [],
   activeSpaceId: '',
+
+  saveCurrentSpace: () => {
+    const { spaces, activeSpaceId } = get();
+    set({
+      spaces: spaces.map((s) =>
+        s.id === activeSpaceId
+          ? { ...s, left: snapshotState('left'), right: snapshotState('right') }
+          : s,
+      ),
+    });
+    get().persistSpaces();
+  },
 
   switchSpace: async (id) => {
     const { spaces, activeSpaceId } = get();

@@ -10,7 +10,7 @@ import { ActivityBar } from './components/activity-bar';
 import { PluginManagerDialog } from './components/plugin-manager-dialog';
 import { Launcher } from './plugins/quick-launcher';
 import { useFileStore, TabBar, AddressBar } from './plugins/file-explorer';
-import { useSpaceStore } from './plugins/file-explorer/space-store';
+import { useSpaceStore, restoreState, initAutoSave } from './plugins/file-explorer/space-store';
 import type { Tab } from './plugins/file-explorer/store';
 import { FileSearch } from './plugins/file-explorer/components/file-search';
 import { TabSearch } from './plugins/file-explorer/components/tab-search';
@@ -66,17 +66,23 @@ function MainApp() {
     if (t.className) document.body.classList.add(t.className);
   }, [theme]);
 
-  // 启动时恢复固定标签，打开第一个标签或默认目录
+  // 启动时恢复 Space 标签 / 固定标签
   useEffect(() => {
     async function init() {
       await useFileStore.getState().loadPinnedTabs();
       await useSpaceStore.getState().loadSpaces();
 
-      const currentLayout = useLayoutStore.getState().layout;
-      const fileStore = useFileStore.getState();
+      const spaceStore = useSpaceStore.getState();
+      const activeSpace = spaceStore.spaces.find((s) => s.id === spaceStore.activeSpaceId);
 
-      // 左面板
-      if (!currentLayout.left.path) {
+      // 如果活跃 Space 有标签，优先恢复 Space 中的标签
+      const leftTabs = activeSpace?.left.tabs ?? [];
+      const rightTabs = activeSpace?.right.tabs ?? [];
+
+      if (leftTabs.length > 0) {
+        await restoreState('left', activeSpace!.left);
+      } else {
+        const fileStore = useFileStore.getState();
         const leftPinned = fileStore.left.tabs.filter((t) => t.pinned);
         const leftTarget = leftPinned.length > 0 ? leftPinned[leftPinned.length - 1].path : null;
         if (leftTarget) {
@@ -91,8 +97,10 @@ function MainApp() {
         }
       }
 
-      // 右面板
-      if (!currentLayout.right.path) {
+      if (rightTabs.length > 0) {
+        await restoreState('right', activeSpace!.right);
+      } else {
+        const fileStore = useFileStore.getState();
         const rightPinned = fileStore.right.tabs.filter((t) => t.pinned);
         const rightTarget = rightPinned.length > 0 ? rightPinned[rightPinned.length - 1].path : null;
         if (rightTarget) {
@@ -103,6 +111,16 @@ function MainApp() {
       }
     }
     init();
+    initAutoSave();
+  }, []);
+
+  // 关闭前保存当前 Space
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      useSpaceStore.getState().saveCurrentSpace();
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
   const activePanel = layout.id;
