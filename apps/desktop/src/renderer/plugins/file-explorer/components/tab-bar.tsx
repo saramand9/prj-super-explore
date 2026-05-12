@@ -156,7 +156,7 @@ export function TabBar({ side }: TabBarProps) {
     return (
       <div
         key={tab.id}
-        className={`group flex items-center gap-1.5 py-1 cursor-pointer select-none text-xs transition-colors duration-150 border-t border-x rounded-t -mb-px min-w-[60px] max-w-[180px] ${
+        className={`group flex items-center gap-1.5 py-1 cursor-pointer select-none text-xs transition-colors duration-150 border-t border-x rounded-t -mb-px min-w-[60px] ${
           indented ? 'pl-6 pr-3' : 'px-3'
         } ${
           isActive
