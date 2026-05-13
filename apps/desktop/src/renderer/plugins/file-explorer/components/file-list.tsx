@@ -247,6 +247,7 @@ export function FileList({ side }: FileListProps) {
     count: entries.length,
     getScrollElement: () => containerRef.current,
     estimateSize: () => 30,
+    measureElement: (el) => el.getBoundingClientRect().height,
     overscan: 10,
   });
 
@@ -604,9 +605,10 @@ export function FileList({ side }: FileListProps) {
           return (
             <div
               key={entry.path}
+              ref={virtualizer.measureElement}
+              data-index={idx}
               className="absolute top-0 left-0 w-full"
               style={{
-                height: `${virtualItem.size}px`,
                 transform: `translateY(${virtualItem.start}px)`,
               }}
             >

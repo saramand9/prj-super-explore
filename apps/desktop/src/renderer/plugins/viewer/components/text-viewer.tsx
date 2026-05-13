@@ -85,11 +85,13 @@ export function TextViewer({ side }: { side: 'left' | 'right' }) {
   const error = useViewerStore((s) => s.error);
   const loadFile = useViewerStore((s) => s.loadFile);
   const [preview, setPreview] = useState(false);
+  const [activeLine, setActiveLine] = useState<number | null>(null);
 
   useEffect(() => {
     if (filePath) {
       loadFile(filePath);
       setPreview(filePath.toLowerCase().endsWith('.md'));
+      setActiveLine(null);
     }
   }, [filePath, loadFile]);
 
@@ -185,22 +187,34 @@ export function TextViewer({ side }: { side: 'left' | 'right' }) {
         ) : isCsvFile && csvRows && csvRows.length > 0 ? (
           <CsvTable rows={csvRows} />
         ) : (
-          <div className="flex font-mono text-sm leading-relaxed">
-            <div
-              className="flex-shrink-0 py-4 select-none text-right text-text-muted/50 border-r border-border/30 bg-surface-light/30"
-              style={{ minWidth: `${maxLineDigits * 0.75 + 2}em`, paddingRight: '0.75em', paddingLeft: '0.75em' }}
-            >
-              {sourceLines.map((_, i) => (
-                <div key={i}>{i + 1}</div>
-              ))}
-            </div>
-            <pre className="flex-1 p-4 whitespace-pre-wrap break-words select-text overflow-x-auto">
-              <code className={`hljs ${lang ? `language-${lang}` : ''}`}>
-                {sourceLines.map((lineHtml, i) => (
-                  <div key={i} dangerouslySetInnerHTML={{ __html: lineHtml || ' ' }} />
-                ))}
-              </code>
-            </pre>
+          <div
+            className="font-mono text-sm leading-relaxed py-4"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: `${maxLineDigits * 0.75 + 2}em 1fr`,
+            }}
+          >
+            {sourceLines.map((lineHtml, i) => {
+              const isActive = i === activeLine;
+              const activeCls = isActive ? 'bg-accent/15' : '';
+              return (
+              <>
+                <div
+                  className={`text-right text-text-muted/30 select-none cursor-pointer hover:bg-surface-lighter/50 ${activeCls}`}
+                  style={{ paddingRight: '1em', paddingLeft: '0.75em' }}
+                  onClick={() => setActiveLine(i)}
+                >
+                  {i + 1}
+                </div>
+                <code
+                  className={`hljs ${lang ? `language-${lang}` : ''} whitespace-pre-wrap break-words cursor-pointer hover:bg-surface-lighter/50 ${activeCls}`}
+                  style={{ paddingLeft: '1rem', paddingRight: '1rem' }}
+                  onClick={() => setActiveLine(i)}
+                >
+                  <div dangerouslySetInnerHTML={{ __html: lineHtml || ' ' }} />
+                </code>
+              </>
+            )})}
           </div>
         )}
       </div>
