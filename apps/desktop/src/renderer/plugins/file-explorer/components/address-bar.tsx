@@ -6,14 +6,17 @@ import { ipc } from '../../../framework/bridge/ipc-client';
 
 interface AddressBarProps {
   side: 'left' | 'right';
+  pathOverride?: string | null;
+  onNavigate?: (path: string) => void;
 }
 
 function naturalName(fullPath: string): string {
   return '起点';
 }
 
-export function AddressBar({ side }: AddressBarProps) {
-  const path = useFileStore((s) => s[side].path);
+export function AddressBar({ side, pathOverride, onNavigate }: AddressBarProps) {
+  const storePath = useFileStore((s) => s[side].path);
+  const path = pathOverride ?? storePath;
   const initialPath = useFileStore((s) => {
     const panel = s[side];
     const activeTab = panel.tabs.find((t) => t.id === panel.activeTabId);
@@ -37,8 +40,9 @@ export function AddressBar({ side }: AddressBarProps) {
     (targetPath: string) => {
       navigateTo(side, targetPath);
       syncLayout(targetPath);
+      onNavigate?.(targetPath);
     },
-    [side, navigateTo, syncLayout],
+    [side, navigateTo, syncLayout, onNavigate],
   );
 
   const startEdit = useCallback(() => {

@@ -7,9 +7,11 @@ import { SpaceDropdown } from './space-dropdown';
 
 interface TabBarProps {
   side: 'left' | 'right';
+  keepEmpty?: boolean;
+  onTabClick?: (tab: Tab) => void;
 }
 
-export function TabBar({ side }: TabBarProps) {
+export function TabBar({ side, keepEmpty = false, onTabClick }: TabBarProps) {
   const tabs = useFileStore((s) => s[side].tabs);
   const activeTabId = useFileStore((s) => s[side].activeTabId);
   const navigateTo = useFileStore((s) => s.navigateTo);
@@ -55,8 +57,9 @@ export function TabBar({ side }: TabBarProps) {
         navigateTo(side, tab.path);
         useLayoutStore.getState().setPanelPath(side, tab.path);
       }
+      onTabClick?.(tab);
     },
-    [side, activeTabId, activateTab, navigateTo],
+    [side, activeTabId, activateTab, navigateTo, onTabClick],
   );
 
   const handleContextMenu = useCallback((e: React.MouseEvent, tab: Tab) => {
@@ -177,7 +180,12 @@ export function TabBar({ side }: TabBarProps) {
     return items;
   }, [tabs, collapsedGroups]);
 
-  if (tabs.length === 0 && side !== 'left') return null;
+  if (tabs.length === 0 && side !== 'left') {
+    if (keepEmpty) {
+      return <div className="flex items-center px-1 flex-shrink-0 h-8" />;
+    }
+    return null;
+  }
 
   if (tabs.length === 0 && side === 'left') {
     return (

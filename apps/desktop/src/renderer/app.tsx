@@ -277,6 +277,9 @@ function PanelSlot({
   const isActive = layout.id === side;
   const [showTabSearch, setShowTabSearch] = useState(false);
   const [showFileSearch, setShowFileSearch] = useState(false);
+  const viewerDir = pluginId === 'viewer' && panel.path ? parentDir(panel.path) : null;
+  const panelDirectoryPath = pluginId === 'viewer' ? viewerDir : panel.path;
+  const showExplorerChrome = pluginId === 'file-explorer' || pluginId === 'viewer';
 
   // Ctrl+T / Ctrl+P 搜索标签
   useEffect(() => {
@@ -326,54 +329,68 @@ function PanelSlot({
     return <Renderer side={side} />;
   };
 
+  const switchToFileExplorer = useCallback(
+    async (targetDir: string | null | undefined) => {
+      const fileStore = useFileStore.getState();
+
+      if (pluginId === 'viewer') {
+        useViewerStore.getState().clear(side);
+      }
+
+      useLayoutStore.getState().setPanelPlugin(side, 'file-explorer', 'browser');
+      if (targetDir) {
+        if (fileStore[side].tabs.length === 0) {
+          fileStore.addTab(side, targetDir);
+        }
+        if (fileStore[side].path !== targetDir) {
+          await fileStore.navigateTo(side, targetDir, false);
+        }
+        useLayoutStore.getState().setPanelPath(side, targetDir);
+      }
+      useLayoutStore.getState().setActivePanel(side);
+    },
+    [side, pluginId],
+  );
+
+  const handleViewerChromeNavigate = useCallback(
+    (targetDir: string) => {
+      switchToFileExplorer(targetDir);
+    },
+    [switchToFileExplorer],
+  );
+
   // 打开文件夹
   const handleOpenFolder = useCallback(async () => {
     const result = await ipc.invoke('dialog:openFolder', {
-      defaultPath: panel.path ?? undefined,
+      defaultPath: panelDirectoryPath ?? undefined,
     });
     if (result) {
       useFileStore.getState().addTab(side, result);
       useFileStore.getState().navigateTo(side, result, false);
       useLayoutStore.getState().setPanelPath(side, result);
     }
-  }, [side, panel.path]);
+  }, [side, panelDirectoryPath]);
 
   const handleClosePluginPanel = useCallback(async () => {
     const fileStore = useFileStore.getState();
     const previousDir = fileStore[side].path;
     const fallbackDir = pluginId === 'viewer' && panel.path ? parentDir(panel.path) : panel.path;
-    const targetDir = previousDir ?? fallbackDir;
-
-    if (pluginId === 'viewer') {
-      useViewerStore.getState().clear(side);
-    }
-
-    useLayoutStore.getState().setPanelPlugin(side, 'file-explorer', 'browser');
-    if (targetDir) {
-      if (fileStore[side].tabs.length === 0) {
-        fileStore.addTab(side, targetDir);
-      }
-      if (fileStore[side].path !== targetDir) {
-        await fileStore.navigateTo(side, targetDir, false);
-      }
-      useLayoutStore.getState().setPanelPath(side, targetDir);
-    }
-    useLayoutStore.getState().setActivePanel(side);
-  }, [side, pluginId, panel.path]);
+    await switchToFileExplorer(previousDir ?? fallbackDir);
+  }, [side, pluginId, panel.path, switchToFileExplorer]);
 
   // 拖放处理
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    if (!panel.path) {
+    if (!panelDirectoryPath) {
       e.dataTransfer.dropEffect = 'none';
       return;
     }
     e.dataTransfer.dropEffect = e.ctrlKey || e.metaKey ? 'move' : 'copy';
-  }, [panel.path]);
+  }, [panelDirectoryPath]);
 
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
-    if (!panel.path) {
+    if (!panelDirectoryPath) {
       notify('目标面板没有打开文件夹', 'warn');
       return;
     }
@@ -382,7 +399,7 @@ function PanelSlot({
     const sources: string[] = JSON.parse(data);
     if (sources.length === 0) return;
 
-    const targetDir = panel.path;
+    const targetDir = panelDirectoryPath;
 
     // 同一目录忽略
     if (sources.every((s) => {
@@ -427,7 +444,7 @@ function PanelSlot({
     useFileStore.getState().refresh(side);
     const otherSide = side === 'left' ? 'right' : 'left';
     useFileStore.getState().refresh(otherSide);
-  }, [side, panel.path, notify]);
+  }, [side, panelDirectoryPath, notify]);
 
   return (
     <div
@@ -437,8 +454,12 @@ function PanelSlot({
       {/* Tab Bar + Panel Header — 统一背景 */}
       <div className={`flex-shrink-0 ${isActive ? 'bg-surface-lighter' : 'bg-surface'}`}>
       <ErrorBoundary name={`TabBar-${side}`}>
-        {pluginId === 'file-explorer' ? (
-          <TabBar side={side} />
+        {showExplorerChrome ? (
+          <TabBar
+            side={side}
+            keepEmpty={pluginId === 'viewer'}
+            onTabClick={pluginId === 'viewer' ? (tab) => { switchToFileExplorer(tab.path); } : undefined}
+          />
         ) : (
           <div className="h-8 flex items-center px-3 text-[11px] text-text-muted/50 select-none">
             {pluginId === 'fulltext-search' && 'Search'}
@@ -453,13 +474,17 @@ function PanelSlot({
         className="h-8 flex items-center px-2 text-sm border-b border-border/30"
       >
         {/* 地址栏 / 路径面包屑 */}
-        {pluginId === 'file-explorer' && panel.path && (
-          <AddressBar side={side} />
+        {showExplorerChrome && panelDirectoryPath && (
+          <AddressBar
+            side={side}
+            pathOverride={pluginId === 'viewer' ? panelDirectoryPath : undefined}
+            onNavigate={pluginId === 'viewer' ? handleViewerChromeNavigate : undefined}
+          />
         )}
-        {pluginId !== 'file-explorer' && panel.path && (
+        {!showExplorerChrome && panel.path && (
           <PathBreadcrumb path={panel.path} />
         )}
-        {!panel.path && (
+        {(!panel.path || (showExplorerChrome && !panelDirectoryPath)) && (
           <span className="flex-1" />
         )}
 
