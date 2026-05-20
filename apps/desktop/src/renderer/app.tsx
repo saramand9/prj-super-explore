@@ -166,7 +166,7 @@ function MainApp() {
   // Ctrl+Shift+F: 在当前活跃面板打开全文搜索
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'F' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+      if (e.key.toLowerCase() === 'f' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
         e.preventDefault();
         const activeSide = useLayoutStore.getState().layout.id;
         if (activeSide === 'left' || activeSide === 'right') {
@@ -293,7 +293,7 @@ function PanelSlot({
         e.preventDefault();
         setShowTabSearch((s) => !s);
       }
-      if (e.key === 'f' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+      if (e.key.toLowerCase() === 'f' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
         e.preventDefault();
         setShowFileSearch((s) => !s);
       }

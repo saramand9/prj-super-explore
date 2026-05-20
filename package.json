@@ -9,7 +9,10 @@
     "preview": "pnpm --filter @explore/desktop preview",
     "lint": "biome check .",
     "format": "biome format --write .",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter @explore/desktop test",
+    "test:unit": "pnpm --filter @explore/desktop test:unit",
+    "test:e2e": "pnpm --filter @explore/desktop test:e2e"
   },
   "engines": {
     "node": ">=22.0.0",

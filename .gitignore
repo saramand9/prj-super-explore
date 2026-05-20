@@ -9,4 +9,6 @@ out
 .turbo
 .cache
 .claude
+test-results
+playwright-report
 scripts/benchmark/data/*.log
