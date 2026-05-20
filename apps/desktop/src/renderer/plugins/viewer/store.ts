@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { ipc } from '../../framework/bridge/ipc-client';
+import type { FileReadResult } from '@explore/shared';
+import { getIpcErrorMessage, ipc } from '../../framework/bridge/ipc-client';
 
 type ViewerSide = 'left' | 'right';
 
@@ -16,6 +17,15 @@ interface ViewerPanelState {
   content: string;
   loading: boolean;
   error: string | null;
+  watchError: string | null;
+  readInfo: {
+    size: number;
+    bytesRead: number;
+    partial: boolean;
+    limit?: number;
+    canContinue: boolean;
+    full: boolean;
+  } | null;
   searchHighlight: SearchHighlight | null;
 }
 
@@ -23,6 +33,7 @@ interface ViewerState {
   left: ViewerPanelState;
   right: ViewerPanelState;
   loadFile: (side: ViewerSide, path: string) => Promise<void>;
+  loadFullFile: (side: ViewerSide) => Promise<void>;
   setSearchHighlight: (side: ViewerSide, highlight: SearchHighlight | null) => void;
   clear: (side: ViewerSide) => void;
   reload: (side: ViewerSide) => Promise<void>;
@@ -35,6 +46,8 @@ function defaultPanel(): ViewerPanelState {
     content: '',
     loading: false,
     error: null,
+    watchError: null,
+    readInfo: null,
     searchHighlight: null,
   };
 }
@@ -50,6 +63,17 @@ function keepHighlightForPath(
   return highlight && normalizePath(highlight.filePath) === normalizePath(path)
     ? highlight
     : null;
+}
+
+function toReadInfo(result: FileReadResult, full: boolean): ViewerPanelState['readInfo'] {
+  return {
+    size: result.size,
+    bytesRead: result.bytesRead,
+    partial: !!result.partial,
+    limit: result.limit,
+    canContinue: !!result.canContinue,
+    full,
+  };
 }
 
 export const useViewerStore = create<ViewerState>((set, get) => ({
@@ -68,6 +92,8 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
         filePath: path,
         loading: true,
         error: null,
+        watchError: null,
+        readInfo: null,
         content: '',
         searchHighlight: keepHighlightForPath(s[side].searchHighlight, path),
       },
@@ -79,15 +105,48 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
         [side]: {
           ...s[side],
           content: result.content,
+          readInfo: toReadInfo(result, !result.partial),
           loading: false,
         },
       }));
-      ipc.invoke('file:watchFile', { path }).catch(() => {});
+      ipc.invoke('file:watchFile', { path }).catch((err) => {
+        set((s) => ({
+          [side]: {
+            ...s[side],
+            watchError: getIpcErrorMessage(err, '文件监听失败，内容不会自动刷新'),
+          },
+        }));
+      });
     } catch (err: any) {
       set((s) => ({
         [side]: {
           ...s[side],
-          error: err.message,
+          error: getIpcErrorMessage(err, '文件读取失败'),
+          loading: false,
+        },
+      }));
+    }
+  },
+
+  loadFullFile: async (side) => {
+    const path = get()[side].filePath;
+    if (!path) return;
+    set((s) => ({ [side]: { ...s[side], loading: true, error: null } }));
+    try {
+      const result = await ipc.invoke('file:read', { path, loadFull: true });
+      set((s) => ({
+        [side]: {
+          ...s[side],
+          content: result.content,
+          readInfo: toReadInfo(result, true),
+          loading: false,
+        },
+      }));
+    } catch (err) {
+      set((s) => ({
+        [side]: {
+          ...s[side],
+          error: getIpcErrorMessage(err, '完整文件加载失败'),
           loading: false,
         },
       }));
@@ -108,11 +167,13 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
     if (!path) return;
     set((s) => ({ [side]: { ...s[side], loading: true, error: null } }));
     try {
-      const result = await ipc.invoke('file:read', { path });
+      const loadFull = get()[side].readInfo?.full ?? false;
+      const result = await ipc.invoke('file:read', { path, loadFull });
       set((s) => ({
         [side]: {
           ...s[side],
           content: result.content,
+          readInfo: toReadInfo(result, loadFull || !result.partial),
           loading: false,
         },
       }));
@@ -120,7 +181,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
       set((s) => ({
         [side]: {
           ...s[side],
-          error: err.message,
+          error: getIpcErrorMessage(err, '文件重新加载失败'),
           loading: false,
         },
       }));
@@ -131,10 +192,23 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
     const path = get()[side].filePath;
     if (!path) return;
     try {
-      const result = await ipc.invoke('file:read', { path });
-      set((s) => ({ [side]: { ...s[side], content: result.content } }));
-    } catch {
-      // 静默失败，不打扰用户
+      const loadFull = get()[side].readInfo?.full ?? false;
+      const result = await ipc.invoke('file:read', { path, loadFull });
+      set((s) => ({
+        [side]: {
+          ...s[side],
+          content: result.content,
+          readInfo: toReadInfo(result, loadFull || !result.partial),
+          error: null,
+        },
+      }));
+    } catch (err) {
+      set((s) => ({
+        [side]: {
+          ...s[side],
+          error: getIpcErrorMessage(err, '文件自动刷新失败'),
+        },
+      }));
     }
   },
 }));
@@ -153,4 +227,20 @@ ipc.on('file:contentChanged', (payload) => {
       state.silentReload(side);
     }
   }
+});
+
+ipc.on('file:watchError', (payload) => {
+  useViewerStore.setState((s) => {
+    const next: Partial<ViewerState> = {};
+    for (const side of ['left', 'right'] as const) {
+      const panel = s[side];
+      if (panel.filePath && normalizePath(panel.filePath) === normalizePath(payload.filePath)) {
+        next[side] = {
+          ...panel,
+          watchError: payload.error.message,
+        };
+      }
+    }
+    return next;
+  });
 });

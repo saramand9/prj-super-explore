@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { FileEntry, SortConfig, DirSizeResult } from '@explore/shared';
 import { pinyin } from 'pinyin-pro';
-import { ipc } from '../../framework/bridge/ipc-client';
+import { getIpcErrorMessage, ipc } from '../../framework/bridge/ipc-client';
 
 export interface Tab {
   id: string;
@@ -15,6 +15,7 @@ interface PanelFileState {
   path: string | null;
   entries: FileEntry[];
   loading: boolean;
+  error: string | null;
   filterText: string;
   selected: Set<string>;
   sort: SortConfig;
@@ -73,6 +74,7 @@ function defaultPanel(): PanelFileState {
     path: null,
     entries: [],
     loading: false,
+    error: null,
     filterText: '',
     selected: new Set(),
     sort: { key: 'name', direction: 'asc' },
@@ -104,6 +106,7 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
       [side]: {
         ...s[side],
         loading: true,
+        error: null,
         path,
         filterText: '',
         selected: new Set(),
@@ -122,9 +125,16 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
 
     try {
       const entries = await loadDir(path, panel.sort, panel.showHidden);
-      set((s) => ({ [side]: { ...s[side], entries, loading: false } }));
-    } catch {
-      set((s) => ({ [side]: { ...s[side], loading: false, entries: [] } }));
+      set((s) => ({ [side]: { ...s[side], entries, loading: false, error: null } }));
+    } catch (err) {
+      set((s) => ({
+        [side]: {
+          ...s[side],
+          loading: false,
+          entries: [],
+          error: getIpcErrorMessage(err, '目录加载失败'),
+        },
+      }));
     }
   },
 
@@ -161,12 +171,18 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
   refresh: async (side) => {
     const panel = get()[side];
     if (!panel.path) return;
-    set((s) => ({ [side]: { ...s[side], loading: true } }));
+    set((s) => ({ [side]: { ...s[side], loading: true, error: null } }));
     try {
       const entries = await loadDir(panel.path, panel.sort, panel.showHidden);
-      set((s) => ({ [side]: { ...s[side], entries, loading: false } }));
-    } catch {
-      set((s) => ({ [side]: { ...s[side], loading: false } }));
+      set((s) => ({ [side]: { ...s[side], entries, loading: false, error: null } }));
+    } catch (err) {
+      set((s) => ({
+        [side]: {
+          ...s[side],
+          loading: false,
+          error: getIpcErrorMessage(err, '目录刷新失败'),
+        },
+      }));
     }
   },
 

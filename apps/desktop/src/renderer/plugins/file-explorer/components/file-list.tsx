@@ -34,6 +34,7 @@ export function FileList({ side }: FileListProps) {
   const selected = useFileStore((s) => s[side].selected);
   const filterText = useFileStore((s) => s[side].filterText);
   const loading = useFileStore((s) => s[side].loading);
+  const error = useFileStore((s) => s[side].error);
   const dirSizeMap = useFileStore((s) => s.dirSizeMap);
   const setDirSizes = useFileStore((s) => s.setDirSizes);
 
@@ -742,6 +743,23 @@ export function FileList({ side }: FileListProps) {
     return (
       <div className="h-full flex items-center justify-center text-text-muted">
         正在加载...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="h-full flex items-center justify-center px-6 text-sm">
+        <div className="max-w-[520px] text-center">
+          <div className="text-red-400 font-medium mb-2">目录加载失败</div>
+          <div className="text-text-secondary whitespace-pre-wrap break-words">{error}</div>
+          <button
+            className="mt-4 px-3 py-1.5 bg-accent/20 hover:bg-accent/40 text-text-primary rounded text-xs transition-colors"
+            onClick={() => refresh(side)}
+          >
+            重试
+          </button>
+        </div>
       </div>
     );
   }

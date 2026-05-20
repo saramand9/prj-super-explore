@@ -103,7 +103,9 @@ export class SearchService implements Service {
           // code 1 = no matches (normal), other codes = error
           if (code !== 1) {
             const detail = stderr.trim();
-            reject(new Error(detail ? `ripgrep exited with code ${code}: ${detail}` : `ripgrep exited with code ${code}`));
+            const err = new Error(detail ? `ripgrep exited with code ${code}: ${detail}` : `ripgrep exited with code ${code}`);
+            (err as any).code = 'PROCESS_FAILED';
+            reject(err);
             return;
           }
         }
@@ -118,6 +120,7 @@ export class SearchService implements Service {
           resolve([]);
           return;
         }
+        (err as any).code = 'PROCESS_FAILED';
         reject(err);
       });
     });

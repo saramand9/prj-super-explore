@@ -10,6 +10,36 @@ import type { Bookmark } from './config';
 import type { Space } from './config';
 import type { PluginInfo, PluginManifest } from './plugin';
 
+export type IpcErrorCode =
+  | 'FILE_NOT_FOUND'
+  | 'PERMISSION_DENIED'
+  | 'PATH_TOO_LONG'
+  | 'FILE_TOO_LARGE'
+  | 'INVALID_ENCODING'
+  | 'IS_DIRECTORY'
+  | 'WATCH_FAILED'
+  | 'PROCESS_FAILED'
+  | 'IPC_BRIDGE_MISSING'
+  | 'UNKNOWN';
+
+export interface IpcErrorInfo {
+  code: IpcErrorCode;
+  message: string;
+  channel?: string;
+  nativeCode?: string;
+  path?: string;
+  details?: string;
+}
+
+export interface FileReadResult {
+  content: string;
+  size: number;
+  bytesRead: number;
+  partial?: boolean;
+  limit?: number;
+  canContinue?: boolean;
+}
+
 // ── 请求-响应 channels ──────────────────────────
 
 export interface IpcChannels {
@@ -59,8 +89,8 @@ export interface IpcChannels {
     res: void;
   };
   'file:read': {
-    req: { path: string; maxSize?: number };
-    res: { content: string; size: number };
+    req: { path: string; maxSize?: number; loadFull?: boolean };
+    res: FileReadResult;
   };
   'file:openInExplorer': {
     req: { path: string };
@@ -248,6 +278,11 @@ export interface IpcEvents {
     watcherId: string;
     events: Array<{ type: 'add' | 'remove' | 'change'; path: string }>;
   };
+  'fs:watchError': {
+    watcherId: string;
+    path: string;
+    error: IpcErrorInfo;
+  };
   'index:progress': {
     done: number;
     total: number;
@@ -264,6 +299,10 @@ export interface IpcEvents {
   };
   'file:contentChanged': {
     filePath: string;
+  };
+  'file:watchError': {
+    filePath: string;
+    error: IpcErrorInfo;
   };
 }
 

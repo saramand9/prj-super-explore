@@ -2,6 +2,9 @@ export type { FileEntry, FileStat, FileOpResult, SortKey, SortConfig, FileConfli
 export type {
   IpcChannels,
   IpcEvents,
+  IpcErrorCode,
+  IpcErrorInfo,
+  FileReadResult,
   FulltextMatch,
   IndexResult,
   DirSizeResult,

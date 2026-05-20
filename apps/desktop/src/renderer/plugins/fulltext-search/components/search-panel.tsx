@@ -1,12 +1,12 @@
-import { useCallback, useRef, useEffect } from 'react';
+import { useCallback, useRef } from 'react';
 import { useSearchStore } from '../store';
-import { ipc } from '../../../framework/bridge/ipc-client';
 
 export function SearchPanel() {
   const inputRef = useRef<HTMLInputElement>(null);
   const query = useSearchStore((s) => s.query);
   const results = useSearchStore((s) => s.results);
   const searching = useSearchStore((s) => s.searching);
+  const error = useSearchStore((s) => s.error);
   const selectedIdx = useSearchStore((s) => s.selectedIdx);
   const filePattern = useSearchStore((s) => s.filePattern);
 
@@ -96,13 +96,19 @@ export function SearchPanel() {
 
       {/* Results */}
       <div className="flex-1 overflow-auto">
-        {results.length === 0 && !searching && query && (
+        {error && (
+          <div className="px-3 py-3 text-red-400 text-xs whitespace-pre-wrap break-words">
+            {error}
+          </div>
+        )}
+
+        {results.length === 0 && !searching && !error && query && (
           <div className="text-center text-text-muted py-8 text-sm">
             未找到结果
           </div>
         )}
 
-        {results.length === 0 && !searching && !query && (
+        {results.length === 0 && !searching && !error && !query && (
           <div className="text-center text-text-muted py-8 text-sm">
             输入搜索内容后按 Enter
           </div>
@@ -114,7 +120,7 @@ export function SearchPanel() {
             <div
               className="sticky top-0 px-3 py-1 bg-surface-light text-xs text-accent font-medium cursor-pointer hover:bg-surface-lighter"
               onClick={() =>
-                ipc.invoke('file:open', { path: group.filePath })
+                openFile(group.matches[0])
               }
               title={group.filePath}
             >

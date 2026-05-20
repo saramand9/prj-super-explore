@@ -19,6 +19,7 @@ export class WatcherService implements Service {
     dirPath: string,
     watcherId: string,
     cb: (event: string, filePath: string) => void,
+    onError?: (err: Error) => void,
   ): void {
     if (this.watchers.has(watcherId)) {
       this.unwatch(watcherId);
@@ -30,8 +31,9 @@ export class WatcherService implements Service {
       }
     });
 
-    watcher.on('error', () => {
-      // 静默处理
+    watcher.on('error', (err) => {
+      console.warn(`[watcher] failed for ${dirPath}:`, err);
+      onError?.(err instanceof Error ? err : new Error(String(err)));
     });
 
     this.watchers.set(watcherId, {

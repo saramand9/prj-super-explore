@@ -85,7 +85,10 @@ export function TextViewer({ side }: { side: 'left' | 'right' }) {
   const content = useViewerStore((s) => s[side].content);
   const loading = useViewerStore((s) => s[side].loading);
   const error = useViewerStore((s) => s[side].error);
+  const watchError = useViewerStore((s) => s[side].watchError);
+  const readInfo = useViewerStore((s) => s[side].readInfo);
   const loadFile = useViewerStore((s) => s.loadFile);
+  const loadFullFile = useViewerStore((s) => s.loadFullFile);
   const searchHighlight = useViewerStore((s) => s[side].searchHighlight);
   const [preview, setPreview] = useState(false);
   const [activeLine, setActiveLine] = useState<number | null>(null);
@@ -233,6 +236,26 @@ export function TextViewer({ side }: { side: 'left' | 'right' }) {
 
   return (
     <div className="h-full flex flex-col bg-surface">
+      {readInfo?.partial && (
+        <div className="flex-shrink-0 flex items-center justify-between gap-3 border-b border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
+          <span className="min-w-0 truncate">
+            文件较大，仅加载前 {formatBytes(readInfo.bytesRead)} / {formatBytes(readInfo.size)}。
+          </span>
+          {readInfo.canContinue && (
+            <button
+              className="flex-shrink-0 px-2 py-0.5 rounded border border-yellow-400/40 text-yellow-100 hover:bg-yellow-400/20"
+              onClick={() => loadFullFile(side)}
+            >
+              继续加载完整文件
+            </button>
+          )}
+        </div>
+      )}
+      {watchError && (
+        <div className="flex-shrink-0 border-b border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300 whitespace-pre-wrap break-words">
+          {watchError}
+        </div>
+      )}
       <div
         ref={containerRef}
         className="flex-1 overflow-auto relative"
@@ -384,6 +407,13 @@ function escapeHtml(text: string): string {
 
 function normalizePath(path: string): string {
   return path.replace(/\\/g, '/').toLowerCase();
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
 }
 
 function highlightRawLineFirst(line: string, highlight: SearchHighlight): string {

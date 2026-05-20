@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { FileEntry, FulltextMatch } from '@explore/shared';
 import { FileSearchIndex } from './file-search-index';
-import { ipc } from '../../../framework/bridge/ipc-client';
+import { getIpcErrorMessage, ipc } from '../../../framework/bridge/ipc-client';
 import { useLayoutStore } from '../../../framework/store/layout-store';
 import { pluginManager } from '../../../framework/plugin-system';
 import { useFileStore } from '../store';
@@ -90,6 +90,7 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
   const [results, setResults] = useState<FileEntry[]>([]);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [building, setBuilding] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const indexRef = useRef<FileSearchIndex | null>(null);
   const indexPathRef = useRef<string | null>(null);
@@ -110,6 +111,7 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
     setResults([]);
     setContentResults([]);
     setContentError(null);
+    setFileError(null);
     setSelectedIdx(0);
     setMode('files');
     setTimeout(() => inputRef.current?.focus(), 50);
@@ -129,7 +131,9 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
         index.build(entries);
         indexPathRef.current = currentPath;
       })
-      .catch(() => {})
+      .catch((err) => {
+        setFileError(getIpcErrorMessage(err, '文件搜索索引建立失败'));
+      })
       .finally(() => setBuilding(false));
   }, [open, side]);
 
@@ -437,6 +441,12 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
             </div>
           )}
 
+          {mode === 'files' && fileError && (
+            <div className="px-3 py-2 text-red-400 text-xs whitespace-pre-wrap break-words">
+              {fileError}
+            </div>
+          )}
+
           {/* Content 模式 loading */}
           {mode === 'content' && contentSearching && (
             <div className="px-3 py-2 text-text-muted text-xs animate-pulse">
@@ -451,7 +461,7 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
           )}
 
           {/* 无结果 */}
-          {mode === 'files' && !building && query && results.length === 0 && (
+          {mode === 'files' && !building && !fileError && query && results.length === 0 && (
             <div className="px-3 py-2 text-text-muted text-xs">未找到文件</div>
           )}
           {mode === 'content' && !contentSearching && !contentError && query && flatContentResults.length === 0 && (

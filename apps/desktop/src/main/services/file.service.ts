@@ -353,12 +353,12 @@ export class FileService {
 
   private fileWatchers = new Map<string, { watcher: ReturnType<typeof watch>; timer: ReturnType<typeof setTimeout> | null; cb: () => void }>();
 
-  watchFile(filePath: string, onChange: () => void): void {
+  watchFile(filePath: string, onChange: () => void, onError?: (err: Error) => void): void {
     this.unwatchFile(filePath);
-    this.createFileWatcher(filePath, onChange);
+    this.createFileWatcher(filePath, onChange, onError);
   }
 
-  private createFileWatcher(filePath: string, onChange: () => void): void {
+  private createFileWatcher(filePath: string, onChange: () => void, onError?: (err: Error) => void): void {
     let watcher: ReturnType<typeof watch>;
     try {
       watcher = watch(filePath, (event) => {
@@ -375,7 +375,7 @@ export class FileService {
                   const current = this.fileWatchers.get(filePath);
                   if (current?.cb === onChange) {
                     this.unwatchFile(filePath);
-                    this.createFileWatcher(filePath, onChange);
+                    this.createFileWatcher(filePath, onChange, onError);
                   }
                   onChange();
                 })
@@ -389,12 +389,19 @@ export class FileService {
           }, 150);
         }
       });
-    } catch {
-      return;
+    } catch (err: any) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      (error as any).code ??= 'WATCH_FAILED';
+      (error as any).path ??= filePath;
+      throw error;
     }
 
-    watcher.on('error', () => {
+    watcher.on('error', (err) => {
       this.unwatchFile(filePath);
+      const error = err instanceof Error ? err : new Error(String(err));
+      (error as any).code ??= 'WATCH_FAILED';
+      (error as any).path ??= filePath;
+      onError?.(error);
       onChange();
     });
     this.fileWatchers.set(filePath, { watcher, timer: null, cb: onChange });

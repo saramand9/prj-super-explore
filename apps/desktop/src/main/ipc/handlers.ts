@@ -1,13 +1,17 @@
-import { ipcMain, BrowserWindow, dialog, app } from 'electron';
-import { readdir, readFile, stat, mkdir, cp } from 'fs/promises';
+import { ipcMain as electronIpcMain, BrowserWindow, dialog, app } from 'electron';
+import { readdir, readFile, stat, mkdir, cp, open as openFileHandle } from 'fs/promises';
 import { join, basename, extname } from 'path';
-import type { IpcChannels, IpcEvents, FileEntry } from '@explore/shared';
+import type { IpcChannels, IpcEvents, FileEntry, IpcErrorCode, IpcErrorInfo, FileReadResult } from '@explore/shared';
 import type { ServiceContainer } from '../service-container';
 import type { FileService } from '../services/file.service';
 import type { SearchService } from '../services/search.service';
 import type { IndexService } from '../services/index.service';
 import type { ConfigService } from '../services/config.service';
 import type { WindowService } from '../services/window.service';
+import type { WatcherService } from '../services/watcher.service';
+
+const IPC_ERROR_PREFIX = '__EXPLORE_IPC_ERROR__';
+const DEFAULT_TEXT_PREVIEW_LIMIT = 1024 * 1024;
 
 export function registerIpcHandlers(container: ServiceContainer): void {
   const file = container.get<FileService>('file');
@@ -15,6 +19,21 @@ export function registerIpcHandlers(container: ServiceContainer): void {
   const index = container.get<IndexService>('index');
   const config = container.get<ConfigService>('config');
   const windowSvc = container.get<WindowService>('window');
+  const watcher = container.get<WatcherService>('watcher');
+  const ipcMain = {
+    handle<C extends keyof IpcChannels>(
+      channel: C,
+      listener: (event: any, payload: IpcChannels[C]['req']) => IpcChannels[C]['res'] | Promise<IpcChannels[C]['res']>,
+    ): void {
+      electronIpcMain.handle(channel, async (event, payload) => {
+        try {
+          return await listener(event, payload);
+        } catch (err) {
+          throw toIpcError(channel, err);
+        }
+      });
+    },
+  };
 
   // ── File ──
 
@@ -86,13 +105,7 @@ export function registerIpcHandlers(container: ServiceContainer): void {
 
   ipcMain.handle(
     'file:read',
-    async (_e, payload: IpcChannels['file:read']['req']) => {
-      const maxSize = payload.maxSize ?? 1024 * 1024;
-      const st = await stat(payload.path);
-      if (st.size > maxSize) throw new Error(`File too large: ${(st.size / 1024).toFixed(1)} KB`);
-      const content = await readFile(payload.path, 'utf-8');
-      return { content, size: st.size };
-    },
+    (_e, payload: IpcChannels['file:read']['req']) => readTextFile(payload),
   );
 
   ipcMain.handle(
@@ -100,6 +113,44 @@ export function registerIpcHandlers(container: ServiceContainer): void {
     (_e, payload: IpcChannels['file:openInExplorer']['req']) => {
       const { shell } = require('electron');
       shell.openPath(payload.path);
+    },
+  );
+
+  ipcMain.handle(
+    'file:watch',
+    (_e, payload: IpcChannels['file:watch']['req']) => {
+      const watcherId = `watch-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      watcher.watch(
+        payload.path,
+        watcherId,
+        (event, filePath) => {
+          const win = BrowserWindow.getAllWindows()[0];
+          if (win && !win.isDestroyed()) {
+            win.webContents.send('fs:changed', {
+              watcherId,
+              events: [{ type: normalizeFsEvent(event), path: join(payload.path, filePath) }],
+            } satisfies IpcEvents['fs:changed']);
+          }
+        },
+        (err) => {
+          const win = BrowserWindow.getAllWindows()[0];
+          if (win && !win.isDestroyed()) {
+            win.webContents.send('fs:watchError', {
+              watcherId,
+              path: payload.path,
+              error: toIpcErrorInfo('file:watch', err),
+            } satisfies IpcEvents['fs:watchError']);
+          }
+        },
+      );
+      return watcherId;
+    },
+  );
+
+  ipcMain.handle(
+    'file:unwatch',
+    (_e, payload: IpcChannels['file:unwatch']['req']) => {
+      watcher.unwatch(payload.watcherId);
     },
   );
 
@@ -112,6 +163,14 @@ export function registerIpcHandlers(container: ServiceContainer): void {
         const win = BrowserWindow.getAllWindows()[0];
         if (win && !win.isDestroyed()) {
           win.webContents.send('file:contentChanged', { filePath: payload.path });
+        }
+      }, (err) => {
+        const win = BrowserWindow.getAllWindows()[0];
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('file:watchError', {
+            filePath: payload.path,
+            error: toIpcErrorInfo('file:watchFile', err),
+          });
         }
       });
     },
@@ -200,7 +259,7 @@ export function registerIpcHandlers(container: ServiceContainer): void {
   ipcMain.handle(
     'index:rebuild',
     (_e, payload: IpcChannels['index:rebuild']['req']) =>
-      index.rebuild(payload.paths),
+      index.rebuild(payload.paths).then((itemCount) => ({ itemCount })),
   );
 
   ipcMain.handle('index:status', () => index.status);
@@ -232,7 +291,13 @@ export function registerIpcHandlers(container: ServiceContainer): void {
 
   // ── Pinned Tabs ──
 
-  ipcMain.handle('tabs:load', () => config.getPinnedTabs());
+  ipcMain.handle('tabs:load', () => {
+    const tabs = config.getPinnedTabs();
+    return {
+      left: tabs.left.map((tab) => ({ ...tab, initialPath: (tab as any).initialPath ?? tab.path })),
+      right: tabs.right.map((tab) => ({ ...tab, initialPath: (tab as any).initialPath ?? tab.path })),
+    };
+  });
 
   ipcMain.handle(
     'tabs:save',
@@ -412,10 +477,144 @@ export function registerIpcHandlers(container: ServiceContainer): void {
   ipcMain.handle('app:getHomeDir', () => app.getPath('home'));
 }
 
+async function readTextFile(payload: IpcChannels['file:read']['req']): Promise<FileReadResult> {
+  const limit = payload.maxSize ?? DEFAULT_TEXT_PREVIEW_LIMIT;
+  const st = await stat(payload.path);
+  if (st.isDirectory()) {
+    throw createIpcCodedError('IS_DIRECTORY', '这是文件夹，不能按文本预览', payload.path);
+  }
+
+  if (payload.loadFull || st.size <= limit) {
+    const buffer = await readFile(payload.path);
+    return {
+      content: decodeUtf8(buffer, false, payload.path),
+      size: st.size,
+      bytesRead: buffer.length,
+    };
+  }
+
+  const handle = await openFileHandle(payload.path, 'r');
+  try {
+    const buffer = Buffer.alloc(limit);
+    const { bytesRead } = await handle.read(buffer, 0, limit, 0);
+    const chunk = buffer.subarray(0, bytesRead);
+    return {
+      content: decodeUtf8(chunk, true, payload.path),
+      size: st.size,
+      bytesRead,
+      partial: true,
+      limit,
+      canContinue: true,
+    };
+  } finally {
+    await handle.close();
+  }
+}
+
+function decodeUtf8(buffer: Buffer, stream: boolean, filePath: string): string {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buffer, { stream });
+  } catch {
+    throw createIpcCodedError('INVALID_ENCODING', '文件不是有效的 UTF-8 文本，无法预览', filePath);
+  }
+}
+
+function createIpcCodedError(code: IpcErrorCode, message: string, path?: string): Error {
+  const err = new Error(message) as Error & { code?: IpcErrorCode; path?: string };
+  err.code = code;
+  err.path = path;
+  return err;
+}
+
+function toIpcError(channel: keyof IpcChannels, err: unknown): Error {
+  return new Error(`${IPC_ERROR_PREFIX}${JSON.stringify(toIpcErrorInfo(channel, err))}`);
+}
+
+function toIpcErrorInfo(channel: keyof IpcChannels, err: unknown): IpcErrorInfo {
+  const anyErr = err as { code?: string; message?: string; path?: string; filePath?: string; errno?: number };
+  const nativeCode = typeof anyErr?.code === 'string' ? anyErr.code : undefined;
+  const code = mapErrorCode(channel, nativeCode);
+  const path = typeof anyErr?.path === 'string'
+    ? anyErr.path
+    : typeof anyErr?.filePath === 'string'
+      ? anyErr.filePath
+      : undefined;
+  const details = anyErr?.message && anyErr.message !== userMessageFor(code)
+    ? anyErr.message
+    : undefined;
+
+  return {
+    code,
+    message: userMessageFor(code),
+    channel: String(channel),
+    nativeCode,
+    path,
+    details,
+  };
+}
+
+function mapErrorCode(channel: keyof IpcChannels, nativeCode?: string): IpcErrorCode {
+  switch (nativeCode) {
+    case 'FILE_NOT_FOUND':
+    case 'PERMISSION_DENIED':
+    case 'PATH_TOO_LONG':
+    case 'FILE_TOO_LARGE':
+    case 'INVALID_ENCODING':
+    case 'IS_DIRECTORY':
+    case 'WATCH_FAILED':
+    case 'PROCESS_FAILED':
+    case 'IPC_BRIDGE_MISSING':
+      return nativeCode;
+    case 'ENOENT':
+    case 'ENOTDIR':
+      return 'FILE_NOT_FOUND';
+    case 'EACCES':
+    case 'EPERM':
+      return 'PERMISSION_DENIED';
+    case 'ENAMETOOLONG':
+      return 'PATH_TOO_LONG';
+    case 'EISDIR':
+      return 'IS_DIRECTORY';
+    default:
+      return String(channel).startsWith('search:') ? 'PROCESS_FAILED' : 'UNKNOWN';
+  }
+}
+
+function userMessageFor(code: IpcErrorCode): string {
+  switch (code) {
+    case 'FILE_NOT_FOUND':
+      return '文件不存在或已被移动';
+    case 'PERMISSION_DENIED':
+      return '没有权限访问此路径';
+    case 'PATH_TOO_LONG':
+      return '路径过长，系统无法访问';
+    case 'FILE_TOO_LARGE':
+      return '文件过大，已停止读取';
+    case 'INVALID_ENCODING':
+      return '文件编码不是有效的 UTF-8 文本，无法预览';
+    case 'IS_DIRECTORY':
+      return '这是文件夹，不能按文本预览';
+    case 'WATCH_FAILED':
+      return '文件监听失败，内容不会自动刷新';
+    case 'PROCESS_FAILED':
+      return '搜索进程执行失败';
+    case 'IPC_BRIDGE_MISSING':
+      return 'IPC 桥接不可用';
+    default:
+      return '操作失败';
+  }
+}
+
+function normalizeFsEvent(event: string): 'add' | 'remove' | 'change' {
+  if (event === 'rename') return 'change';
+  return event === 'change' ? 'change' : 'change';
+}
+
 async function walkTree(
   dirPath: string,
   maxDepth: number,
   excludePatterns: Set<string>,
+  isRoot = true,
 ): Promise<FileEntry[]> {
   if (maxDepth <= 0) return [];
   const exclude = new Set(['node_modules', '.git', '$RECYCLE.BIN', 'System Volume Information', ...excludePatterns]);
@@ -437,13 +636,15 @@ async function walkTree(
           modifiedAt: st.mtimeMs,
         });
         if (st.isDirectory() && !st.isSymbolicLink()) {
-          const children = await walkTree(fullPath, maxDepth - 1, excludePatterns);
+          const children = await walkTree(fullPath, maxDepth - 1, excludePatterns, false);
           result.push(...children);
         }
       } catch { /* skip */ }
     });
     await Promise.all(tasks);
-  } catch { /* skip */ }
+  } catch (err) {
+    if (isRoot) throw err;
+  }
 
   return result;
 }
