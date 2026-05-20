@@ -77,7 +77,7 @@ export function Launcher() {
             value={query}
             onChange={(e) => handleInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Search files and programs..."
+            placeholder="搜索文件和程序..."
             className="flex-1 bg-transparent text-lg text-text-primary placeholder:text-text-muted focus:outline-none"
             autoFocus
           />
@@ -91,17 +91,17 @@ export function Launcher() {
       <div className="flex-1 overflow-auto px-2 pb-2">
         {results.length === 0 && query && !loading && (
           <div className="text-center text-text-muted py-8">
-            No results for "{query}"
+            未找到“{query}”
           </div>
         )}
 
         {results.length === 0 && !query && (
           <div className="text-center text-text-muted py-8">
             <div className="text-sm">
-              Type to search files across indexed directories
+              输入关键字搜索已索引目录中的文件
             </div>
             <div className="text-xs mt-2">
-              Configure index paths in settings
+              可在设置中配置索引路径
             </div>
           </div>
         )}
@@ -133,9 +133,9 @@ export function Launcher() {
 
       {/* Footer */}
       <div className="flex-shrink-0 px-4 py-1.5 border-t border-border text-xs text-text-muted flex gap-4">
-        <span>↑↓ Navigate</span>
-        <span>↵ Open</span>
-        <span>Esc Close</span>
+        <span>↑↓ 选择</span>
+        <span>↵ 打开</span>
+        <span>Esc 关闭</span>
       </div>
     </div>
   );

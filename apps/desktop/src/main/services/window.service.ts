@@ -26,6 +26,18 @@ export class WindowService implements Service {
       this.mainWindow?.show();
     });
 
+    if (is.dev) {
+      this.mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+        console.log(`[renderer:${level}] ${message} (${sourceId}:${line})`);
+      });
+      this.mainWindow.webContents.on('render-process-gone', (_event, details) => {
+        console.error('[renderer:gone]', details);
+      });
+      this.mainWindow.webContents.on('did-fail-load', (_event, code, description, url) => {
+        console.error(`[renderer:load-failed] ${code} ${description} ${url}`);
+      });
+    }
+
     if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
       this.mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);
     } else {

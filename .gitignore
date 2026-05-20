@@ -9,3 +9,4 @@ out
 .turbo
 .cache
 .claude
+scripts/benchmark/data/*.log

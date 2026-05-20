@@ -4,6 +4,10 @@ import { useFileStore } from '../plugins/file-explorer/store';
 import { useAppStore } from '../framework/store/app-store';
 import { themes } from '../framework/themes';
 import { ipc } from '../framework/bridge/ipc-client';
+import {
+  resolveCopyConflictStrategyWithConfirm,
+  summarizeFileOpResult,
+} from '../plugins/file-explorer/utils/file-op-result';
 
 interface MenuItem {
   label?: string;
@@ -85,9 +89,24 @@ export function MenuBar() {
             const state = useFileStore.getState()[side];
             const targetPath = useLayoutStore.getState().layout[target].path;
             if (targetPath && state.selected.size > 0) {
-              await ipc.invoke('file:copy', { sources: [...state.selected], destDir: targetPath });
-              useFileStore.getState().clearSelection(side);
+              const sources = [...state.selected];
+              const conflictStrategy = await resolveCopyConflictStrategyWithConfirm(
+                sources,
+                targetPath,
+                (p) => ipc.invoke('file:readDir', { path: p }),
+                (message) => ipc.invoke('dialog:confirm', { message }),
+              );
+              if (!conflictStrategy) return;
+              const result = await ipc.invoke('file:copy', {
+                sources,
+                destDir: targetPath,
+                conflictStrategy,
+              });
+              const summary = summarizeFileOpResult('Copy', result);
+              if (summary) await ipc.invoke('dialog:alert', { message: summary });
+              if (result.success) useFileStore.getState().clearSelection(side);
               useFileStore.getState().refresh(side);
+              useFileStore.getState().refresh(target);
             }
           },
         },
@@ -100,9 +119,24 @@ export function MenuBar() {
             const state = useFileStore.getState()[side];
             const targetPath = useLayoutStore.getState().layout[target].path;
             if (targetPath && state.selected.size > 0) {
-              await ipc.invoke('file:move', { sources: [...state.selected], destDir: targetPath });
-              useFileStore.getState().clearSelection(side);
+              const sources = [...state.selected];
+              const conflictStrategy = await resolveCopyConflictStrategyWithConfirm(
+                sources,
+                targetPath,
+                (p) => ipc.invoke('file:readDir', { path: p }),
+                (message) => ipc.invoke('dialog:confirm', { message }),
+              );
+              if (!conflictStrategy) return;
+              const result = await ipc.invoke('file:move', {
+                sources,
+                destDir: targetPath,
+                conflictStrategy,
+              });
+              const summary = summarizeFileOpResult('Move', result);
+              if (summary) await ipc.invoke('dialog:alert', { message: summary });
+              if (result.success) useFileStore.getState().clearSelection(side);
               useFileStore.getState().refresh(side);
+              useFileStore.getState().refresh(target);
             }
           },
         },
@@ -114,8 +148,10 @@ export function MenuBar() {
             const state = useFileStore.getState()[side];
             if (state.selected.size === 0) return;
             const names = [...state.selected].map((p) => p.split(/[/\\]/).pop()).join(', ');
-            if (confirm(`Delete ${names}?`)) {
-              await ipc.invoke('file:delete', { paths: [...state.selected] });
+            if (await ipc.invoke('dialog:confirm', { message: `确定要移到回收站吗？\n${names}` })) {
+              const result = await ipc.invoke('file:delete', { paths: [...state.selected] });
+              const summary = summarizeFileOpResult('Delete', result);
+              if (summary) await ipc.invoke('dialog:alert', { message: summary });
               useFileStore.getState().clearSelection(side);
               useFileStore.getState().refresh(side);
             }
@@ -178,7 +214,10 @@ export function MenuBar() {
           label: 'About Explore',
           action: async () => {
             const version = await ipc.invoke('app:getVersion', undefined);
-            alert(`Explore v${version}\nDual-pane file manager`);
+            await ipc.invoke('dialog:alert', {
+              title: '关于',
+              message: `Explore v${version}\n双栏文件管理器`,
+            });
           },
         },
       ],

@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import hljs from 'highlight.js';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { marked } from 'marked';
-import { Eye, Code2 } from 'lucide-react';
-import { useViewerStore } from '../store';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { Eye, Code2, ScrollText } from 'lucide-react';
+import { useViewerStore, type SearchHighlight } from '../store';
 import { useLayoutStore } from '../../../framework/store/layout-store';
+import HighlightWorker from '../highlight.worker?worker';
 import '../styles/hljs.css';
 
 function extToLang(filePath: string): string | undefined {
@@ -35,6 +36,7 @@ function extToLang(filePath: string): string | undefined {
 
 const isMd = (path: string) => path.toLowerCase().endsWith('.md');
 const isCsv = (path: string) => path.toLowerCase().endsWith('.csv');
+const defaultTailMode = (path: string) => /\.(log|txt)$/i.test(path);
 
 function parseCsv(content: string): string[][] {
   const rows: string[][] = [];
@@ -80,38 +82,113 @@ function parseCsv(content: string): string[][] {
 export function TextViewer({ side }: { side: 'left' | 'right' }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const filePath = useLayoutStore((s) => s.layout[side].path);
-  const content = useViewerStore((s) => s.content);
-  const loading = useViewerStore((s) => s.loading);
-  const error = useViewerStore((s) => s.error);
+  const content = useViewerStore((s) => s[side].content);
+  const loading = useViewerStore((s) => s[side].loading);
+  const error = useViewerStore((s) => s[side].error);
   const loadFile = useViewerStore((s) => s.loadFile);
+  const searchHighlight = useViewerStore((s) => s[side].searchHighlight);
   const [preview, setPreview] = useState(false);
   const [activeLine, setActiveLine] = useState<number | null>(null);
+  const [tailMode, setTailMode] = useState(false);
 
   useEffect(() => {
     if (filePath) {
-      loadFile(filePath);
+      loadFile(side, filePath);
       setPreview(filePath.toLowerCase().endsWith('.md'));
+      setTailMode(defaultTailMode(filePath));
       setActiveLine(null);
     }
-  }, [filePath, loadFile]);
+  }, [filePath, side, loadFile]);
 
   const lang = filePath ? extToLang(filePath) : undefined;
   const isMarkdown = filePath ? isMd(filePath) : false;
   const isCsvFile = filePath ? isCsv(filePath) : false;
 
-  const sourceLines = useMemo(() => {
+  const workerRef = useRef<Worker | null>(null);
+  const contentVersionRef = useRef(0);
+  const [highlightedLines, setHighlightedLines] = useState<string[] | null>(null);
+
+  // 纯文本兜底：content 变化时同步派生，永不空白
+  const plainLines = useMemo(() => {
     if (!content) return [];
-    try {
-      const result = lang
-        ? hljs.highlight(content, { language: lang })
-        : hljs.highlightAuto(content);
-      return result.value.split('\n');
-    } catch {
-      return escapeHtml(content).split('\n');
+    return escapeHtml(content).split('\n');
+  }, [content]);
+  const rawLines = useMemo(() => {
+    if (!content) return [];
+    return content.split('\n').map((line) => line.replace(/\r$/, ''));
+  }, [content]);
+
+  const sourceLines = highlightedLines ?? plainLines;
+
+  // Worker 异步高亮
+  useEffect(() => {
+    if (!content) {
+      setHighlightedLines(null);
+      return;
     }
+    // 清掉旧高亮，先显示纯文本
+    setHighlightedLines(null);
+    const version = ++contentVersionRef.current;
+
+    if (!workerRef.current) {
+      workerRef.current = new HighlightWorker();
+    }
+    const worker = workerRef.current;
+    worker.onmessage = (e) => {
+      if (e.data.version === contentVersionRef.current) {
+        setHighlightedLines(e.data.lines);
+      }
+    };
+    worker.postMessage({ content, lang, version });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content, lang]);
 
   const maxLineDigits = String(sourceLines.length).length;
+  const colWidth = `${maxLineDigits * 0.75 + 2}em`;
+
+  const virtualizer = useVirtualizer({
+    count: sourceLines.length,
+    getScrollElement: () => containerRef.current,
+    estimateSize: () => 23,
+    measureElement: (el) => el.getBoundingClientRect().height,
+    overscan: 20,
+  });
+
+  const isSearchHighlightForFile =
+    !!filePath &&
+    !!searchHighlight &&
+    normalizePath(searchHighlight.filePath) === normalizePath(filePath);
+
+  useEffect(() => {
+    if (!isSearchHighlightForFile || !searchHighlight || sourceLines.length === 0) return;
+    const lineIdx = Math.max(0, Math.min(searchHighlight.lineNumber - 1, sourceLines.length - 1));
+    setActiveLine(lineIdx);
+    setTailMode(false);
+    setPreview(false);
+    requestAnimationFrame(() => {
+      virtualizer.scrollToIndex(lineIdx, { align: 'center' });
+    });
+  }, [isSearchHighlightForFile, searchHighlight, sourceLines.length, virtualizer]);
+
+  // tail -f: 内容变更时自动滚到底部
+  const tailRef = useRef(tailMode);
+  tailRef.current = tailMode;
+  useEffect(() => {
+    if (isSearchHighlightForFile) return;
+    if (!tailRef.current || !containerRef.current) return;
+    requestAnimationFrame(() => {
+      const el = containerRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+  }, [content, isSearchHighlightForFile]);
+
+  // 手动滚动时关掉 tail 模式
+  const handleScroll = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 30;
+    if (!atBottom && tailRef.current) setTailMode(false);
+  }, []);
 
   const previewHtml = useMemo(() => {
     if (!content) return '';
@@ -151,17 +228,30 @@ export function TextViewer({ side }: { side: 'left' | 'right' }) {
     );
   }
 
-  const showPreview = isMarkdown && preview;
+  const showSearchSource = isSearchHighlightForFile;
+  const showPreview = isMarkdown && preview && !showSearchSource;
 
   return (
     <div className="h-full flex flex-col bg-surface">
       <div
         ref={containerRef}
         className="flex-1 overflow-auto relative"
+        onScroll={handleScroll}
       >
-        {/* Markdown toggle — floating */}
-        {isMarkdown && (
-          <div className="absolute top-2 right-2 z-10">
+        {/* Tail + Markdown toggle — floating */}
+        <div className="absolute top-2 right-2 z-10 flex gap-1">
+          <button
+            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] transition-colors shadow-md ${
+              tailMode
+                ? 'bg-accent/40 text-white'
+                : 'bg-surface-light/90 text-text-muted hover:text-text-primary border border-border/30'
+            }`}
+            onClick={() => { setTailMode((v) => !v); }}
+            title={tailMode ? 'Tail mode on — auto-scroll' : 'Tail mode off'}
+          >
+            <ScrollText className="w-3 h-3" /> Tail
+          </button>
+          {isMarkdown && (
             <button
               className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] transition-colors shadow-md ${
                 showPreview
@@ -177,44 +267,55 @@ export function TextViewer({ side }: { side: 'left' | 'right' }) {
                 <><Eye className="w-3 h-3" /> Preview</>
               )}
             </button>
-          </div>
-        )}
+          )}
+        </div>
         {showPreview ? (
           <div
             className="p-6 text-sm text-text-primary select-text leading-relaxed markdown-body"
             dangerouslySetInnerHTML={{ __html: previewHtml }}
           />
-        ) : isCsvFile && csvRows && csvRows.length > 0 ? (
+        ) : isCsvFile && csvRows && csvRows.length > 0 && !showSearchSource ? (
           <CsvTable rows={csvRows} />
         ) : (
-          <div
-            className="font-mono text-sm leading-relaxed py-4"
-            style={{
-              display: 'grid',
-              gridTemplateColumns: `${maxLineDigits * 0.75 + 2}em 1fr`,
-            }}
-          >
-            {sourceLines.map((lineHtml, i) => {
+          <div className="relative font-mono text-sm leading-relaxed py-4"
+            style={{ height: `${virtualizer.getTotalSize()}px` }}>
+            {virtualizer.getVirtualItems().map((vItem) => {
+              const i = vItem.index;
+              const lineHtml = sourceLines[i];
               const isActive = i === activeLine;
+              const displayLineHtml =
+                showSearchSource && searchHighlight && i === searchHighlight.lineNumber - 1
+                  ? highlightRawLineFirst(rawLines[i] ?? '', searchHighlight)
+                  : lineHtml;
               const activeCls = isActive ? 'bg-accent/15' : '';
               return (
-              <>
                 <div
-                  className={`text-right text-text-muted/30 select-none cursor-pointer hover:bg-surface-lighter/50 ${activeCls}`}
-                  style={{ paddingRight: '1em', paddingLeft: '0.75em' }}
-                  onClick={() => setActiveLine(i)}
+                  key={i}
+                  ref={virtualizer.measureElement}
+                  data-index={i}
+                  className="absolute left-0 w-full grid"
+                  style={{
+                    gridTemplateColumns: colWidth + ' 1fr',
+                    transform: `translateY(${vItem.start}px)`,
+                  }}
                 >
-                  {i + 1}
+                  <div
+                    className={`text-right text-text-muted/30 select-none cursor-pointer hover:bg-surface-lighter/50 ${activeCls}`}
+                    style={{ paddingRight: '1em', paddingLeft: '0.75em' }}
+                    onClick={() => setActiveLine(i)}
+                  >
+                    {i + 1}
+                  </div>
+                  <code
+                    className={`hljs ${lang ? `language-${lang}` : ''} whitespace-pre-wrap break-words cursor-pointer hover:bg-surface-lighter/50 ${activeCls}`}
+                    style={{ paddingLeft: '1rem', paddingRight: '1rem' }}
+                    onClick={() => setActiveLine(i)}
+                  >
+                    <div dangerouslySetInnerHTML={{ __html: displayLineHtml || ' ' }} />
+                  </code>
                 </div>
-                <code
-                  className={`hljs ${lang ? `language-${lang}` : ''} whitespace-pre-wrap break-words cursor-pointer hover:bg-surface-lighter/50 ${activeCls}`}
-                  style={{ paddingLeft: '1rem', paddingRight: '1rem' }}
-                  onClick={() => setActiveLine(i)}
-                >
-                  <div dangerouslySetInnerHTML={{ __html: lineHtml || ' ' }} />
-                </code>
-              </>
-            )})}
+              );
+            })}
           </div>
         )}
       </div>
@@ -279,4 +380,46 @@ function escapeHtml(text: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+function normalizePath(path: string): string {
+  return path.replace(/\\/g, '/').toLowerCase();
+}
+
+function highlightRawLineFirst(line: string, highlight: SearchHighlight): string {
+  const rangeStart =
+    typeof highlight.columnStart === 'number' && highlight.columnStart > 0
+      ? highlight.columnStart - 1
+      : -1;
+  const rangeEnd =
+    typeof highlight.columnEnd === 'number' && highlight.columnEnd > rangeStart
+      ? highlight.columnEnd - 1
+      : -1;
+
+  let start = rangeStart;
+  let end = rangeEnd;
+
+  const rangeText = start >= 0 && end > start ? line.slice(start, Math.min(end, line.length)) : '';
+  const expected = highlight.text.trim();
+  const rangeMatches =
+    !expected ||
+    rangeText.toLowerCase() === expected.toLowerCase();
+
+  if (start < 0 || end <= start || start >= line.length || !rangeMatches) {
+    const needle = highlight.text.trim();
+    if (!needle) return escapeHtml(line);
+    start = line.toLowerCase().indexOf(needle.toLowerCase());
+    if (start < 0) return escapeHtml(line);
+    end = start + needle.length;
+  }
+
+  end = Math.min(end, line.length);
+
+  return [
+    escapeHtml(line.slice(0, start)),
+    '<mark class="bg-yellow-300 text-black rounded-sm px-0.5">',
+    escapeHtml(line.slice(start, end)),
+    '</mark>',
+    escapeHtml(line.slice(end)),
+  ].join('');
 }

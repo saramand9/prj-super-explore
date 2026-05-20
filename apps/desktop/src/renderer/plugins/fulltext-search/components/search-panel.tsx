@@ -72,7 +72,7 @@ export function SearchPanel() {
                 search();
               }
             }}
-            placeholder="Search text in files..."
+            placeholder="搜索文件内容..."
             className="flex-1 bg-surface-lighter border border-border rounded px-3 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
           />
           <button
@@ -80,7 +80,7 @@ export function SearchPanel() {
             disabled={searching || !query.trim()}
             className="px-3 py-1.5 bg-accent text-white text-sm rounded hover:bg-accent/80 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {searching ? '...' : 'Search'}
+            {searching ? '...' : '搜索'}
           </button>
         </div>
         <div className="flex gap-2 mt-1">
@@ -88,7 +88,7 @@ export function SearchPanel() {
             type="text"
             value={filePattern}
             onChange={(e) => setFilePattern(e.target.value)}
-            placeholder="File pattern e.g. *.ts"
+            placeholder="文件名模式，例如 *.ts"
             className="flex-1 bg-surface-lighter border border-border rounded px-2 py-0.5 text-xs text-text-secondary placeholder:text-text-muted focus:outline-none focus:border-accent"
           />
         </div>
@@ -98,13 +98,13 @@ export function SearchPanel() {
       <div className="flex-1 overflow-auto">
         {results.length === 0 && !searching && query && (
           <div className="text-center text-text-muted py-8 text-sm">
-            No results
+            未找到结果
           </div>
         )}
 
         {results.length === 0 && !searching && !query && (
           <div className="text-center text-text-muted py-8 text-sm">
-            Enter search term and press Enter
+            输入搜索内容后按 Enter
           </div>
         )}
 
@@ -120,7 +120,7 @@ export function SearchPanel() {
             >
               📄 {group.fileName}
               <span className="text-text-muted ml-2">
-                ({group.matches.length} matches)
+                ({group.matches.length} 个匹配)
               </span>
             </div>
 
@@ -157,10 +157,10 @@ export function SearchPanel() {
 
       {/* Footer */}
       <div className="flex-shrink-0 px-2 py-1 border-t border-border text-xs text-text-muted flex gap-4">
-        <span>{results.length} results</span>
-        <span>↑↓ Navigate</span>
-        <span>↵ Open</span>
-        <span>Esc Clear</span>
+        <span>{results.length} 个结果</span>
+        <span>↑↓ 选择</span>
+        <span>↵ 打开</span>
+        <span>Esc 清空</span>
       </div>
     </div>
   );

@@ -32,13 +32,13 @@ export function registerIpcHandlers(container: ServiceContainer): void {
   ipcMain.handle(
     'file:copy',
     (_e, payload: IpcChannels['file:copy']['req']) =>
-      file.copyFiles(payload.sources, payload.destDir),
+      file.copyFiles(payload.sources, payload.destDir, payload.conflictStrategy),
   );
 
   ipcMain.handle(
     'file:move',
     (_e, payload: IpcChannels['file:move']['req']) =>
-      file.moveFiles(payload.sources, payload.destDir),
+      file.moveFiles(payload.sources, payload.destDir, payload.conflictStrategy),
   );
 
   ipcMain.handle(
@@ -51,6 +51,12 @@ export function registerIpcHandlers(container: ServiceContainer): void {
     'file:mkdir',
     (_e, payload: IpcChannels['file:mkdir']['req']) =>
       file.createDir(payload.parentPath, payload.name),
+  );
+
+  ipcMain.handle(
+    'file:create',
+    (_e, payload: IpcChannels['file:create']['req']) =>
+      file.createFile(payload.parentPath, payload.name),
   );
 
   ipcMain.handle(
@@ -87,6 +93,27 @@ export function registerIpcHandlers(container: ServiceContainer): void {
     (_e, payload: IpcChannels['file:openInExplorer']['req']) => {
       const { shell } = require('electron');
       shell.openPath(payload.path);
+    },
+  );
+
+  // ── File watching (tail -f) ──
+
+  ipcMain.handle(
+    'file:watchFile',
+    (_e, payload: IpcChannels['file:watchFile']['req']) => {
+      file.watchFile(payload.path, () => {
+        const win = BrowserWindow.getAllWindows()[0];
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('file:contentChanged', { filePath: payload.path });
+        }
+      });
+    },
+  );
+
+  ipcMain.handle(
+    'file:unwatchFile',
+    (_e, payload: IpcChannels['file:unwatchFile']['req']) => {
+      file.unwatchFile(payload.path);
     },
   );
 
@@ -138,10 +165,12 @@ export function registerIpcHandlers(container: ServiceContainer): void {
   ipcMain.handle(
     'search:fulltext',
     (_e, payload: IpcChannels['search:fulltext']['req']) => {
-      const searchId = `${payload.dir}:${payload.query}`;
+      const searchId = payload.searchId ?? `${payload.dir}:${payload.query}`;
       return search.fulltext(payload.dir, payload.query, searchId, {
         filePattern: payload.filePattern,
+        excludePatterns: payload.excludePatterns,
         maxResults: payload.maxResults,
+        maxFileSize: payload.maxFileSize,
       });
     },
   );
@@ -244,12 +273,27 @@ export function registerIpcHandlers(container: ServiceContainer): void {
       if (!win) return false;
       const result = await dialog.showMessageBox(win, {
         type: 'question',
-        buttons: ['OK', 'Cancel'],
+        buttons: ['确定', '取消'],
         defaultId: 0,
-        title: payload.title || 'Confirm',
+        title: payload.title || '确认',
         message: payload.message,
       });
       return result.response === 0;
+    },
+  );
+
+  ipcMain.handle(
+    'dialog:alert',
+    async (_e, payload: IpcChannels['dialog:alert']['req']) => {
+      const win = BrowserWindow.getFocusedWindow();
+      if (!win) return;
+      await dialog.showMessageBox(win, {
+        type: payload.type ?? 'info',
+        buttons: ['确定'],
+        defaultId: 0,
+        title: payload.title || '提示',
+        message: payload.message,
+      });
     },
   );
 
@@ -263,10 +307,10 @@ export function registerIpcHandlers(container: ServiceContainer): void {
       // For now, use showMessageBox with a workaround
       const result = await dialog.showMessageBox(win, {
         type: 'question',
-        buttons: ['OK', 'Cancel'],
+        buttons: ['确定', '取消'],
         defaultId: 0,
-        title: payload.title || 'Input',
-        message: `${payload.message}\n\nDefault: ${payload.defaultValue || ''}`,
+        title: payload.title || '输入',
+        message: `${payload.message}\n\n默认值：${payload.defaultValue || ''}`,
       });
       if (result.response === 0) {
         return payload.defaultValue || '';

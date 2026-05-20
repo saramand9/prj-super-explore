@@ -28,10 +28,14 @@
     "files": [
       "out/**/*",
       "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/@lvce-editor/ripgrep/bin/**/*"
     ]
   },
   "dependencies": {
     "@explore/shared": "workspace:*",
+    "@lvce-editor/ripgrep": "^4.1.0",
     "pinyin-pro": "^3.28.1"
   },
   "devDependencies": {

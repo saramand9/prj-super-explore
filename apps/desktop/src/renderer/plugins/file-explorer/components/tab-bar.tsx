@@ -94,7 +94,7 @@ export function TabBar({ side }: TabBarProps) {
     const tab = contextMenu.tab;
     if (tab.pinned) {
       const confirmed = await ipc.invoke('dialog:confirm', {
-        message: `Close pinned tab "${tab.label}"?\n\nIt will be unpinned and closed.`,
+        message: `确定要关闭固定标签“${tab.label}”吗？\n\n该标签会先取消固定，然后关闭。`,
       });
       if (!confirmed) { setContextMenu(null); return; }
       unpinTab(side, tab.id);
@@ -118,7 +118,7 @@ export function TabBar({ side }: TabBarProps) {
     const tab = contextMenu.tab;
     forkTab(side, tab.id);
     const confirmed = await ipc.invoke('dialog:confirm', {
-      message: `Pin the cloned tab "${tab.label}"?\n\nPinned tabs persist across sessions and always open at their initial path.`,
+      message: `是否固定克隆出的标签“${tab.label}”？\n\n固定标签会跨会话保留，并始终从初始路径打开。`,
     });
     if (confirmed) {
       const newActiveId = useFileStore.getState()[side].activeTabId;

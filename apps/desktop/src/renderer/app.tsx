@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useState } from 'react';
-import { FolderOpen } from 'lucide-react';
+import { FolderOpen, X } from 'lucide-react';
 import { SplitPane, useLayoutStore } from './framework/layout';
 import { pluginManager } from './framework/plugin-system';
 import { setNotificationHandler } from './framework/plugin-system/plugin-context';
@@ -15,10 +15,25 @@ import type { Tab } from './plugins/file-explorer/store';
 import { FileSearch } from './plugins/file-explorer/components/file-search';
 import { TabSearch } from './plugins/file-explorer/components/tab-search';
 import { SpaceSearch } from './plugins/file-explorer/components/space-search';
+import {
+  resolveCopyConflictStrategyWithConfirm,
+  summarizeFileOpResult,
+} from './plugins/file-explorer/utils/file-op-result';
 import { useSearchStore } from './plugins/fulltext-search';
+import { useViewerStore } from './plugins/viewer/store';
 import { ipc } from './framework/bridge/ipc-client';
 
 // ── App Shell ──
+
+function parentDir(path: string): string | null {
+  const normalized = path.replace(/[\\/]+$/, '');
+  const idx = Math.max(normalized.lastIndexOf('\\'), normalized.lastIndexOf('/'));
+  if (idx < 0) return null;
+  const dir = normalized.slice(0, idx);
+  const sep = normalized[idx];
+  if (/^[A-Za-z]:$/.test(dir)) return `${dir}${sep}`;
+  return dir || null;
+}
 
 export function App() {
   const hash = window.location.hash;
@@ -226,7 +241,7 @@ function MainApp() {
       {/* Toast notification */}
       {toast && (
         <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[200] pointer-events-none">
-          <div className={`px-4 py-2 rounded-lg shadow-lg text-sm ${
+          <div className={`px-4 py-2 rounded-lg shadow-lg text-sm whitespace-pre-line max-w-[min(720px,90vw)] ${
             toast.type === 'error' ? 'bg-red-600/90 text-white' :
             toast.type === 'warn' ? 'bg-yellow-600/90 text-white' :
             'bg-accent/90 text-white'
@@ -323,6 +338,29 @@ function PanelSlot({
     }
   }, [side, panel.path]);
 
+  const handleClosePluginPanel = useCallback(async () => {
+    const fileStore = useFileStore.getState();
+    const previousDir = fileStore[side].path;
+    const fallbackDir = pluginId === 'viewer' && panel.path ? parentDir(panel.path) : panel.path;
+    const targetDir = previousDir ?? fallbackDir;
+
+    if (pluginId === 'viewer') {
+      useViewerStore.getState().clear(side);
+    }
+
+    useLayoutStore.getState().setPanelPlugin(side, 'file-explorer', 'browser');
+    if (targetDir) {
+      if (fileStore[side].tabs.length === 0) {
+        fileStore.addTab(side, targetDir);
+      }
+      if (fileStore[side].path !== targetDir) {
+        await fileStore.navigateTo(side, targetDir, false);
+      }
+      useLayoutStore.getState().setPanelPath(side, targetDir);
+    }
+    useLayoutStore.getState().setActivePanel(side);
+  }, [side, pluginId, panel.path]);
+
   // 拖放处理
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -336,7 +374,7 @@ function PanelSlot({
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     if (!panel.path) {
-      notify('No folder open in target panel', 'warn');
+      notify('目标面板没有打开文件夹', 'warn');
       return;
     }
     const data = e.dataTransfer.getData('application/x-explore-files');
@@ -351,47 +389,40 @@ function PanelSlot({
       const parent = s.replace(/[/\\][^/\\]*$/, '');
       return parent === targetDir || s === targetDir;
     })) {
-      notify('Already in the same directory', 'info');
+      notify('已经在同一目录中', 'info');
       return;
     }
 
     // 拖文件夹到自己子目录 → 阻止
     if (sources.some((s) => targetDir.startsWith(s + '\\') || targetDir.startsWith(s + '/'))) {
-      notify('Cannot copy a folder into itself', 'error');
+      notify('不能把文件夹复制到它自己里面', 'error');
       return;
-    }
-
-    // 同名冲突确认
-    const sourceNames = new Set(sources.map((s) => s.split(/[/\\]/).pop()?.toLowerCase()));
-    const destEntries = await ipc.invoke('file:readDir', { path: targetDir });
-    const conflicts = destEntries.filter((de) => sourceNames.has(de.name.toLowerCase()));
-    if (conflicts.length > 0) {
-      const names = conflicts.map((c) => c.name).join(', ');
-      if (!await ipc.invoke('dialog:confirm', { message: `Overwrite existing files?\n${names}` })) {
-        notify('Cancelled', 'info');
-        return;
-      }
     }
 
     const isMove = e.ctrlKey || e.metaKey;
     try {
-      if (isMove) {
-        const result = await ipc.invoke('file:move', { sources, destDir: targetDir });
-        if (!result.success && result.skipped?.length) {
-          await ipc.invoke('file:copy', { sources: result.skipped, destDir: targetDir });
-          await ipc.invoke('file:delete', { paths: result.skipped });
-          notify(`Moved ${sources.length} item(s) (cross-drive fallback)`, 'info');
-        } else if (result.success) {
-          notify(`Moved ${sources.length} item(s)`, 'info');
-        } else {
-          notify(`Move failed: ${result.error || 'unknown'}`, 'error');
-        }
+      const conflictStrategy = await resolveCopyConflictStrategyWithConfirm(
+        sources,
+        targetDir,
+        (p) => ipc.invoke('file:readDir', { path: p }),
+        (message) => ipc.invoke('dialog:confirm', { message }),
+      );
+      if (!conflictStrategy) {
+        notify('已取消', 'info');
+        return;
+      }
+
+      const result = isMove
+        ? await ipc.invoke('file:move', { sources, destDir: targetDir, conflictStrategy })
+        : await ipc.invoke('file:copy', { sources, destDir: targetDir, conflictStrategy });
+      const summary = summarizeFileOpResult(isMove ? 'Move' : 'Copy', result);
+      if (summary) {
+        notify(summary, result.success ? 'warn' : 'error');
       } else {
-        await ipc.invoke('file:copy', { sources, destDir: targetDir });
-        notify(`Copied ${sources.length} item(s)`, 'info');
+        notify(`${isMove ? '已移动' : '已复制'} ${sources.length} 个项目`, 'info');
       }
     } catch (err: any) {
-      notify(`Operation failed: ${err.message}`, 'error');
+      notify(`操作失败：${err.message}`, 'error');
     }
     useFileStore.getState().refresh(side);
     const otherSide = side === 'left' ? 'right' : 'left';
@@ -434,9 +465,21 @@ function PanelSlot({
 
         {/* 工具栏 — 最右 */}
         <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
+          {pluginId !== 'file-explorer' && (
+            <button
+              className="text-text-muted hover:text-text-primary hover:bg-white/5 rounded p-0.5 cursor-pointer transition-colors"
+              title={pluginId === 'viewer' ? '关闭预览' : '关闭面板'}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleClosePluginPanel();
+              }}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
           <button
             className="text-text-muted hover:text-text-primary hover:bg-white/5 rounded p-0.5 cursor-pointer transition-colors"
-            title="Open folder (Ctrl+O)"
+            title="打开文件夹 (Ctrl+O)"
             onClick={(e) => {
               e.stopPropagation();
               handleOpenFolder();

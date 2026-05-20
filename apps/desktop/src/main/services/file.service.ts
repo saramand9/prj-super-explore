@@ -1,8 +1,15 @@
-import { readdir, stat, copyFile, rename, unlink, rm, mkdir, access } from 'fs/promises';
-import { constants } from 'fs';
-import { join, basename, extname } from 'path';
+import { readdir, stat, copyFile, rename, unlink, rm, mkdir, access, writeFile } from 'fs/promises';
+import { constants, watch } from 'fs';
+import { join, basename, extname, parse, resolve, relative, isAbsolute } from 'path';
 import { shell } from 'electron';
-import type { FileEntry, FileStat, FileOpResult, SortConfig, DirSizeResult } from '@explore/shared';
+import type {
+  FileConflictStrategy,
+  FileEntry,
+  FileOpResult,
+  FileStat,
+  SortConfig,
+  DirSizeResult,
+} from '@explore/shared';
 import type { ServiceContainer } from '../service-container';
 import type { WatcherService } from './watcher.service';
 
@@ -161,57 +168,121 @@ export class FileService {
     }
   }
 
-  async copyFiles(sources: string[], destDir: string): Promise<FileOpResult> {
-    const skipped: string[] = [];
+  async copyFiles(
+    sources: string[],
+    destDir: string,
+    conflictStrategy: FileConflictStrategy = 'rename',
+  ): Promise<FileOpResult> {
+    const result = this.createOpResult();
+
+    const destCheck = await this.validateDestDir(destDir);
+    if (destCheck) {
+      for (const src of sources) this.addFailure(result, src, destDir, destCheck);
+      return this.finalizeOpResult(result);
+    }
+
     for (const src of sources) {
       try {
-        const dest = join(destDir, basename(src));
         const st = await stat(src);
-        if (st.isDirectory()) {
-          await this.copyDir(src, dest);
-        } else {
-          await copyFile(src, dest);
+        if (st.isDirectory() && this.isSameOrChild(destDir, src)) {
+          this.addFailure(result, src, destDir, '不能把文件夹复制到它自己里面');
+          continue;
         }
+
+        const target = await this.resolveDestination(src, destDir, conflictStrategy, result);
+        if (!target) continue;
+
+        if (st.isDirectory()) {
+          await this.copyDir(src, target.dest);
+        } else {
+          await copyFile(src, target.dest, constants.COPYFILE_EXCL);
+        }
+        result.completed.push({ path: src, dest: target.dest, action: 'copied' });
       } catch (e: any) {
-        skipped.push(src);
+        this.addFailure(result, src, undefined, e.message ?? '复制失败', e.code);
       }
     }
-    return { success: skipped.length === 0, skipped };
+
+    return this.finalizeOpResult(result);
   }
 
-  async moveFiles(sources: string[], destDir: string): Promise<FileOpResult> {
-    const skipped: string[] = [];
+  async moveFiles(
+    sources: string[],
+    destDir: string,
+    conflictStrategy: FileConflictStrategy = 'rename',
+  ): Promise<FileOpResult> {
+    const result = this.createOpResult();
+
+    const destCheck = await this.validateDestDir(destDir);
+    if (destCheck) {
+      for (const src of sources) this.addFailure(result, src, destDir, destCheck);
+      return this.finalizeOpResult(result);
+    }
+
     for (const src of sources) {
       try {
-        const dest = join(destDir, basename(src));
-        await rename(src, dest);
-      } catch {
-        skipped.push(src);
+        const st = await stat(src);
+        if (st.isDirectory() && this.isSameOrChild(destDir, src)) {
+          this.addFailure(result, src, destDir, '不能把文件夹移动到它自己里面');
+          continue;
+        }
+
+        const target = await this.resolveDestination(src, destDir, conflictStrategy, result);
+        if (!target) continue;
+
+        try {
+          await rename(src, target.dest);
+        } catch (e: any) {
+          if (e.code !== 'EXDEV') throw e;
+          if (st.isDirectory()) {
+            await this.copyDir(src, target.dest);
+            await rm(src, { recursive: true, force: true });
+          } else {
+            await copyFile(src, target.dest, constants.COPYFILE_EXCL);
+            await unlink(src);
+          }
+        }
+        result.completed.push({ path: src, dest: target.dest, action: 'moved' });
+      } catch (e: any) {
+        this.addFailure(result, src, undefined, e.message ?? '移动失败', e.code);
       }
     }
-    return { success: skipped.length === 0, skipped };
+
+    return this.finalizeOpResult(result);
   }
 
   async deleteFiles(paths: string[], permanent = false): Promise<FileOpResult> {
-    const skipped: string[] = [];
+    const result = this.createOpResult();
     for (const p of paths) {
       try {
         if (permanent) {
           await rm(p, { recursive: true, force: true });
+          result.completed.push({ path: p, action: 'deleted' });
         } else {
           await shell.trashItem(p);
+          result.completed.push({ path: p, action: 'trashed' });
         }
-      } catch {
-        skipped.push(p);
+      } catch (e: any) {
+        this.addFailure(result, p, undefined, e.message ?? '删除失败', e.code);
       }
     }
-    return { success: skipped.length === 0, skipped };
+    return this.finalizeOpResult(result);
   }
 
   async createDir(parentPath: string, name: string) {
     try {
       const fullPath = join(parentPath, name);
       await mkdir(fullPath);
+      return { success: true, path: fullPath };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  async createFile(parentPath: string, name: string) {
+    try {
+      const fullPath = join(parentPath, name);
+      await writeFile(fullPath, '', { flag: 'wx' });
       return { success: true, path: fullPath };
     } catch (e: any) {
       return { success: false, error: e.message };
@@ -242,7 +313,180 @@ export class FileService {
     await shell.openPath(filePath);
   }
 
+  // ── File watching (tail -f) ──
+
+  private fileWatchers = new Map<string, { watcher: ReturnType<typeof watch>; timer: ReturnType<typeof setTimeout> | null; cb: () => void }>();
+
+  watchFile(filePath: string, onChange: () => void): void {
+    this.unwatchFile(filePath);
+    this.createFileWatcher(filePath, onChange);
+  }
+
+  private createFileWatcher(filePath: string, onChange: () => void): void {
+    let watcher: ReturnType<typeof watch>;
+    try {
+      watcher = watch(filePath, (event) => {
+        if (event === 'change' || event === 'rename') {
+          const entry = this.fileWatchers.get(filePath);
+          if (!entry) return;
+          // 防抖：编辑器保存可能连续触发多个事件
+          if (entry.timer) clearTimeout(entry.timer);
+          entry.timer = setTimeout(() => {
+            entry.timer = null;
+            if (event === 'rename') {
+              access(filePath, constants.F_OK)
+                .then(() => {
+                  const current = this.fileWatchers.get(filePath);
+                  if (current?.cb === onChange) {
+                    this.unwatchFile(filePath);
+                    this.createFileWatcher(filePath, onChange);
+                  }
+                  onChange();
+                })
+                .catch(() => {
+                  this.unwatchFile(filePath);
+                  onChange();
+                });
+              return;
+            }
+            onChange();
+          }, 150);
+        }
+      });
+    } catch {
+      return;
+    }
+
+    watcher.on('error', () => {
+      this.unwatchFile(filePath);
+      onChange();
+    });
+    this.fileWatchers.set(filePath, { watcher, timer: null, cb: onChange });
+  }
+
+  unwatchFile(filePath: string): void {
+    const entry = this.fileWatchers.get(filePath);
+    if (entry) {
+      if (entry.timer) clearTimeout(entry.timer);
+      entry.watcher.close();
+      this.fileWatchers.delete(filePath);
+    }
+  }
+
+  disposeWatchers(): void {
+    for (const [, entry] of this.fileWatchers) {
+      if (entry.timer) clearTimeout(entry.timer);
+      entry.watcher.close();
+    }
+    this.fileWatchers.clear();
+  }
+
   // ── private ──
+
+  private createOpResult(): Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed'>> {
+    return {
+      skipped: [],
+      completed: [],
+      failures: [],
+      renamed: [],
+    };
+  }
+
+  private finalizeOpResult(
+    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed'>>,
+  ): FileOpResult {
+    const skipped = result.skipped;
+    const failures = result.failures;
+    const success = skipped.length === 0 && failures.length === 0;
+    return {
+      success,
+      error: success ? undefined : this.summarizeOpError(result),
+      skipped,
+      completed: result.completed,
+      failures,
+      renamed: result.renamed,
+    };
+  }
+
+  private summarizeOpError(
+    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed'>>,
+  ): string {
+    const parts: string[] = [];
+    if (result.completed.length > 0) parts.push(`已处理 ${result.completed.length} 项`);
+    if (result.skipped.length > 0) parts.push(`已跳过 ${result.skipped.length} 项`);
+    if (result.failures.length > 0) parts.push(`失败 ${result.failures.length} 项`);
+    return parts.join('，') || '操作失败';
+  }
+
+  private addFailure(
+    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed'>>,
+    path: string,
+    dest: string | undefined,
+    reason: string,
+    code?: string,
+  ): void {
+    result.failures.push({ path, dest, reason, code });
+  }
+
+  private async validateDestDir(destDir: string): Promise<string | null> {
+    try {
+      const st = await stat(destDir);
+      return st.isDirectory() ? null : 'Destination is not a directory';
+    } catch (e: any) {
+      return e.message ?? 'Destination is not accessible';
+    }
+  }
+
+  private isSameOrChild(targetPath: string, parentPath: string): boolean {
+    const rel = relative(resolve(parentPath), resolve(targetPath));
+    return rel === '' || (!!rel && !rel.startsWith('..') && !isAbsolute(rel));
+  }
+
+  private async resolveDestination(
+    src: string,
+    destDir: string,
+    strategy: FileConflictStrategy,
+    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed'>>,
+  ): Promise<{ dest: string } | null> {
+    const dest = join(destDir, basename(src));
+    if (resolve(src) === resolve(dest)) {
+      result.skipped.push(src);
+      return null;
+    }
+
+    const exists = await this.exists(dest);
+    if (!exists) return { dest };
+
+    if (strategy === 'skip') {
+      result.skipped.push(src);
+      return null;
+    }
+
+    if (strategy === 'error') {
+      this.addFailure(result, src, dest, '目标已存在', 'EEXIST');
+      return null;
+    }
+
+    if (strategy === 'overwrite') {
+      await rm(dest, { recursive: true, force: true });
+      return { dest };
+    }
+
+    const uniqueDest = await this.uniquePath(dest);
+    result.renamed.push({ source: src, dest: uniqueDest });
+    return { dest: uniqueDest };
+  }
+
+  private async uniquePath(dest: string): Promise<string> {
+    const parsed = parse(dest);
+    let candidate = join(parsed.dir, `${parsed.name} copy${parsed.ext}`);
+    let index = 2;
+    while (await this.exists(candidate)) {
+      candidate = join(parsed.dir, `${parsed.name} copy ${index}${parsed.ext}`);
+      index++;
+    }
+    return candidate;
+  }
 
   private async copyDir(src: string, dest: string): Promise<void> {
     await mkdir(dest, { recursive: true });

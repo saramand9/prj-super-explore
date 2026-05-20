@@ -26,9 +26,9 @@ export function BookmarkPanel() {
   }, [newPath, add]);
 
   const handleContextMenu = useCallback(
-    (e: React.MouseEvent, id: string) => {
+    async (e: React.MouseEvent, id: string) => {
       e.preventDefault();
-      if (confirm('Remove this bookmark?')) {
+      if (await ipc.invoke('dialog:confirm', { message: '确定要删除这个书签吗？' })) {
         remove(id);
       }
     },

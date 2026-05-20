@@ -28,11 +28,19 @@ export function createPluginContext(): PluginContext {
       stat(path) {
         return ipc.invoke('file:stat', { path });
       },
-      copy(sources, destDir) {
-        return ipc.invoke('file:copy', { sources, destDir });
+      copy(sources, destDir, opts) {
+        return ipc.invoke('file:copy', {
+          sources,
+          destDir,
+          conflictStrategy: opts?.conflictStrategy,
+        });
       },
-      move(sources, destDir) {
-        return ipc.invoke('file:move', { sources, destDir });
+      move(sources, destDir, opts) {
+        return ipc.invoke('file:move', {
+          sources,
+          destDir,
+          conflictStrategy: opts?.conflictStrategy,
+        });
       },
       delete(paths, permanent) {
         return ipc.invoke('file:delete', { paths, permanent });

@@ -92,7 +92,7 @@ export function SpaceSearch({ open, onClose }: SpaceSearchProps) {
           <input
             ref={inputRef}
             className="flex-1 bg-transparent border-none outline-none text-sm text-text-primary placeholder:text-text-muted"
-            placeholder="Search workspace..."
+            placeholder="搜索工作区..."
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -109,7 +109,7 @@ export function SpaceSearch({ open, onClose }: SpaceSearchProps) {
         </div>
         <div className="flex-1 overflow-y-auto py-1">
           {filtered.length === 0 ? (
-            <div className="px-3 py-2 text-text-muted text-xs">No workspace found</div>
+            <div className="px-3 py-2 text-text-muted text-xs">未找到工作区</div>
           ) : (
             filtered.map((space, idx) => {
               const isActive = space.id === activeSpaceId;
@@ -131,7 +131,7 @@ export function SpaceSearch({ open, onClose }: SpaceSearchProps) {
                     {space.name}
                   </span>
                   <span className="text-text-muted text-[10px] ml-auto flex-shrink-0">
-                    {tabCount} tabs
+                    {tabCount} 个标签页
                   </span>
                   {isActive && (
                     <span className="active-dot" />
@@ -142,9 +142,9 @@ export function SpaceSearch({ open, onClose }: SpaceSearchProps) {
           )}
         </div>
         <div className="px-2 py-1 border-t border-border/40 text-[10px] text-text-muted flex gap-3">
-          <span>↑↓ Navigate</span>
-          <span>↵ Switch</span>
-          <span>Esc Close</span>
+          <span>↑↓ 选择</span>
+          <span>↵ 切换</span>
+          <span>Esc 关闭</span>
         </div>
       </div>
     </div>

@@ -24,5 +24,8 @@
   "dependencies": {
     "highlight.js": "^11.11.1",
     "marked": "^18.0.3"
+  },
+  "devDependencies": {
+    "@lvce-editor/ripgrep": "^4.1.0"
   }
 }

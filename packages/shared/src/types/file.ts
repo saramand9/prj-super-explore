@@ -28,9 +28,32 @@ export interface SortConfig {
   direction: 'asc' | 'desc';
 }
 
+export type FileConflictStrategy = 'rename' | 'skip' | 'overwrite' | 'error';
+
+export interface FileOpFailure {
+  path: string;
+  dest?: string;
+  reason: string;
+  code?: string;
+}
+
+export interface FileOpCompleted {
+  path: string;
+  dest?: string;
+  action: 'copied' | 'moved' | 'trashed' | 'deleted';
+}
+
+export interface FileOpRename {
+  source: string;
+  dest: string;
+}
+
 /** 文件操作结果 */
 export interface FileOpResult {
   success: boolean;
   error?: string;
   skipped?: string[];
+  completed?: FileOpCompleted[];
+  failures?: FileOpFailure[];
+  renamed?: FileOpRename[];
 }

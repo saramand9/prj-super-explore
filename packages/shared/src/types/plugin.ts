@@ -124,8 +124,8 @@ export interface PluginContext {
 export interface FsApi {
   readDir(path: string, opts?: { sort?: import('./file').SortConfig; showHidden?: boolean }): Promise<import('./file').FileEntry[]>;
   stat(path: string): Promise<import('./file').FileStat | null>;
-  copy(sources: string[], destDir: string): Promise<import('./file').FileOpResult>;
-  move(sources: string[], destDir: string): Promise<import('./file').FileOpResult>;
+  copy(sources: string[], destDir: string, opts?: { conflictStrategy?: import('./file').FileConflictStrategy }): Promise<import('./file').FileOpResult>;
+  move(sources: string[], destDir: string, opts?: { conflictStrategy?: import('./file').FileConflictStrategy }): Promise<import('./file').FileOpResult>;
   delete(paths: string[], permanent?: boolean): Promise<import('./file').FileOpResult>;
   mkdir(parentPath: string, name: string): Promise<{ success: boolean; path?: string; error?: string }>;
   open(path: string): Promise<void>;

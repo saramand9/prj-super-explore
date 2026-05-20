@@ -1,3 +1,10 @@
+/// <reference types="vite/client" />
+
+declare module '*?worker' {
+  const worker: new () => Worker;
+  export default worker;
+}
+
 import type { IpcChannels, IpcEvents } from '@explore/shared';
 
 export interface ExploreApi {

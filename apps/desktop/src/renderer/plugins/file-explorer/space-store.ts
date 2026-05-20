@@ -201,6 +201,8 @@ export const useSpaceStore = create<{
 
   persistSpaces: async () => {
     const { spaces } = get();
-    await ipc.invoke('space:save', { spaces }).catch(() => {});
+    await ipc.invoke('space:save', { spaces }).catch((err) => {
+      console.error('[spaces] save failed', err);
+    });
   },
 }));

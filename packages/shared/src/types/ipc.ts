@@ -5,7 +5,7 @@
  * 事件推送模式：主进程 → 渲染进程 on
  */
 
-import type { FileEntry, FileOpResult, FileStat, SortConfig } from './file';
+import type { FileConflictStrategy, FileEntry, FileOpResult, FileStat, SortConfig } from './file';
 import type { Bookmark } from './config';
 import type { Space } from './config';
 import type { PluginInfo, PluginManifest } from './plugin';
@@ -23,11 +23,11 @@ export interface IpcChannels {
     res: FileStat | null;
   };
   'file:copy': {
-    req: { sources: string[]; destDir: string };
+    req: { sources: string[]; destDir: string; conflictStrategy?: FileConflictStrategy };
     res: FileOpResult;
   };
   'file:move': {
-    req: { sources: string[]; destDir: string };
+    req: { sources: string[]; destDir: string; conflictStrategy?: FileConflictStrategy };
     res: FileOpResult;
   };
   'file:delete': {
@@ -35,6 +35,10 @@ export interface IpcChannels {
     res: FileOpResult;
   };
   'file:mkdir': {
+    req: { parentPath: string; name: string };
+    res: { success: boolean; path?: string; error?: string };
+  };
+  'file:create': {
     req: { parentPath: string; name: string };
     res: { success: boolean; path?: string; error?: string };
   };
@@ -69,6 +73,16 @@ export interface IpcChannels {
     res: void;
   };
 
+  // 单文件变更监听（tail -f）
+  'file:watchFile': {
+    req: { path: string };
+    res: void;
+  };
+  'file:unwatchFile': {
+    req: { path: string };
+    res: void;
+  };
+
   // Recursive directory walk for search index
   'file:walkTree': {
     req: { path: string; maxDepth?: number; excludePatterns?: string[] };
@@ -83,7 +97,15 @@ export interface IpcChannels {
 
   // Search
   'search:fulltext': {
-    req: { dir: string; query: string; filePattern?: string; maxResults?: number };
+    req: {
+      dir: string;
+      query: string;
+      searchId?: string;
+      filePattern?: string;
+      excludePatterns?: string[];
+      maxResults?: number;
+      maxFileSize?: string;
+    };
     res: FulltextMatch[];
   };
   'search:cancel': {
@@ -180,6 +202,10 @@ export interface IpcChannels {
     req: { title?: string; message: string };
     res: boolean;
   };
+  'dialog:alert': {
+    req: { title?: string; message: string; type?: 'info' | 'warning' | 'error' };
+    res: void;
+  };
   'dialog:prompt': {
     req: { title?: string; message: string; defaultValue?: string };
     res: string | null;
@@ -220,6 +246,9 @@ export interface IpcEvents {
     path: string;
     size: number;
     partial?: boolean;
+  };
+  'file:contentChanged': {
+    filePath: string;
   };
 }
 
