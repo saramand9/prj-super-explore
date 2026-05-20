@@ -527,7 +527,7 @@ function createIpcCodedError(code: IpcErrorCode, message: string, path?: string)
 }
 
 function toIpcError(channel: keyof IpcChannels, err: unknown): Error {
-  return new Error(`${IPC_ERROR_PREFIX}${JSON.stringify(toIpcErrorInfo(channel, err))}`);
+  return new Error(`${IPC_ERROR_PREFIX}${encodeIpcErrorInfo(toIpcErrorInfo(channel, err))}`);
 }
 
 function toIpcErrorInfo(channel: keyof IpcChannels, err: unknown): IpcErrorInfo {
@@ -551,6 +551,10 @@ function toIpcErrorInfo(channel: keyof IpcChannels, err: unknown): IpcErrorInfo 
     path,
     details,
   };
+}
+
+function encodeIpcErrorInfo(info: IpcErrorInfo): string {
+  return `b64:${Buffer.from(JSON.stringify(info), 'utf8').toString('base64url')}`;
 }
 
 function mapErrorCode(channel: keyof IpcChannels, nativeCode?: string): IpcErrorCode {

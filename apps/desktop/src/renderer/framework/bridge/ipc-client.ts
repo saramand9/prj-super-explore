@@ -101,6 +101,10 @@ function parseIpcErrorInfo(err: unknown): IpcErrorInfo | null {
   if (idx < 0) return null;
 
   const raw = message.slice(idx + IPC_ERROR_PREFIX.length).trim();
+  if (raw.startsWith('b64:')) {
+    return parseBase64UrlIpcError(raw.slice(4));
+  }
+
   try {
     return JSON.parse(raw) as IpcErrorInfo;
   } catch {
@@ -112,6 +116,21 @@ function parseIpcErrorInfo(err: unknown): IpcErrorInfo | null {
     } catch {
       return null;
     }
+  }
+}
+
+function parseBase64UrlIpcError(payload: string): IpcErrorInfo | null {
+  try {
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    const binary = atob(padded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return JSON.parse(new TextDecoder('utf-8').decode(bytes)) as IpcErrorInfo;
+  } catch {
+    return null;
   }
 }
 
