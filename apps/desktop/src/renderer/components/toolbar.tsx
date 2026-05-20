@@ -2,10 +2,15 @@ import { useCallback, useState } from 'react';
 import { useLayoutStore, useActivePanel } from '../framework/layout';
 import { useFileStore } from '../plugins/file-explorer/store';
 import { ipc } from '../framework/bridge/ipc-client';
+import { appDialog } from '../framework/dialogs/app-dialog';
+import { showNotification } from '../framework/plugin-system';
 import {
-  resolveCopyConflictStrategyWithConfirm,
+  getFileOpToastType,
+  resolveCopyConflictStrategyWithChoice,
   summarizeFileOpResult,
+  summarizeFileOpToast,
 } from '../plugins/file-explorer/utils/file-op-result';
+import type { FileOpResult } from '@explore/shared';
 
 export function Toolbar() {
   const { activePanel } = useActivePanel();
@@ -24,6 +29,18 @@ export function Toolbar() {
       }),
     [],
   );
+
+  const reportFileOperationResult = useCallback(async (action: string, result: FileOpResult) => {
+    const summary = summarizeFileOpResult(action, result);
+    if (summary) {
+      await appDialog.alert({
+        message: summary,
+        type: getFileOpToastType(result) === 'error' ? 'error' : 'warning',
+      });
+      return;
+    }
+    showNotification(summarizeFileOpToast(action, result), getFileOpToastType(result));
+  }, []);
 
   const handleOpenFolder = useCallback(async () => {
     const currentPath = useFileStore.getState()[activeSide].path;
@@ -56,11 +73,17 @@ export function Toolbar() {
     const targetPath = useLayoutStore.getState().layout[targetSide].path;
     if (targetPath && state.selected.size > 0) {
       const sources = [...state.selected];
-      const conflictStrategy = await resolveCopyConflictStrategyWithConfirm(
+      const conflictStrategy = await resolveCopyConflictStrategyWithChoice(
         sources,
         targetPath,
         (p) => ipc.invoke('file:readDir', { path: p }),
-        (message) => ipc.invoke('dialog:confirm', { message }),
+        (message, buttons) => appDialog.choice({
+          title: '同名冲突',
+          message,
+          buttons,
+          defaultId: 'rename',
+          cancelId: 'cancel',
+        }),
       );
       if (!conflictStrategy) return;
       const result = await ipc.invoke('file:copy', {
@@ -68,13 +91,12 @@ export function Toolbar() {
         destDir: targetPath,
         conflictStrategy,
       });
-      const summary = summarizeFileOpResult('Copy', result);
-      if (summary) await ipc.invoke('dialog:alert', { message: summary });
+      await reportFileOperationResult('Copy', result);
       if (result.success) useFileStore.getState().clearSelection(activeSide);
       useFileStore.getState().refresh(activeSide);
       useFileStore.getState().refresh(targetSide);
     }
-  }, [activeSide]);
+  }, [activeSide, reportFileOperationResult]);
 
   const handleMove = useCallback(async () => {
     const state = useFileStore.getState()[activeSide];
@@ -82,11 +104,17 @@ export function Toolbar() {
     const targetPath = useLayoutStore.getState().layout[targetSide].path;
     if (targetPath && state.selected.size > 0) {
       const sources = [...state.selected];
-      const conflictStrategy = await resolveCopyConflictStrategyWithConfirm(
+      const conflictStrategy = await resolveCopyConflictStrategyWithChoice(
         sources,
         targetPath,
         (p) => ipc.invoke('file:readDir', { path: p }),
-        (message) => ipc.invoke('dialog:confirm', { message }),
+        (message, buttons) => appDialog.choice({
+          title: '同名冲突',
+          message,
+          buttons,
+          defaultId: 'rename',
+          cancelId: 'cancel',
+        }),
       );
       if (!conflictStrategy) return;
       const result = await ipc.invoke('file:move', {
@@ -94,26 +122,45 @@ export function Toolbar() {
         destDir: targetPath,
         conflictStrategy,
       });
-      const summary = summarizeFileOpResult('Move', result);
-      if (summary) await ipc.invoke('dialog:alert', { message: summary });
+      await reportFileOperationResult('Move', result);
       if (result.success) useFileStore.getState().clearSelection(activeSide);
       useFileStore.getState().refresh(activeSide);
       useFileStore.getState().refresh(targetSide);
     }
-  }, [activeSide]);
+  }, [activeSide, reportFileOperationResult]);
 
   const handleDelete = useCallback(async () => {
     const state = useFileStore.getState()[activeSide];
     if (state.selected.size === 0) return;
     const names = [...state.selected].map((p) => p.split(/[/\\]/).pop()).join(', ');
-    if (await ipc.invoke('dialog:confirm', { message: `确定要移到回收站吗？\n${names}` })) {
+    if (await appDialog.confirm({ message: `确定要移到回收站吗？\n${names}` })) {
       const result = await ipc.invoke('file:delete', { paths: [...state.selected] });
-      const summary = summarizeFileOpResult('Delete', result);
-      if (summary) await ipc.invoke('dialog:alert', { message: summary });
+      await reportFileOperationResult('Delete', result);
       useFileStore.getState().clearSelection(activeSide);
       useFileStore.getState().refresh(activeSide);
     }
-  }, [activeSide]);
+  }, [activeSide, reportFileOperationResult]);
+
+  const handlePermanentDelete = useCallback(async () => {
+    const state = useFileStore.getState()[activeSide];
+    if (state.selected.size === 0) return;
+    const paths = [...state.selected];
+    const names = paths.map((p) => p.split(/[/\\]/).pop()).join(', ');
+    const first = await appDialog.confirm({
+      title: '永久删除',
+      message: `确定要永久删除 ${paths.length} 个项目吗？\n这些项目不会进入回收站。\n${names}`,
+    });
+    if (!first) return;
+    const second = await appDialog.confirm({
+      title: '再次确认永久删除',
+      message: '再次确认：永久删除无法从回收站恢复。是否继续？',
+    });
+    if (!second) return;
+    const result = await ipc.invoke('file:delete', { paths, permanent: true });
+    await reportFileOperationResult('PermanentDelete', result);
+    useFileStore.getState().clearSelection(activeSide);
+    useFileStore.getState().refresh(activeSide);
+  }, [activeSide, reportFileOperationResult]);
 
   const btn =
     'px-2 py-0.5 text-xs text-text-secondary hover:text-text-primary hover:bg-surface-lighter rounded transition-colors cursor-pointer flex items-center gap-1';
@@ -142,6 +189,9 @@ export function Toolbar() {
       </button>
       <button className={btn} onClick={handleDelete} title="Delete (F8)">
         🗑 Delete
+      </button>
+      <button className={btn} onClick={handlePermanentDelete} title="Permanent delete (Shift+F8)">
+        ⛔ Permanent
       </button>
 
       <span className="flex-1" />

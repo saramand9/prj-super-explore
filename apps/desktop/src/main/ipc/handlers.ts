@@ -32,19 +32,26 @@ export function registerIpcHandlers(container: ServiceContainer): void {
   ipcMain.handle(
     'file:copy',
     (_e, payload: IpcChannels['file:copy']['req']) =>
-      file.copyFiles(payload.sources, payload.destDir, payload.conflictStrategy),
+      file.copyFiles(payload.sources, payload.destDir, payload.conflictStrategy, payload.operationId),
   );
 
   ipcMain.handle(
     'file:move',
     (_e, payload: IpcChannels['file:move']['req']) =>
-      file.moveFiles(payload.sources, payload.destDir, payload.conflictStrategy),
+      file.moveFiles(payload.sources, payload.destDir, payload.conflictStrategy, payload.operationId),
   );
 
   ipcMain.handle(
     'file:delete',
     (_e, payload: IpcChannels['file:delete']['req']) =>
-      file.deleteFiles(payload.paths, payload.permanent),
+      file.deleteFiles(payload.paths, payload.permanent, payload.operationId),
+  );
+
+  ipcMain.handle(
+    'file:cancelOperation',
+    (_e, payload: IpcChannels['file:cancelOperation']['req']) => ({
+      cancelled: file.cancelOperation(payload.operationId),
+    }),
   );
 
   ipcMain.handle(
@@ -294,6 +301,29 @@ export function registerIpcHandlers(container: ServiceContainer): void {
         title: payload.title || '提示',
         message: payload.message,
       });
+    },
+  );
+
+  ipcMain.handle(
+    'dialog:choice',
+    async (_e, payload: IpcChannels['dialog:choice']['req']) => {
+      const win = BrowserWindow.getFocusedWindow();
+      if (!win) return null;
+      const defaultId = payload.defaultId
+        ? payload.buttons.findIndex((button) => button.id === payload.defaultId)
+        : 0;
+      const cancelId = payload.cancelId
+        ? payload.buttons.findIndex((button) => button.id === payload.cancelId)
+        : payload.buttons.length - 1;
+      const result = await dialog.showMessageBox(win, {
+        type: payload.type ?? 'question',
+        buttons: payload.buttons.map((button) => button.label),
+        defaultId: defaultId >= 0 ? defaultId : 0,
+        cancelId: cancelId >= 0 ? cancelId : payload.buttons.length - 1,
+        title: payload.title || '请选择',
+        message: payload.message,
+      });
+      return payload.buttons[result.response]?.id ?? null;
     },
   );
 

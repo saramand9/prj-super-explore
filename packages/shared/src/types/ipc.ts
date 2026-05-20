@@ -23,16 +23,20 @@ export interface IpcChannels {
     res: FileStat | null;
   };
   'file:copy': {
-    req: { sources: string[]; destDir: string; conflictStrategy?: FileConflictStrategy };
+    req: { sources: string[]; destDir: string; conflictStrategy?: FileConflictStrategy; operationId?: string };
     res: FileOpResult;
   };
   'file:move': {
-    req: { sources: string[]; destDir: string; conflictStrategy?: FileConflictStrategy };
+    req: { sources: string[]; destDir: string; conflictStrategy?: FileConflictStrategy; operationId?: string };
     res: FileOpResult;
   };
   'file:delete': {
-    req: { paths: string[]; permanent?: boolean };
+    req: { paths: string[]; permanent?: boolean; operationId?: string };
     res: FileOpResult;
+  };
+  'file:cancelOperation': {
+    req: { operationId: string };
+    res: { cancelled: boolean };
   };
   'file:mkdir': {
     req: { parentPath: string; name: string };
@@ -205,6 +209,17 @@ export interface IpcChannels {
   'dialog:alert': {
     req: { title?: string; message: string; type?: 'info' | 'warning' | 'error' };
     res: void;
+  };
+  'dialog:choice': {
+    req: {
+      title?: string;
+      message: string;
+      buttons: { id: string; label: string }[];
+      defaultId?: string;
+      cancelId?: string;
+      type?: 'none' | 'info' | 'error' | 'question' | 'warning';
+    };
+    res: string | null;
   };
   'dialog:prompt': {
     req: { title?: string; message: string; defaultValue?: string };

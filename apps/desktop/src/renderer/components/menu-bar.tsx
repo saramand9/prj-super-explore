@@ -4,10 +4,15 @@ import { useFileStore } from '../plugins/file-explorer/store';
 import { useAppStore } from '../framework/store/app-store';
 import { themes } from '../framework/themes';
 import { ipc } from '../framework/bridge/ipc-client';
+import { appDialog } from '../framework/dialogs/app-dialog';
+import { showNotification } from '../framework/plugin-system';
 import {
-  resolveCopyConflictStrategyWithConfirm,
+  getFileOpToastType,
+  resolveCopyConflictStrategyWithChoice,
   summarizeFileOpResult,
+  summarizeFileOpToast,
 } from '../plugins/file-explorer/utils/file-op-result';
+import type { FileOpResult } from '@explore/shared';
 
 interface MenuItem {
   label?: string;
@@ -35,6 +40,18 @@ export function MenuBar() {
   const activeSide = useCallback(() => {
     const side = useLayoutStore.getState().layout.id;
     return side === 'left' || side === 'right' ? side : 'left';
+  }, []);
+
+  const reportFileOperationResult = useCallback(async (action: string, result: FileOpResult) => {
+    const summary = summarizeFileOpResult(action, result);
+    if (summary) {
+      await appDialog.alert({
+        message: summary,
+        type: getFileOpToastType(result) === 'error' ? 'error' : 'warning',
+      });
+      return;
+    }
+    showNotification(summarizeFileOpToast(action, result), getFileOpToastType(result));
   }, []);
 
   const menus: MenuDef[] = [
@@ -90,11 +107,17 @@ export function MenuBar() {
             const targetPath = useLayoutStore.getState().layout[target].path;
             if (targetPath && state.selected.size > 0) {
               const sources = [...state.selected];
-              const conflictStrategy = await resolveCopyConflictStrategyWithConfirm(
+              const conflictStrategy = await resolveCopyConflictStrategyWithChoice(
                 sources,
                 targetPath,
                 (p) => ipc.invoke('file:readDir', { path: p }),
-                (message) => ipc.invoke('dialog:confirm', { message }),
+                (message, buttons) => appDialog.choice({
+                  title: '同名冲突',
+                  message,
+                  buttons,
+                  defaultId: 'rename',
+                  cancelId: 'cancel',
+                }),
               );
               if (!conflictStrategy) return;
               const result = await ipc.invoke('file:copy', {
@@ -102,8 +125,7 @@ export function MenuBar() {
                 destDir: targetPath,
                 conflictStrategy,
               });
-              const summary = summarizeFileOpResult('Copy', result);
-              if (summary) await ipc.invoke('dialog:alert', { message: summary });
+              await reportFileOperationResult('Copy', result);
               if (result.success) useFileStore.getState().clearSelection(side);
               useFileStore.getState().refresh(side);
               useFileStore.getState().refresh(target);
@@ -120,11 +142,17 @@ export function MenuBar() {
             const targetPath = useLayoutStore.getState().layout[target].path;
             if (targetPath && state.selected.size > 0) {
               const sources = [...state.selected];
-              const conflictStrategy = await resolveCopyConflictStrategyWithConfirm(
+              const conflictStrategy = await resolveCopyConflictStrategyWithChoice(
                 sources,
                 targetPath,
                 (p) => ipc.invoke('file:readDir', { path: p }),
-                (message) => ipc.invoke('dialog:confirm', { message }),
+                (message, buttons) => appDialog.choice({
+                  title: '同名冲突',
+                  message,
+                  buttons,
+                  defaultId: 'rename',
+                  cancelId: 'cancel',
+                }),
               );
               if (!conflictStrategy) return;
               const result = await ipc.invoke('file:move', {
@@ -132,8 +160,7 @@ export function MenuBar() {
                 destDir: targetPath,
                 conflictStrategy,
               });
-              const summary = summarizeFileOpResult('Move', result);
-              if (summary) await ipc.invoke('dialog:alert', { message: summary });
+              await reportFileOperationResult('Move', result);
               if (result.success) useFileStore.getState().clearSelection(side);
               useFileStore.getState().refresh(side);
               useFileStore.getState().refresh(target);
@@ -148,13 +175,37 @@ export function MenuBar() {
             const state = useFileStore.getState()[side];
             if (state.selected.size === 0) return;
             const names = [...state.selected].map((p) => p.split(/[/\\]/).pop()).join(', ');
-            if (await ipc.invoke('dialog:confirm', { message: `确定要移到回收站吗？\n${names}` })) {
+            if (await appDialog.confirm({ message: `确定要移到回收站吗？\n${names}` })) {
               const result = await ipc.invoke('file:delete', { paths: [...state.selected] });
-              const summary = summarizeFileOpResult('Delete', result);
-              if (summary) await ipc.invoke('dialog:alert', { message: summary });
+              await reportFileOperationResult('Delete', result);
               useFileStore.getState().clearSelection(side);
               useFileStore.getState().refresh(side);
             }
+          },
+        },
+        {
+          label: 'Permanently Delete',
+          shortcut: 'Shift+F8',
+          action: async () => {
+            const side = activeSide() as 'left' | 'right';
+            const state = useFileStore.getState()[side];
+            if (state.selected.size === 0) return;
+            const paths = [...state.selected];
+            const names = paths.map((p) => p.split(/[/\\]/).pop()).join(', ');
+            const first = await appDialog.confirm({
+              title: '永久删除',
+              message: `确定要永久删除 ${paths.length} 个项目吗？\n这些项目不会进入回收站。\n${names}`,
+            });
+            if (!first) return;
+            const second = await appDialog.confirm({
+              title: '再次确认永久删除',
+              message: '再次确认：永久删除无法从回收站恢复。是否继续？',
+            });
+            if (!second) return;
+            const result = await ipc.invoke('file:delete', { paths, permanent: true });
+            await reportFileOperationResult('PermanentDelete', result);
+            useFileStore.getState().clearSelection(side);
+            useFileStore.getState().refresh(side);
           },
         },
         { separator: true },
@@ -214,7 +265,7 @@ export function MenuBar() {
           label: 'About Explore',
           action: async () => {
             const version = await ipc.invoke('app:getVersion', undefined);
-            await ipc.invoke('dialog:alert', {
+            await appDialog.alert({
               title: '关于',
               message: `Explore v${version}\n双栏文件管理器`,
             });

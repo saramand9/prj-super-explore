@@ -48,12 +48,19 @@ export interface FileOpRename {
   dest: string;
 }
 
+export interface FileOpReplaced {
+  path: string;
+  originalDest: string;
+}
+
 /** 文件操作结果 */
 export interface FileOpResult {
   success: boolean;
+  cancelled?: boolean;
   error?: string;
   skipped?: string[];
   completed?: FileOpCompleted[];
   failures?: FileOpFailure[];
   renamed?: FileOpRename[];
+  replaced?: FileOpReplaced[];
 }

@@ -16,12 +16,15 @@ import { FileSearch } from './plugins/file-explorer/components/file-search';
 import { TabSearch } from './plugins/file-explorer/components/tab-search';
 import { SpaceSearch } from './plugins/file-explorer/components/space-search';
 import {
-  resolveCopyConflictStrategyWithConfirm,
+  getFileOpToastType,
+  resolveCopyConflictStrategyWithChoice,
   summarizeFileOpResult,
+  summarizeFileOpToast,
 } from './plugins/file-explorer/utils/file-op-result';
 import { useSearchStore } from './plugins/fulltext-search';
 import { useViewerStore } from './plugins/viewer/store';
 import { ipc } from './framework/bridge/ipc-client';
+import { appDialog, AppDialogHost } from './framework/dialogs/app-dialog';
 
 // ── App Shell ──
 
@@ -253,6 +256,7 @@ function MainApp() {
 
       <PluginManagerDialog />
       <SpaceSearch open={showSpaceSearch} onClose={() => setShowSpaceSearch(false)} />
+      <AppDialogHost />
     </div>
   );
 }
@@ -418,11 +422,17 @@ function PanelSlot({
 
     const isMove = e.ctrlKey || e.metaKey;
     try {
-      const conflictStrategy = await resolveCopyConflictStrategyWithConfirm(
+      const conflictStrategy = await resolveCopyConflictStrategyWithChoice(
         sources,
         targetDir,
         (p) => ipc.invoke('file:readDir', { path: p }),
-        (message) => ipc.invoke('dialog:confirm', { message }),
+        (message, buttons) => appDialog.choice({
+          title: '同名冲突',
+          message,
+          buttons,
+          defaultId: 'rename',
+          cancelId: 'cancel',
+        }),
       );
       if (!conflictStrategy) {
         notify('已取消', 'info');
@@ -434,9 +444,9 @@ function PanelSlot({
         : await ipc.invoke('file:copy', { sources, destDir: targetDir, conflictStrategy });
       const summary = summarizeFileOpResult(isMove ? 'Move' : 'Copy', result);
       if (summary) {
-        notify(summary, result.success ? 'warn' : 'error');
+        notify(summary, getFileOpToastType(result));
       } else {
-        notify(`${isMove ? '已移动' : '已复制'} ${sources.length} 个项目`, 'info');
+        notify(summarizeFileOpToast(isMove ? 'Move' : 'Copy', result), getFileOpToastType(result));
       }
     } catch (err: any) {
       notify(`操作失败：${err.message}`, 'error');

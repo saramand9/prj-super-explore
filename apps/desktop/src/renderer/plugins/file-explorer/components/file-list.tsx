@@ -5,10 +5,15 @@ import { useFileStore, useFilteredEntries } from '../store';
 import { FileRow } from './file-row';
 import { ipc } from '../../../framework/bridge/ipc-client';
 import { useLayoutStore } from '../../../framework/store/layout-store';
-import { pluginManager } from '../../../framework/plugin-system';
+import { pluginManager, showNotification } from '../../../framework/plugin-system';
 import { FolderOpen, FolderPlus, RefreshCw, Trash2, Copy, ArrowRightLeft, Pencil, File, FilePlus, Folder, Clipboard, ClipboardCheck } from 'lucide-react';
-import { resolveCopyConflictStrategy, summarizeFileOpResult } from '../utils/file-op-result';
-import type { FileConflictStrategy } from '@explore/shared';
+import {
+  getFileOpToastType,
+  resolveCopyConflictStrategy,
+  summarizeFileOpResult,
+  summarizeFileOpToast,
+} from '../utils/file-op-result';
+import type { FileConflictStrategy, FileOpResult } from '@explore/shared';
 
 interface FileListProps {
   side: 'left' | 'right';
@@ -60,10 +65,23 @@ export function FileList({ side }: FileListProps) {
     message: string;
     resolve: (strategy: FileConflictStrategy | null) => void;
   } | null>(null);
+  const [conflictHover, setConflictHover] = useState<FileConflictStrategy | 'cancel' | null>(null);
+  const [pendingOperation, setPendingOperation] = useState<{
+    id: string;
+    label: string;
+    cancelling: boolean;
+  } | null>(null);
+  const [inlineAlert, setInlineAlert] = useState<{
+    message: string;
+    type: 'info' | 'warning' | 'error';
+    resolve: () => void;
+  } | null>(null);
 
   const showAlert = useCallback(
     (message: string, type: 'info' | 'warning' | 'error' = 'info') =>
-      ipc.invoke('dialog:alert', { message, type }),
+      new Promise<void>((resolve) => {
+        setInlineAlert({ message, type, resolve });
+      }),
     [],
   );
 
@@ -86,6 +104,7 @@ export function FileList({ side }: FileListProps) {
   const showCopyConflictChoice = useCallback(
     (message: string): Promise<FileConflictStrategy | null> =>
       new Promise((resolve) => {
+        setConflictHover(null);
         setCopyConflictChoice({ message, resolve });
       }),
     [],
@@ -100,6 +119,46 @@ export function FileList({ side }: FileListProps) {
         showCopyConflictChoice,
       ),
     [showCopyConflictChoice],
+  );
+
+  const runFileOperation = useCallback(
+    async (
+      channel: 'file:copy' | 'file:move' | 'file:delete',
+      payload: Record<string, unknown>,
+      label: string,
+    ): Promise<FileOpResult> => {
+      const operationId = `op-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const timer = window.setTimeout(() => {
+        setPendingOperation({ id: operationId, label, cancelling: false });
+      }, 500);
+      try {
+        return await ipc.invoke(channel, { ...payload, operationId } as any);
+      } finally {
+        window.clearTimeout(timer);
+        setPendingOperation(null);
+      }
+    },
+    [],
+  );
+
+  const cancelPendingOperation = useCallback(() => {
+    const current = pendingOperation;
+    if (!current || current.cancelling) return;
+    setPendingOperation({ ...current, cancelling: true });
+    ipc.invoke('file:cancelOperation', { operationId: current.id }).catch(() => {});
+  }, [pendingOperation]);
+
+  const reportFileOperationResult = useCallback(
+    async (action: string, result: FileOpResult) => {
+      const summary = summarizeFileOpResult(action, result);
+      if (summary) {
+        const type = getFileOpToastType(result) === 'error' ? 'error' : 'warning';
+        await showAlert(summary, type);
+        return;
+      }
+      showNotification(summarizeFileOpToast(action, result), getFileOpToastType(result));
+    },
+    [showAlert],
   );
 
   const refreshPeerIfSameDirectory = useCallback(
@@ -153,24 +212,46 @@ export function FileList({ side }: FileListProps) {
     closeMenu();
   }, [contextMenu, side, closeMenu]);
 
-  const ctxDelete = useCallback(async () => {
-    if (!contextMenu) return;
-    const paths = contextMenu.single
-      ? [contextMenu.single.path]
-      : [...(useFileStore.getState()[side].selected)];
-    if (paths.length === 0) { closeMenu(); return; }
-    if (!await showConfirm(`确定要将 ${paths.length} 个项目移到回收站吗？`)) { closeMenu(); return; }
+  const deletePaths = useCallback(async (paths: string[], permanent = false) => {
+    if (paths.length === 0) return;
+    if (permanent) {
+      if (!await showConfirm(`确定要永久删除 ${paths.length} 个项目吗？\n这些项目不会进入回收站。`)) return;
+      if (!await showConfirm('再次确认：永久删除无法从回收站恢复。是否继续？')) return;
+    } else if (!await showConfirm(`确定要将 ${paths.length} 个项目移到回收站吗？`)) {
+      return;
+    }
+
     try {
-      const result = await ipc.invoke('file:delete', { paths });
-      const summary = summarizeFileOpResult('Delete', result);
-      if (summary) await showAlert(summary);
+      const result = await runFileOperation(
+        'file:delete',
+        { paths, permanent },
+        permanent ? '正在永久删除...' : '正在移到回收站...',
+      );
+      await reportFileOperationResult(permanent ? 'PermanentDelete' : 'Delete', result);
       clearSelection(side);
       refresh(side);
     } catch (err: any) {
       await showAlert(`删除失败：${err.message}`, 'error');
     }
+  }, [side, clearSelection, refresh, showAlert, runFileOperation, reportFileOperationResult]);
+
+  const ctxDelete = useCallback(async () => {
+    if (!contextMenu) return;
+    const paths = contextMenu.single
+      ? [contextMenu.single.path]
+      : [...(useFileStore.getState()[side].selected)];
+    await deletePaths(paths, false);
     closeMenu();
-  }, [contextMenu, side, clearSelection, refresh, closeMenu, showAlert]);
+  }, [contextMenu, side, closeMenu, deletePaths]);
+
+  const ctxPermanentDelete = useCallback(async () => {
+    if (!contextMenu) return;
+    const paths = contextMenu.single
+      ? [contextMenu.single.path]
+      : [...(useFileStore.getState()[side].selected)];
+    await deletePaths(paths, true);
+    closeMenu();
+  }, [contextMenu, side, closeMenu, deletePaths]);
 
   const ctxRename = useCallback(async () => {
     if (!contextMenu?.single) return;
@@ -196,16 +277,19 @@ export function FileList({ side }: FileListProps) {
     try {
       const conflictStrategy = await chooseConflictStrategy(paths, dest);
       if (!conflictStrategy) { closeMenu(); return; }
-      const result = await ipc.invoke('file:copy', { sources: paths, destDir: dest, conflictStrategy });
-      const summary = summarizeFileOpResult('Copy', result);
-      if (summary) await showAlert(summary);
+      const result = await runFileOperation(
+        'file:copy',
+        { sources: paths, destDir: dest, conflictStrategy },
+        '正在复制...',
+      );
+      await reportFileOperationResult('Copy', result);
       refresh(side);
       useFileStore.getState().refresh(other);
     } catch (err: any) {
       await showAlert(`复制失败：${err.message}`, 'error');
     }
     closeMenu();
-  }, [contextMenu, side, refresh, closeMenu, chooseConflictStrategy, showAlert]);
+  }, [contextMenu, side, refresh, closeMenu, chooseConflictStrategy, showAlert, runFileOperation, reportFileOperationResult]);
 
   const ctxMove = useCallback(async () => {
     if (!contextMenu) return;
@@ -218,16 +302,19 @@ export function FileList({ side }: FileListProps) {
     try {
       const conflictStrategy = await chooseConflictStrategy(paths, dest);
       if (!conflictStrategy) { closeMenu(); return; }
-      const result = await ipc.invoke('file:move', { sources: paths, destDir: dest, conflictStrategy });
-      const summary = summarizeFileOpResult('Move', result);
-      if (summary) await showAlert(summary);
+      const result = await runFileOperation(
+        'file:move',
+        { sources: paths, destDir: dest, conflictStrategy },
+        '正在移动...',
+      );
+      await reportFileOperationResult('Move', result);
       refresh(side);
       useFileStore.getState().refresh(other);
     } catch (err: any) {
       await showAlert(`移动失败：${err.message}`, 'error');
     }
     closeMenu();
-  }, [contextMenu, side, refresh, closeMenu, chooseConflictStrategy, showAlert]);
+  }, [contextMenu, side, refresh, closeMenu, chooseConflictStrategy, showAlert, runFileOperation, reportFileOperationResult]);
 
   const ctxCopyName = useCallback(() => {
     if (!contextMenu) return;
@@ -282,17 +369,9 @@ export function FileList({ side }: FileListProps) {
   const ctxEmptyFolder = useCallback(async () => {
     const allPaths = useFileStore.getState()[side].entries.map((e) => e.path);
     if (allPaths.length === 0) { closeMenu(); return; }
-    if (!await ipc.invoke('dialog:confirm', { message: `确定要将全部 ${allPaths.length} 个项目移到回收站吗？` })) { closeMenu(); return; }
-    try {
-      const result = await ipc.invoke('file:delete', { paths: allPaths });
-      const summary = summarizeFileOpResult('Delete', result);
-      if (summary) await showAlert(summary);
-      refresh(side);
-    } catch (err: any) {
-      await showAlert(`清空文件夹失败：${err.message}`, 'error');
-    }
+    await deletePaths(allPaths, false);
     closeMenu();
-  }, [side, refresh, closeMenu, showAlert]);
+  }, [side, closeMenu, deletePaths]);
 
   // Inline confirm helper
   const showConfirm = useCallback(
@@ -557,13 +636,16 @@ export function FileList({ side }: FileListProps) {
           if (targetPath && state.selected.size > 0) {
             const conflictStrategy = await chooseConflictStrategy([...state.selected], targetPath);
             if (!conflictStrategy) break;
-            const result = await ipc.invoke('file:copy', {
-              sources: [...state.selected],
-              destDir: targetPath,
-              conflictStrategy,
-            });
-            const summary = summarizeFileOpResult('Copy', result);
-            if (summary) await showAlert(summary);
+            const result = await runFileOperation(
+              'file:copy',
+              {
+                sources: [...state.selected],
+                destDir: targetPath,
+                conflictStrategy,
+              },
+              '正在复制...',
+            );
+            await reportFileOperationResult('Copy', result);
             if (result.success) {
               clearSelection(side);
               refresh(side);
@@ -578,13 +660,16 @@ export function FileList({ side }: FileListProps) {
           if (targetPath && state.selected.size > 0) {
             const conflictStrategy = await chooseConflictStrategy([...state.selected], targetPath);
             if (!conflictStrategy) break;
-            const result = await ipc.invoke('file:move', {
-              sources: [...state.selected],
-              destDir: targetPath,
-              conflictStrategy,
-            });
-            const summary = summarizeFileOpResult('Move', result);
-            if (summary) await showAlert(summary);
+            const result = await runFileOperation(
+              'file:move',
+              {
+                sources: [...state.selected],
+                destDir: targetPath,
+                conflictStrategy,
+              },
+              '正在移动...',
+            );
+            await reportFileOperationResult('Move', result);
             if (result.success) {
               clearSelection(side);
               refresh(side);
@@ -608,16 +693,13 @@ export function FileList({ side }: FileListProps) {
         }
         case 'Delete': {
           if (state.selected.size > 0) {
-            const names = [...state.selected]
-              .map((p) => p.split(/[/\\]/).pop())
-              .join(', ');
-            if (await ipc.invoke('dialog:confirm', { message: `确定要移到回收站吗？\n${names}` })) {
-              const result = await ipc.invoke('file:delete', { paths: [...state.selected] });
-              const summary = summarizeFileOpResult('Delete', result);
-              if (summary) await showAlert(summary);
-              clearSelection(side);
-              refresh(side);
-            }
+            await deletePaths([...state.selected], e.shiftKey);
+          }
+          break;
+        }
+        case 'F8': {
+          if (state.selected.size > 0) {
+            await deletePaths([...state.selected], e.shiftKey);
           }
           break;
         }
@@ -626,7 +708,7 @@ export function FileList({ side }: FileListProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [side, filterText, path, entries, selected, setFilter, clearSelection, selectSingle, navigateToPath, refresh, handleOpenFolder, chooseConflictStrategy, showAlert]);
+  }, [side, filterText, path, entries, selected, setFilter, clearSelection, selectSingle, navigateToPath, refresh, handleOpenFolder, chooseConflictStrategy, showAlert, runFileOperation, deletePaths, reportFileOperationResult]);
 
   // 键盘操作后禁 hover，鼠标移动恢复
   useEffect(() => {
@@ -778,10 +860,17 @@ export function FileList({ side }: FileListProps) {
                     const conflictStrategy = await chooseConflictStrategy(sources, entry.path);
                     if (!conflictStrategy) return;
                     const result = isMove
-                      ? await ipc.invoke('file:move', { sources, destDir: entry.path, conflictStrategy })
-                      : await ipc.invoke('file:copy', { sources, destDir: entry.path, conflictStrategy });
-                    const summary = summarizeFileOpResult(isMove ? 'Move' : 'Copy', result);
-                    if (summary) await showAlert(summary);
+                      ? await runFileOperation(
+                          'file:move',
+                          { sources, destDir: entry.path, conflictStrategy },
+                          '正在移动...',
+                        )
+                      : await runFileOperation(
+                          'file:copy',
+                          { sources, destDir: entry.path, conflictStrategy },
+                          '正在复制...',
+                        );
+                    await reportFileOperationResult(isMove ? 'Move' : 'Copy', result);
                   } catch (err: any) {
                     await showAlert(`操作失败：${err.message}`, 'error');
                   }
@@ -840,28 +929,91 @@ export function FileList({ side }: FileListProps) {
       </div>
     )}
 
-    {copyConflictChoice && (
-      <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/50" onClick={() => { copyConflictChoice.resolve(null); setCopyConflictChoice(null); }}>
-        <div className="bg-surface-light border border-border rounded-lg shadow-2xl p-4 min-w-[360px] max-w-[520px]" onClick={(e) => e.stopPropagation()}>
-          <div className="text-sm text-text-primary mb-4 whitespace-pre-wrap">{copyConflictChoice.message}</div>
-          <div className="flex justify-end gap-2">
+    {inlineAlert && (
+      <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/50" onClick={() => { inlineAlert.resolve(); setInlineAlert(null); }}>
+        <div className="bg-surface-light border border-border rounded-lg shadow-2xl p-4 min-w-[360px] max-w-[min(680px,90vw)]" onClick={(e) => e.stopPropagation()}>
+          <div className="text-sm font-medium text-text-primary mb-3">
+            {inlineAlert.type === 'error' ? '操作失败' : inlineAlert.type === 'warning' ? '操作结果' : '提示'}
+          </div>
+          <div className="text-xs leading-relaxed text-text-secondary whitespace-pre-wrap max-h-[60vh] overflow-auto pr-1">
+            {inlineAlert.message}
+          </div>
+          <div className="flex justify-end mt-4">
             <button
-              className="px-4 py-1 text-xs text-text-muted hover:text-text-primary border border-border rounded"
-              onClick={() => { copyConflictChoice.resolve(null); setCopyConflictChoice(null); }}
+              className="px-4 py-1 text-xs bg-accent text-white rounded"
+              onClick={() => { inlineAlert.resolve(); setInlineAlert(null); }}
+            >
+              确定
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {copyConflictChoice && (
+      <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/50" onClick={() => { copyConflictChoice.resolve(null); setConflictHover(null); setCopyConflictChoice(null); }}>
+        <div className="bg-surface-light border border-border rounded-lg shadow-2xl p-4 min-w-[560px] max-w-[min(720px,90vw)]" onClick={(e) => e.stopPropagation()}>
+          <div className="text-sm text-text-primary mb-4 whitespace-pre-wrap">{copyConflictChoice.message}</div>
+          <div className="grid grid-cols-4 gap-2">
+            <button
+              className={getConflictChoiceButtonClass('skip', conflictHover)}
+              onMouseEnter={() => setConflictHover('skip')}
+              onMouseLeave={() => setConflictHover(null)}
+              onFocus={() => setConflictHover('skip')}
+              onBlur={() => setConflictHover(null)}
+              onClick={() => { copyConflictChoice.resolve('skip'); setConflictHover(null); setCopyConflictChoice(null); }}
+            >
+              跳过全部同名
+            </button>
+            <button
+              className={getConflictChoiceButtonClass('rename', conflictHover)}
+              onMouseEnter={() => setConflictHover('rename')}
+              onMouseLeave={() => setConflictHover(null)}
+              onFocus={() => setConflictHover('rename')}
+              onBlur={() => setConflictHover(null)}
+              onClick={() => { copyConflictChoice.resolve('rename'); setConflictHover(null); setCopyConflictChoice(null); }}
+            >
+              自动重命名全部
+            </button>
+            <button
+              className={getConflictChoiceButtonClass('overwrite', conflictHover)}
+              onMouseEnter={() => setConflictHover('overwrite')}
+              onMouseLeave={() => setConflictHover(null)}
+              onFocus={() => setConflictHover('overwrite')}
+              onBlur={() => setConflictHover(null)}
+              onClick={() => { copyConflictChoice.resolve('overwrite'); setConflictHover(null); setCopyConflictChoice(null); }}
+            >
+              覆盖全部
+            </button>
+            <button
+              className={getConflictChoiceButtonClass('cancel', conflictHover)}
+              onMouseEnter={() => setConflictHover('cancel')}
+              onMouseLeave={() => setConflictHover(null)}
+              onFocus={() => setConflictHover('cancel')}
+              onBlur={() => setConflictHover(null)}
+              onClick={() => { copyConflictChoice.resolve(null); setConflictHover(null); setCopyConflictChoice(null); }}
             >
               取消
             </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {pendingOperation && (
+      <div className="fixed inset-0 z-[205] flex items-center justify-center bg-black/40">
+        <div className="bg-surface-light border border-border rounded-lg shadow-2xl p-4 min-w-[320px]">
+          <div className="text-sm text-text-primary mb-1">{pendingOperation.label}</div>
+          <div className="text-xs text-text-muted mb-4">
+            长任务可取消；已完成的项目会在结果报告中列出。
+          </div>
+          <div className="flex justify-end">
             <button
-              className="px-4 py-1 text-xs text-text-secondary hover:text-text-primary border border-border rounded"
-              onClick={() => { copyConflictChoice.resolve('rename'); setCopyConflictChoice(null); }}
+              className="px-4 py-1 text-xs text-text-secondary hover:text-text-primary border border-border rounded disabled:opacity-60"
+              disabled={pendingOperation.cancelling}
+              onClick={cancelPendingOperation}
             >
-              自动重命名
-            </button>
-            <button
-              className="px-4 py-1 text-xs bg-red-600/80 hover:bg-red-600 text-white rounded"
-              onClick={() => { copyConflictChoice.resolve('overwrite'); setCopyConflictChoice(null); }}
-            >
-              覆盖
+              {pendingOperation.cancelling ? '正在取消...' : '取消任务'}
             </button>
           </div>
         </div>
@@ -900,6 +1052,7 @@ export function FileList({ side }: FileListProps) {
               <MenuSep />
               <MenuBtn onClick={ctxRename}><Pencil className="w-3.5 h-3.5" /> 重命名</MenuBtn>
               <MenuBtn onClick={ctxDelete}><Trash2 className="w-3.5 h-3.5" /> 删除</MenuBtn>
+              <MenuBtn onClick={ctxPermanentDelete}><Trash2 className="w-3.5 h-3.5" /> 永久删除</MenuBtn>
               <MenuSep />
               <MenuBtn onClick={ctxCopyName}><Clipboard className="w-3.5 h-3.5" /> 复制文件名</MenuBtn>
               <MenuBtn onClick={ctxCopyPath}><ClipboardCheck className="w-3.5 h-3.5" /> 复制路径</MenuBtn>
@@ -912,6 +1065,7 @@ export function FileList({ side }: FileListProps) {
               <MenuBtn onClick={ctxMove}><ArrowRightLeft className="w-3.5 h-3.5" /> 移动 {contextMenu.count} 项到另一侧</MenuBtn>
               <MenuSep />
               <MenuBtn onClick={ctxDelete}><Trash2 className="w-3.5 h-3.5" /> 删除 {contextMenu.count} 项</MenuBtn>
+              <MenuBtn onClick={ctxPermanentDelete}><Trash2 className="w-3.5 h-3.5" /> 永久删除 {contextMenu.count} 项</MenuBtn>
               <MenuSep />
               <MenuBtn onClick={ctxCopyName}><Clipboard className="w-3.5 h-3.5" /> 复制文件名</MenuBtn>
               <MenuBtn onClick={ctxCopyPath}><ClipboardCheck className="w-3.5 h-3.5" /> 复制路径</MenuBtn>
@@ -937,6 +1091,23 @@ function MenuBtn({ onClick, children }: { onClick: () => void; children: React.R
 
 function MenuSep() {
   return <div className="border-t border-border/50 my-0.5" />;
+}
+
+function getConflictChoiceButtonClass(
+  id: FileConflictStrategy | 'cancel',
+  hoveredId: FileConflictStrategy | 'cancel' | null,
+): string {
+  const base = 'px-4 py-1 text-xs border rounded';
+  if (hoveredId === id) {
+    if (id === 'overwrite') {
+      return `${base} bg-red-600/80 border-red-500/80 text-white`;
+    }
+    return `${base} bg-accent border-accent text-white`;
+  }
+  if (!hoveredId && id === 'rename') {
+    return `${base} bg-accent border-accent text-white`;
+  }
+  return `${base} text-text-secondary hover:text-text-primary border-border`;
 }
 
 // ── 列头排序 ──

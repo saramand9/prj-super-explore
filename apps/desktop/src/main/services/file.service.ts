@@ -19,6 +19,7 @@ const DIR_SIZE_MAX_FILES = 50000;
 export class FileService {
   private dirSizeCache = new Map<string, { size: number; ts: number }>();
   private dirSizePending = new Map<string, Promise<DirSizeResult>>();
+  private cancelledOperations = new Set<string>();
 
   private get watcher(): WatcherService {
     return this.container.get<WatcherService>('watcher');
@@ -172,35 +173,44 @@ export class FileService {
     sources: string[],
     destDir: string,
     conflictStrategy: FileConflictStrategy = 'rename',
+    operationId?: string,
   ): Promise<FileOpResult> {
     const result = this.createOpResult();
 
-    const destCheck = await this.validateDestDir(destDir);
-    if (destCheck) {
-      for (const src of sources) this.addFailure(result, src, destDir, destCheck);
-      return this.finalizeOpResult(result);
-    }
-
-    for (const src of sources) {
-      try {
-        const st = await stat(src);
-        if (st.isDirectory() && this.isSameOrChild(destDir, src)) {
-          this.addFailure(result, src, destDir, '不能把文件夹复制到它自己里面');
-          continue;
-        }
-
-        const target = await this.resolveDestination(src, destDir, conflictStrategy, result);
-        if (!target) continue;
-
-        if (st.isDirectory()) {
-          await this.copyDir(src, target.dest);
-        } else {
-          await copyFile(src, target.dest, constants.COPYFILE_EXCL);
-        }
-        result.completed.push({ path: src, dest: target.dest, action: 'copied' });
-      } catch (e: any) {
-        this.addFailure(result, src, undefined, e.message ?? '复制失败', e.code);
+    try {
+      const destCheck = await this.validateDestDir(destDir);
+      if (destCheck) {
+        for (const src of sources) this.addFailure(result, src, destDir, destCheck);
+        return this.finalizeOpResult(result);
       }
+
+      for (let i = 0; i < sources.length; i++) {
+        const src = sources[i];
+        if (this.markCancelledIfNeeded(result, operationId, sources.slice(i))) break;
+        try {
+          const st = await stat(src);
+          if (st.isDirectory() && this.isSameOrChild(destDir, src)) {
+            this.addFailure(result, src, destDir, '不能把文件夹复制到它自己里面');
+            continue;
+          }
+
+          const target = await this.resolveDestination(src, destDir, conflictStrategy, result);
+          if (!target) continue;
+
+          if (st.isDirectory()) {
+            await this.copyDir(src, target.dest, operationId);
+          } else {
+            this.throwIfCancelled(operationId);
+            await copyFile(src, target.dest, constants.COPYFILE_EXCL);
+          }
+          result.completed.push({ path: src, dest: target.dest, action: 'copied' });
+        } catch (e: any) {
+          if (this.handleCancellation(result, e, sources.slice(i))) break;
+          this.addFailure(result, src, undefined, e.message ?? '复制失败', e.code);
+        }
+      }
+    } finally {
+      if (operationId) this.cancelledOperations.delete(operationId);
     }
 
     return this.finalizeOpResult(result);
@@ -210,63 +220,89 @@ export class FileService {
     sources: string[],
     destDir: string,
     conflictStrategy: FileConflictStrategy = 'rename',
+    operationId?: string,
   ): Promise<FileOpResult> {
     const result = this.createOpResult();
 
-    const destCheck = await this.validateDestDir(destDir);
-    if (destCheck) {
-      for (const src of sources) this.addFailure(result, src, destDir, destCheck);
-      return this.finalizeOpResult(result);
-    }
-
-    for (const src of sources) {
-      try {
-        const st = await stat(src);
-        if (st.isDirectory() && this.isSameOrChild(destDir, src)) {
-          this.addFailure(result, src, destDir, '不能把文件夹移动到它自己里面');
-          continue;
-        }
-
-        const target = await this.resolveDestination(src, destDir, conflictStrategy, result);
-        if (!target) continue;
-
-        try {
-          await rename(src, target.dest);
-        } catch (e: any) {
-          if (e.code !== 'EXDEV') throw e;
-          if (st.isDirectory()) {
-            await this.copyDir(src, target.dest);
-            await rm(src, { recursive: true, force: true });
-          } else {
-            await copyFile(src, target.dest, constants.COPYFILE_EXCL);
-            await unlink(src);
-          }
-        }
-        result.completed.push({ path: src, dest: target.dest, action: 'moved' });
-      } catch (e: any) {
-        this.addFailure(result, src, undefined, e.message ?? '移动失败', e.code);
+    try {
+      const destCheck = await this.validateDestDir(destDir);
+      if (destCheck) {
+        for (const src of sources) this.addFailure(result, src, destDir, destCheck);
+        return this.finalizeOpResult(result);
       }
+
+      for (let i = 0; i < sources.length; i++) {
+        const src = sources[i];
+        if (this.markCancelledIfNeeded(result, operationId, sources.slice(i))) break;
+        try {
+          const st = await stat(src);
+          if (st.isDirectory() && this.isSameOrChild(destDir, src)) {
+            this.addFailure(result, src, destDir, '不能把文件夹移动到它自己里面');
+            continue;
+          }
+
+          const target = await this.resolveDestination(src, destDir, conflictStrategy, result);
+          if (!target) continue;
+
+          try {
+            this.throwIfCancelled(operationId);
+            await rename(src, target.dest);
+          } catch (e: any) {
+            if (e.code !== 'EXDEV') throw e;
+            if (st.isDirectory()) {
+              await this.copyDir(src, target.dest, operationId);
+              this.throwIfCancelled(operationId);
+              await rm(src, { recursive: true, force: true });
+            } else {
+              this.throwIfCancelled(operationId);
+              await copyFile(src, target.dest, constants.COPYFILE_EXCL);
+              this.throwIfCancelled(operationId);
+              await unlink(src);
+            }
+          }
+          result.completed.push({ path: src, dest: target.dest, action: 'moved' });
+        } catch (e: any) {
+          if (this.handleCancellation(result, e, sources.slice(i))) break;
+          this.addFailure(result, src, undefined, e.message ?? '移动失败', e.code);
+        }
+      }
+    } finally {
+      if (operationId) this.cancelledOperations.delete(operationId);
     }
 
     return this.finalizeOpResult(result);
   }
 
-  async deleteFiles(paths: string[], permanent = false): Promise<FileOpResult> {
+  async deleteFiles(paths: string[], permanent = false, operationId?: string): Promise<FileOpResult> {
     const result = this.createOpResult();
-    for (const p of paths) {
-      try {
-        if (permanent) {
-          await rm(p, { recursive: true, force: true });
-          result.completed.push({ path: p, action: 'deleted' });
-        } else {
-          await shell.trashItem(p);
-          result.completed.push({ path: p, action: 'trashed' });
+    try {
+      for (let i = 0; i < paths.length; i++) {
+        const p = paths[i];
+        if (this.markCancelledIfNeeded(result, operationId, paths.slice(i))) break;
+        try {
+          if (permanent) {
+            this.throwIfCancelled(operationId);
+            await rm(p, { recursive: true, force: true });
+            result.completed.push({ path: p, action: 'deleted' });
+          } else {
+            this.throwIfCancelled(operationId);
+            await shell.trashItem(p);
+            result.completed.push({ path: p, action: 'trashed' });
+          }
+        } catch (e: any) {
+          if (this.handleCancellation(result, e, paths.slice(i))) break;
+          this.addFailure(result, p, undefined, e.message ?? '删除失败', e.code);
         }
-      } catch (e: any) {
-        this.addFailure(result, p, undefined, e.message ?? '删除失败', e.code);
       }
+    } finally {
+      if (operationId) this.cancelledOperations.delete(operationId);
     }
     return this.finalizeOpResult(result);
+  }
+
+  cancelOperation(operationId: string): boolean {
+    this.cancelledOperations.add(operationId);
+    return true;
   }
 
   async createDir(parentPath: string, name: string) {
@@ -383,35 +419,40 @@ export class FileService {
 
   // ── private ──
 
-  private createOpResult(): Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed'>> {
+  private createOpResult(): Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed' | 'replaced'>> & Pick<FileOpResult, 'cancelled'> {
     return {
       skipped: [],
       completed: [],
       failures: [],
       renamed: [],
+      replaced: [],
+      cancelled: false,
     };
   }
 
   private finalizeOpResult(
-    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed'>>,
+    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed' | 'replaced'>> & Pick<FileOpResult, 'cancelled'>,
   ): FileOpResult {
     const skipped = result.skipped;
     const failures = result.failures;
-    const success = skipped.length === 0 && failures.length === 0;
+    const success = !result.cancelled && skipped.length === 0 && failures.length === 0;
     return {
       success,
+      cancelled: result.cancelled || undefined,
       error: success ? undefined : this.summarizeOpError(result),
       skipped,
       completed: result.completed,
       failures,
       renamed: result.renamed,
+      replaced: result.replaced,
     };
   }
 
   private summarizeOpError(
-    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed'>>,
+    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed' | 'replaced'>> & Pick<FileOpResult, 'cancelled'>,
   ): string {
     const parts: string[] = [];
+    if (result.cancelled) parts.push('已取消');
     if (result.completed.length > 0) parts.push(`已处理 ${result.completed.length} 项`);
     if (result.skipped.length > 0) parts.push(`已跳过 ${result.skipped.length} 项`);
     if (result.failures.length > 0) parts.push(`失败 ${result.failures.length} 项`);
@@ -419,7 +460,7 @@ export class FileService {
   }
 
   private addFailure(
-    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed'>>,
+    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed' | 'replaced'>> & Pick<FileOpResult, 'cancelled'>,
     path: string,
     dest: string | undefined,
     reason: string,
@@ -446,7 +487,7 @@ export class FileService {
     src: string,
     destDir: string,
     strategy: FileConflictStrategy,
-    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed'>>,
+    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed' | 'replaced'>> & Pick<FileOpResult, 'cancelled'>,
   ): Promise<{ dest: string } | null> {
     const dest = join(destDir, basename(src));
     if (resolve(src) === resolve(dest)) {
@@ -468,7 +509,8 @@ export class FileService {
     }
 
     if (strategy === 'overwrite') {
-      await rm(dest, { recursive: true, force: true });
+      await shell.trashItem(dest);
+      result.replaced.push({ path: src, originalDest: dest });
       return { dest };
     }
 
@@ -488,19 +530,50 @@ export class FileService {
     return candidate;
   }
 
-  private async copyDir(src: string, dest: string): Promise<void> {
+  private async copyDir(src: string, dest: string, operationId?: string): Promise<void> {
+    this.throwIfCancelled(operationId);
     await mkdir(dest, { recursive: true });
     const entries = await readdir(src);
     for (const name of entries) {
+      this.throwIfCancelled(operationId);
       const srcPath = join(src, name);
       const destPath = join(dest, name);
       const st = await stat(srcPath);
       if (st.isDirectory()) {
-        await this.copyDir(srcPath, destPath);
+        await this.copyDir(srcPath, destPath, operationId);
       } else {
-        await copyFile(srcPath, destPath);
+        await copyFile(srcPath, destPath, constants.COPYFILE_EXCL);
       }
     }
+  }
+
+  private throwIfCancelled(operationId?: string): void {
+    if (!operationId || !this.cancelledOperations.has(operationId)) return;
+    const err = new Error('操作已取消');
+    (err as any).code = 'ECANCELED';
+    throw err;
+  }
+
+  private markCancelledIfNeeded(
+    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed' | 'replaced'>> & Pick<FileOpResult, 'cancelled'>,
+    operationId: string | undefined,
+    remaining: string[],
+  ): boolean {
+    if (!operationId || !this.cancelledOperations.has(operationId)) return false;
+    result.cancelled = true;
+    result.skipped.push(...remaining);
+    return true;
+  }
+
+  private handleCancellation(
+    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed' | 'replaced'>> & Pick<FileOpResult, 'cancelled'>,
+    err: any,
+    remaining: string[],
+  ): boolean {
+    if (err?.code !== 'ECANCELED') return false;
+    result.cancelled = true;
+    result.skipped.push(...remaining);
+    return true;
   }
 
   private makeComparator(sort: SortConfig): (a: FileEntry, b: FileEntry) => number {

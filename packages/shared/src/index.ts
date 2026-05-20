@@ -1,4 +1,4 @@
-export type { FileEntry, FileStat, FileOpResult, SortKey, SortConfig } from './types/file';
+export type { FileEntry, FileStat, FileOpResult, SortKey, SortConfig, FileConflictStrategy } from './types/file';
 export type {
   IpcChannels,
   IpcEvents,

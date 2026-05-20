@@ -9,6 +9,10 @@ export function setNotificationHandler(fn: typeof notifyFn): void {
   notifyFn = fn;
 }
 
+export function showNotification(message: string, type: 'info' | 'warn' | 'error' = 'info'): void {
+  notifyFn?.(message, type);
+}
+
 const eventListeners = new Map<string, Set<(...args: any[]) => void>>();
 
 export function emitEvent(event: string, ...args: any[]): void {
@@ -78,13 +82,13 @@ export function createPluginContext(): PluginContext {
 
     notifications: {
       info(message) {
-        notifyFn?.(message, 'info');
+        showNotification(message, 'info');
       },
       warn(message) {
-        notifyFn?.(message, 'warn');
+        showNotification(message, 'warn');
       },
       error(message) {
-        notifyFn?.(message, 'error');
+        showNotification(message, 'error');
       },
     },
 
