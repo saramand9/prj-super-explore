@@ -1,6 +1,6 @@
 {
   "name": "@explore/desktop",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "main": "./out/main/index.js",
@@ -22,7 +22,7 @@
     },
     "win": {
       "target": "nsis",
-      "icon": null
+      "icon": "build/icons/prism_app.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -30,6 +30,7 @@
     },
     "files": [
       "out/**/*",
+      "build/icons/**/*",
       "package.json"
     ],
     "asarUnpack": [
@@ -37,11 +38,11 @@
     ]
   },
   "dependencies": {
-    "@explore/shared": "workspace:*",
     "@lvce-editor/ripgrep": "^4.1.0",
     "pinyin-pro": "^3.28.1"
   },
   "devDependencies": {
+    "@explore/shared": "workspace:*",
     "@electron-toolkit/preload": "^3.0.0",
     "@electron-toolkit/utils": "^3.0.0",
     "@playwright/test": "^1.60.0",

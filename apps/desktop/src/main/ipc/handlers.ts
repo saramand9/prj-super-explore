@@ -188,7 +188,7 @@ export function registerIpcHandlers(container: ServiceContainer): void {
   ipcMain.handle(
     'file:walkTree',
     async (_e, payload: IpcChannels['file:walkTree']['req']) => {
-      return walkTree(payload.path, payload.maxDepth ?? 5, new Set(payload.excludePatterns ?? []));
+      return walkTree(payload.path, payload.maxDepth, new Set(payload.excludePatterns ?? []));
     },
   );
 
@@ -616,11 +616,11 @@ function normalizeFsEvent(event: string): 'add' | 'remove' | 'change' {
 
 async function walkTree(
   dirPath: string,
-  maxDepth: number,
+  maxDepth: number | undefined,
   excludePatterns: Set<string>,
   isRoot = true,
 ): Promise<FileEntry[]> {
-  if (maxDepth <= 0) return [];
+  if (maxDepth !== undefined && maxDepth <= 0) return [];
   const exclude = new Set(['node_modules', '.git', '$RECYCLE.BIN', 'System Volume Information', ...excludePatterns]);
   const result: FileEntry[] = [];
 
@@ -640,7 +640,8 @@ async function walkTree(
           modifiedAt: st.mtimeMs,
         });
         if (st.isDirectory() && !st.isSymbolicLink()) {
-          const children = await walkTree(fullPath, maxDepth - 1, excludePatterns, false);
+          const nextDepth = maxDepth === undefined ? undefined : maxDepth - 1;
+          const children = await walkTree(fullPath, nextDepth, excludePatterns, false);
           result.push(...children);
         }
       } catch { /* skip */ }

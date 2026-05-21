@@ -1,7 +1,13 @@
 import { BrowserWindow, screen } from 'electron';
+import { existsSync } from 'fs';
 import { join } from 'path';
 import { is } from '@electron-toolkit/utils';
 import type { Service } from '../service-container';
+
+function getAppIconPath(): string | undefined {
+  const iconPath = join(__dirname, '../../build/icons/prism_app.ico');
+  return existsSync(iconPath) ? iconPath : undefined;
+}
 
 export class WindowService implements Service {
   private mainWindow: BrowserWindow | null = null;
@@ -14,6 +20,7 @@ export class WindowService implements Service {
       minWidth: 800,
       minHeight: 500,
       title: 'Explore',
+      icon: getAppIconPath(),
       backgroundColor: '#1a1a2e',
       autoHideMenuBar: true,
       webPreferences: {
@@ -70,6 +77,7 @@ export class WindowService implements Service {
       skipTaskbar: true,
       alwaysOnTop: true,
       show: false,
+      icon: getAppIconPath(),
       webPreferences: {
         preload: join(__dirname, '../preload/index.mjs'),
         sandbox: false,

@@ -21,9 +21,6 @@ importers:
 
   apps/desktop:
     dependencies:
-      '@explore/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@lvce-editor/ripgrep':
         specifier: ^4.1.0
         version: 4.1.0
@@ -37,6 +34,9 @@ importers:
       '@electron-toolkit/utils':
         specifier: ^3.0.0
         version: 3.0.0(electron@33.4.11)
+      '@explore/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@playwright/test':
         specifier: ^1.60.0
         version: 1.60.0

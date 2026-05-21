@@ -51,6 +51,9 @@ test.describe('Ctrl+F file search', () => {
     await expect(page.getByText('target file.txt', { exact: true })).toBeVisible();
     await expect(page.getByText('space dir', { exact: true })).toBeVisible();
 
+    await searchInput.fill('deep-target');
+    await expect(page.getByText('deep-target.txt', { exact: true })).toBeVisible();
+
     await searchInput.fill('excluded');
     await expect(page.getByText('未找到文件')).toBeVisible();
     await expect(page.getByText('excluded.txt', { exact: true })).toHaveCount(0);
@@ -72,9 +75,11 @@ async function createFixture(root: string): Promise<void> {
   await mkdir(join(root, 'node_modules', 'pkg'), { recursive: true });
   await mkdir(join(root, 'empty dir'), { recursive: true });
   await mkdir(join(root, 'many files'), { recursive: true });
+  await mkdir(join(root, 'level-1', 'level-2', 'level-3', 'level-4', 'level-5', 'level-6'), { recursive: true });
 
   await writeFile(join(root, '中文 文件.txt'), 'hello 中文', 'utf8');
   await writeFile(join(root, 'space dir', 'target file.txt'), 'target', 'utf8');
+  await writeFile(join(root, 'level-1', 'level-2', 'level-3', 'level-4', 'level-5', 'level-6', 'deep-target.txt'), 'deep', 'utf8');
   await writeFile(join(root, 'node_modules', 'pkg', 'excluded.txt'), 'excluded', 'utf8');
 
   for (let i = 0; i < 60; i++) {

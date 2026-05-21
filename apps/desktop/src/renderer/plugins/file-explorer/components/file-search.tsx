@@ -126,7 +126,7 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
     indexPathRef.current = currentPath;
 
     ipc
-      .invoke('file:walkTree', { path: currentPath, maxDepth: 5 })
+      .invoke('file:walkTree', { path: currentPath })
       .then((entries) => {
         index.build(entries);
         indexPathRef.current = currentPath;
