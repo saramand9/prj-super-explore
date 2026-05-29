@@ -41,6 +41,7 @@ export function FileList({ side }: FileListProps) {
   const navigateTo = useFileStore((s) => s.navigateTo);
   const toggleSelect = useFileStore((s) => s.toggleSelect);
   const clearSelection = useFileStore((s) => s.clearSelection);
+  const selectRange = useFileStore((s) => s.selectRange);
   const selectSingle = useFileStore((s) => s.selectSingle);
   const selectAll = useFileStore((s) => s.selectAll);
   const setFilter = useFileStore((s) => s.setFilter);
@@ -393,6 +394,7 @@ export function FileList({ side }: FileListProps) {
   useEffect(() => {
     setFocusIdx(0);
     focusIdxRef.current = 0;
+    lastSelectedRef.current = null;
     clearSelection(side);
     // entries/clearSelection 故意不放 deps，只在 filterText/path 变化时触发
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -454,6 +456,41 @@ export function FileList({ side }: FileListProps) {
     }
   }, [side, navigateTo, syncToLayout]);
 
+  const getRangeAnchor = useCallback(() => {
+    const visiblePaths = new Set(entries.map((entry) => entry.path));
+    if (lastSelectedRef.current && visiblePaths.has(lastSelectedRef.current)) {
+      return lastSelectedRef.current;
+    }
+    const selectedPath = [...selected].find((entryPath) => visiblePaths.has(entryPath));
+    if (selectedPath) return selectedPath;
+    return entries[focusIdxRef.current]?.path ?? entries[0]?.path ?? null;
+  }, [entries, selected]);
+
+  const selectSingleAtIndex = useCallback(
+    (idx: number) => {
+      const entry = entries[idx];
+      if (!entry) return;
+      selectSingle(side, entry.path);
+      setFocusIdx(idx);
+      focusIdxRef.current = idx;
+      lastSelectedRef.current = entry.path;
+    },
+    [entries, selectSingle, side],
+  );
+
+  const selectRangeToIndex = useCallback(
+    (idx: number) => {
+      const entry = entries[idx];
+      if (!entry) return;
+      const anchor = getRangeAnchor() ?? entry.path;
+      selectRange(side, anchor, entry.path, entries.map((item) => item.path));
+      setFocusIdx(idx);
+      focusIdxRef.current = idx;
+      lastSelectedRef.current = anchor;
+    },
+    [entries, getRangeAnchor, selectRange, side],
+  );
+
   // ── 键盘事件 ──
 
   useEffect(() => {
@@ -507,7 +544,11 @@ export function FileList({ side }: FileListProps) {
               if (target) {
                 selectSingle(side, target.path);
                 const idx = entries.indexOf(target);
-                if (idx >= 0) setFocusIdx(idx);
+                if (idx >= 0) {
+                  setFocusIdx(idx);
+                  focusIdxRef.current = idx;
+                }
+                lastSelectedRef.current = target.path;
               }
             });
           }
@@ -534,14 +575,19 @@ export function FileList({ side }: FileListProps) {
         case 'Escape':
           setFilter(side, '');
           clearSelection(side);
+          lastSelectedRef.current = null;
           break;
 
         case 'ArrowDown':
           e.preventDefault();
           {
+            if (entries.length === 0) break;
             const next = Math.min(focusIdxRef.current + 1, entries.length - 1);
-            selectSingle(side, entries[next].path);
-            setFocusIdx(next);
+            if (e.shiftKey) {
+              selectRangeToIndex(next);
+            } else {
+              selectSingleAtIndex(next);
+            }
             setDisableHover(true);
             (document.activeElement as HTMLElement)?.blur();
           }
@@ -549,9 +595,50 @@ export function FileList({ side }: FileListProps) {
         case 'ArrowUp':
           e.preventDefault();
           {
+            if (entries.length === 0) break;
             const next = Math.max(focusIdxRef.current - 1, 0);
-            selectSingle(side, entries[next].path);
-            setFocusIdx(next);
+            if (e.shiftKey) {
+              selectRangeToIndex(next);
+            } else {
+              selectSingleAtIndex(next);
+            }
+            setDisableHover(true);
+            (document.activeElement as HTMLElement)?.blur();
+          }
+          break;
+
+        case 'Home':
+        case 'End':
+          e.preventDefault();
+          {
+            if (entries.length === 0) break;
+            const next = e.key === 'Home' ? 0 : entries.length - 1;
+            if (e.shiftKey) {
+              selectRangeToIndex(next);
+            } else {
+              selectSingleAtIndex(next);
+            }
+            setDisableHover(true);
+            (document.activeElement as HTMLElement)?.blur();
+          }
+          break;
+
+        case 'PageDown':
+        case 'PageUp':
+          e.preventDefault();
+          {
+            if (entries.length === 0) break;
+            const visibleRows = Math.max(
+              1,
+              Math.floor((containerRef.current?.clientHeight ?? 300) / 30) - 1,
+            );
+            const delta = e.key === 'PageDown' ? visibleRows : -visibleRows;
+            const next = Math.max(0, Math.min(focusIdxRef.current + delta, entries.length - 1));
+            if (e.shiftKey) {
+              selectRangeToIndex(next);
+            } else {
+              selectSingleAtIndex(next);
+            }
             setDisableHover(true);
             (document.activeElement as HTMLElement)?.blur();
           }
@@ -709,7 +796,7 @@ export function FileList({ side }: FileListProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [side, filterText, path, entries, selected, setFilter, clearSelection, selectSingle, navigateToPath, refresh, handleOpenFolder, chooseConflictStrategy, showAlert, runFileOperation, deletePaths, reportFileOperationResult]);
+  }, [side, filterText, path, entries, selected, setFilter, clearSelection, selectAll, selectSingle, selectSingleAtIndex, selectRangeToIndex, navigateToPath, navigateTo, refresh, handleOpenFolder, chooseConflictStrategy, showAlert, runFileOperation, deletePaths, reportFileOperationResult, pinTab, unpinTab, repinTab]);
 
   // 键盘操作后禁 hover，鼠标移动恢复
   useEffect(() => {
@@ -734,6 +821,7 @@ export function FileList({ side }: FileListProps) {
     if (idx < 0) return;
     setFocusIdx(idx);
     focusIdxRef.current = idx;
+    lastSelectedRef.current = selectedPath;
     virtualizer.scrollToIndex(idx, { align: 'center' });
   }, [selected, entries, virtualizer]);
 
@@ -820,13 +908,17 @@ export function FileList({ side }: FileListProps) {
                 highlight={filterText}
                 dirSize={dirSizeMap[entry.path]}
                 onClick={(e: React.MouseEvent) => {
-                  if (e.ctrlKey || e.metaKey) {
+                  if (e.shiftKey) {
+                    e.preventDefault();
+                    selectRangeToIndex(idx);
+                  } else if (e.ctrlKey || e.metaKey) {
                     toggleSelect(side, entry.path);
-                  } else {
-                    selectSingle(side, entry.path);
                     setFocusIdx(idx);
+                    focusIdxRef.current = idx;
+                    lastSelectedRef.current = entry.path;
+                  } else {
+                    selectSingleAtIndex(idx);
                   }
-                  lastSelectedRef.current = entry.path;
                 }}
                 onDoubleClick={() => {
                   if (entry.isDirectory) {
@@ -1132,6 +1224,7 @@ function getConflictChoiceButtonClass(
 
 const SORT_COLS: { key: import('@explore/shared').SortKey; label: string; className: string }[] = [
   { key: 'name', label: '名称', className: 'flex-1 ml-1' },
+  { key: 'extension', label: '类型', className: 'w-24 text-left ml-2' },
   { key: 'size', label: '大小', className: 'w-20 text-right ml-2' },
   { key: 'modifiedAt', label: '修改时间', className: 'w-36 text-right ml-2' },
 ];

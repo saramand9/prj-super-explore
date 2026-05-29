@@ -1,6 +1,7 @@
 import { memo, useCallback } from 'react';
 import type { FileEntry, DirSizeResult } from '@explore/shared';
 import { highlightMatches } from '../store';
+import { getFileTypeLabel } from '../utils/file-entry-type';
 import {
   Folder, File, FileCode, FileJson, FileText, FileImage,
   FileArchive, Cog, Palette, Globe, EyeOff, Lock,
@@ -61,6 +62,8 @@ export const FileRow = memo(function FileRow({
   const sz = entry.isDirectory ? (dirSize?.size ?? 0) : entry.size;
   const sizeStr = formatSize(sz);
   const segments = highlightMatches(entry.name, highlight ?? '');
+  const typeLabel = getFileTypeLabel(entry);
+  const typeSegments = highlightMatches(typeLabel, highlight ?? '');
 
   return (
     <div
@@ -93,6 +96,17 @@ export const FileRow = memo(function FileRow({
       </span>
       <span className="flex-1 truncate ml-1" title={entry.name}>
         {segments.map((seg, i) =>
+          seg.match ? (
+            <span key={i} className="text-green font-bold">
+              {seg.text}
+            </span>
+          ) : (
+            <span key={i}>{seg.text}</span>
+          ),
+        )}
+      </span>
+      <span className="w-24 truncate text-text-muted flex-shrink-0 ml-2" title={typeLabel}>
+        {typeSegments.map((seg, i) =>
           seg.match ? (
             <span key={i} className="text-green font-bold">
               {seg.text}

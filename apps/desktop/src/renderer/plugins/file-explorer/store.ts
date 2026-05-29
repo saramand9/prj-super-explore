@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { FileEntry, SortConfig, DirSizeResult } from '@explore/shared';
 import { pinyin } from 'pinyin-pro';
 import { getIpcErrorMessage, ipc } from '../../framework/bridge/ipc-client';
+import { getFileTypeSearchText } from './utils/file-entry-type';
 
 export interface Tab {
   id: string;
@@ -37,7 +38,7 @@ interface FileExplorerState {
   refresh: (side: 'left' | 'right') => Promise<void>;
   setFilter: (side: 'left' | 'right', text: string) => void;
   toggleSelect: (side: 'left' | 'right', path: string) => void;
-  selectRange: (side: 'left' | 'right', from: string, to: string) => void;
+  selectRange: (side: 'left' | 'right', from: string, to: string, orderedPaths?: string[]) => void;
   clearSelection: (side: 'left' | 'right') => void;
   selectSingle: (side: 'left' | 'right', path: string) => void;
   selectAll: (side: 'left' | 'right') => void;
@@ -197,16 +198,17 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
       return { [side]: { ...s[side], selected } };
     }),
 
-  selectRange: (side, from, to) =>
+  selectRange: (side, from, to, orderedPaths) =>
     set((s) => {
       const panel = s[side];
-      const fromIdx = panel.entries.findIndex((e) => e.path === from);
-      const toIdx = panel.entries.findIndex((e) => e.path === to);
+      const paths = orderedPaths ?? panel.entries.map((e) => e.path);
+      const fromIdx = paths.indexOf(from);
+      const toIdx = paths.indexOf(to);
       if (fromIdx === -1 || toIdx === -1) return {};
       const start = Math.min(fromIdx, toIdx);
       const end = Math.max(fromIdx, toIdx);
-      const selected = new Set(panel.selected);
-      for (let i = start; i <= end; i++) selected.add(panel.entries[i].path);
+      const selected = new Set<string>();
+      for (let i = start; i <= end; i++) selected.add(paths[i]);
       return { [side]: { ...panel, selected } };
     }),
 
@@ -437,6 +439,7 @@ export function useFilteredEntries(side: 'left' | 'right') {
   const lower = panel.filterText.toLowerCase();
   return panel.entries.filter((e) => {
     if (e.name.toLowerCase().includes(lower)) return true;
+    if (getFileTypeSearchText(e).includes(lower)) return true;
     // 只有包含中文才做拼音匹配，避免纯英文文本被 pinyin-pro 逐字符拆分后误匹配
     if (!/[一-鿿]/.test(e.name)) return false;
     const full = pinyin(e.name, { toneType: 'none' }).replace(/\s+/g, '').toLowerCase();

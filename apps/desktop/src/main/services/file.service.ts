@@ -598,12 +598,23 @@ export class FileService {
           cmp = a.modifiedAt - b.modifiedAt;
           break;
         case 'extension':
-          cmp = extname(a.name).localeCompare(extname(b.name));
+          cmp = this.getTypeSortValue(a).localeCompare(this.getTypeSortValue(b));
           break;
       }
       if (cmp !== 0) return dir * cmp;
       // 次级排序：按名称
       return a.name.localeCompare(b.name);
     };
+  }
+
+  private getTypeSortValue(entry: FileEntry): string {
+    if (entry.isDirectory) return '0:folder';
+    return `1:${this.getExtensionForSort(entry.name)}`;
+  }
+
+  private getExtensionForSort(name: string): string {
+    const lower = name.toLowerCase();
+    if (lower === '.env' || lower === '.gitignore') return lower.slice(1);
+    return extname(name).slice(1).toLowerCase();
   }
 }
