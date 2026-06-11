@@ -1,4 +1,7 @@
 import { EventEmitter } from 'events';
+import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { PassThrough } from 'stream';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { spawn } from 'child_process';
@@ -89,6 +92,39 @@ describe('SearchService', () => {
     });
   });
 
+  it('falls back to JS search when ripgrep is missing', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'explore-search-'));
+    process.env.RG_PATH = join(root, 'missing-rg.exe');
+    mockSpawnError(Object.assign(new Error('spawn missing-rg ENOENT'), { code: 'ENOENT' }));
+
+    try {
+      await writeFile(join(root, 'note.txt'), 'first line\nNeedle here\n', 'utf8');
+      await writeFile(join(root, 'skip.md'), 'Needle hidden by pattern\n', 'utf8');
+      await mkdir(join(root, 'node_modules'));
+      await writeFile(join(root, 'node_modules', 'dep.txt'), 'Needle ignored\n', 'utf8');
+
+      const service = createService();
+      const results = await service.fulltext(root, 'Needle', 'fallback-search', {
+        filePattern: '*.txt',
+        maxResults: 10,
+      });
+
+      expect(results).toEqual([
+        expect.objectContaining({
+          filePath: join(root, 'note.txt'),
+          fileName: 'note.txt',
+          lineNumber: 2,
+          columnStart: 1,
+          columnEnd: 7,
+          lineContent: 'Needle here',
+          matchText: 'Needle',
+        }),
+      ]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('cancels older searches with the same search id', async () => {
     const first = mockHangingRipgrep();
     mockRipgrep({
@@ -143,6 +179,16 @@ function mockRipgrep(options: { code: number; stdoutLines?: string[]; stderr?: s
       proc.stdout.end();
       proc.stderr.end();
       proc.emit('close', options.code);
+    });
+    return proc as any;
+  });
+}
+
+function mockSpawnError(error: Error & { code?: string }): void {
+  spawnMock.mockImplementationOnce(() => {
+    const proc = makeProcess();
+    setImmediate(() => {
+      proc.emit('error', error);
     });
     return proc as any;
   });

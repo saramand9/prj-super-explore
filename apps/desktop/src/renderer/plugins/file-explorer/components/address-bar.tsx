@@ -151,7 +151,7 @@ export function AddressBar({ side, pathOverride, onNavigate }: AddressBarProps) 
   const initialName = initialPath ? (initialPath.split(/[/\\]/).pop() || initialPath) : null;
 
   return (
-    <div className="flex items-center gap-0.5 flex-1 min-w-0 text-sm">
+    <div className="flex items-center gap-0.5 flex-1 min-w-0 overflow-hidden text-sm">
       {/* 起始路径 */}
       {initialPath && (
         <button
@@ -189,15 +189,15 @@ export function AddressBar({ side, pathOverride, onNavigate }: AddressBarProps) 
             idx: number,
             isLast: boolean,
           ) => (
-            <span key={part.fullPath} className="flex items-center gap-0.5">
+            <span key={part.fullPath} className="flex items-center gap-0.5 min-w-0 overflow-hidden">
               {idx > 0 && (
                 <span className="text-text-muted/40 shrink-0">{sep}</span>
               )}
               <span
                 className={`hover:text-accent hover:bg-accent/10 rounded px-0.5 cursor-pointer ${
                   isLast
-                    ? 'text-text-primary font-medium shrink-0'
-                    : 'text-text-secondary shrink min-w-0 truncate inline-block max-w-full align-bottom'
+                    ? 'text-text-primary font-medium shrink min-w-0 truncate inline-block max-w-[180px] align-bottom'
+                    : 'text-text-secondary shrink min-w-0 truncate inline-block max-w-[140px] align-bottom'
                 }`}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -213,27 +213,27 @@ export function AddressBar({ side, pathOverride, onNavigate }: AddressBarProps) 
           return (
         <div
           ref={containerRef}
-          className="flex items-center gap-0.5 cursor-text flex-1 min-w-0 overflow-hidden"
+          className="flex items-center gap-0.5 cursor-text flex-1 min-w-0 overflow-hidden whitespace-nowrap"
           onClick={startEdit}
           title="Click to edit path"
         >
           {expanded ? (
             /* 展开模式 — 所有段自然换行 */
-            <div className="flex items-center gap-0.5 flex-wrap min-w-0">
+            <div className="flex items-center gap-0.5 flex-wrap min-w-0 overflow-hidden">
               {displayParts.map((part, i) =>
                 renderSegment(part, i, i === displayParts.length - 1),
               )}
             </div>
           ) : (
-            /* 正常模式 — 前缀可压缩，末2段永不截断 */
+            /* 正常模式：前缀和末段都可压缩，避免窄栏时文字挤出工具栏 */
             <>
               {prefixParts.map((part, i) => (
-                <span key={part.fullPath} className="flex items-center gap-0.5">
+                <span key={part.fullPath} className="flex items-center gap-0.5 min-w-0 overflow-hidden">
                   {i > 0 && (
                     <span className="text-text-muted/40 shrink-0">{sep}</span>
                   )}
                   <span
-                    className="text-text-secondary hover:text-accent hover:bg-accent/10 rounded px-0.5 cursor-pointer shrink min-w-0 truncate"
+                    className="text-text-secondary hover:text-accent hover:bg-accent/10 rounded px-0.5 cursor-pointer shrink min-w-0 max-w-[120px] truncate"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleSegmentClick(part.fullPath);
@@ -259,20 +259,20 @@ export function AddressBar({ side, pathOverride, onNavigate }: AddressBarProps) 
                 </span>
               )}
 
-              {/* 末 KEEP_LAST 段 — 永不截断 */}
+              {/* 末 KEEP_LAST 段 */}
               {lastParts.map((part, i) => {
                 // 不需要前导分隔符：是第一个末段 且 前面没有任何段（无前缀 + 未折叠）
                 const skipSep = i === 0 && prefixParts.length === 0 && !isCollapsed;
                 return (
-                  <span key={part.fullPath} className="flex items-center gap-0.5">
+                  <span key={part.fullPath} className="flex items-center gap-0.5 min-w-0 overflow-hidden">
                     {!skipSep && (
                       <span className="text-text-muted/40 shrink-0">{sep}</span>
                     )}
                     <span
-                      className={`hover:text-accent hover:bg-accent/10 rounded px-0.5 cursor-pointer shrink-0 ${
+                      className={`hover:text-accent hover:bg-accent/10 rounded px-0.5 cursor-pointer shrink min-w-0 truncate inline-block ${
                         i === lastParts.length - 1
-                          ? 'text-text-primary font-medium'
-                          : 'text-text-secondary'
+                          ? 'text-text-primary font-medium max-w-[180px]'
+                          : 'text-text-secondary max-w-[120px]'
                       }`}
                       onClick={(e) => {
                         e.stopPropagation();

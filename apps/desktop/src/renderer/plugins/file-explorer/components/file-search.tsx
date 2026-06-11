@@ -310,6 +310,18 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
     [side],
   );
 
+  const openDirectoryResult = useCallback(
+    (dirPath: string) => {
+      onClose();
+      window.setTimeout(() => {
+        useLayoutStore.getState().setPanelPlugin(side, 'file-explorer', 'browser');
+        void useFileStore.getState().navigateTo(side, dirPath);
+        useLayoutStore.getState().setPanelPath(side, dirPath);
+      }, 0);
+    },
+    [side, onClose],
+  );
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'ArrowDown') {
@@ -324,13 +336,11 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
           const entry = results[selectedIdx];
           if (entry) {
             if (entry.isDirectory) {
-              useLayoutStore.getState().setPanelPlugin(side, 'file-explorer', 'browser');
-              useFileStore.getState().navigateTo(side, entry.path);
-              useLayoutStore.getState().setPanelPath(side, entry.path);
+              openDirectoryResult(entry.path);
             } else {
               revealAndOpenFile(entry.path);
+              onClose();
             }
-            onClose();
           }
         } else {
           const match = flatContentResults[selectedIdx];
@@ -351,7 +361,7 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
         handleModeSwitch(mode === 'files' ? 'content' : 'files');
       }
     },
-    [results, flatContentResults, selectedIdx, side, mode, totalItems, query, revealAndOpenFile, handleModeSwitch, onClose],
+    [results, flatContentResults, selectedIdx, mode, totalItems, query, revealAndOpenFile, openDirectoryResult, handleModeSwitch, onClose],
   );
 
   // 选中项自动滚入视野
@@ -482,13 +492,11 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
                   }`}
                   onClick={() => {
                     if (entry.isDirectory) {
-                      useLayoutStore.getState().setPanelPlugin(side, 'file-explorer', 'browser');
-                      useFileStore.getState().navigateTo(side, entry.path);
-                      useLayoutStore.getState().setPanelPath(side, entry.path);
+                      openDirectoryResult(entry.path);
                     } else {
                       revealAndOpenFile(entry.path);
+                      onClose();
                     }
-                    onClose();
                   }}
                   onMouseEnter={() => setSelectedIdx(idx)}
                 >

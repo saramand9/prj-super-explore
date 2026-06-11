@@ -117,6 +117,14 @@ export function registerIpcHandlers(container: ServiceContainer): void {
   );
 
   ipcMain.handle(
+    'file:showItemInFolder',
+    (_e, payload: IpcChannels['file:showItemInFolder']['req']) => {
+      const { shell } = require('electron');
+      shell.showItemInFolder(payload.path);
+    },
+  );
+
+  ipcMain.handle(
     'file:watch',
     (_e, payload: IpcChannels['file:watch']['req']) => {
       const watcherId = `watch-${Date.now()}-${Math.random().toString(36).slice(2)}`;

@@ -96,6 +96,10 @@ export interface IpcChannels {
     req: { path: string };
     res: void;
   };
+  'file:showItemInFolder': {
+    req: { path: string };
+    res: void;
+  };
 
   // File watching
   'file:watch': {

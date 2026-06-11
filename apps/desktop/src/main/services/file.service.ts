@@ -15,6 +15,7 @@ import type { WatcherService } from './watcher.service';
 
 const DIR_SIZE_TIMEOUT = 1000; // ms
 const DIR_SIZE_MAX_FILES = 50000;
+const DIR_SIZE_CONCURRENCY = 2;
 
 export class FileService {
   private dirSizeCache = new Map<string, { size: number; ts: number }>();
@@ -32,35 +33,43 @@ export class FileService {
     const CACHE_TTL = 5 * 60 * 1000;
     const now = Date.now();
     const result: Record<string, DirSizeResult> = {};
+    const queue = [...new Set(paths)];
+    let cursor = 0;
 
-    await Promise.all(
-      paths.map(async (dirPath) => {
-        const cached = this.dirSizeCache.get(dirPath);
-        if (cached && now - cached.ts < CACHE_TTL) {
-          result[dirPath] = { size: cached.size };
-          return;
+    const runOne = async (dirPath: string): Promise<void> => {
+      const cached = this.dirSizeCache.get(dirPath);
+      if (cached && now - cached.ts < CACHE_TTL) {
+        result[dirPath] = { size: cached.size };
+        return;
+      }
+      // 去重并发请求
+      const pending = this.dirSizePending.get(dirPath);
+      if (pending) {
+        result[dirPath] = await pending;
+        return;
+      }
+      const promise = this.computeDirSize(dirPath);
+      this.dirSizePending.set(dirPath, promise);
+      try {
+        const r = await promise;
+        if (!r.partial) {
+          this.dirSizeCache.set(dirPath, { size: r.size, ts: now });
         }
-        // 去重并发请求
-        const pending = this.dirSizePending.get(dirPath);
-        if (pending) {
-          result[dirPath] = await pending;
-          return;
-        }
-        const promise = this.computeDirSize(dirPath);
-        this.dirSizePending.set(dirPath, promise);
-        try {
-          const r = await promise;
-          if (!r.partial) {
-            this.dirSizeCache.set(dirPath, { size: r.size, ts: now });
-          }
-          result[dirPath] = r;
-        } catch {
-          result[dirPath] = { size: 0 };
-        } finally {
-          this.dirSizePending.delete(dirPath);
-        }
-      }),
-    );
+        result[dirPath] = r;
+      } catch {
+        result[dirPath] = { size: 0 };
+      } finally {
+        this.dirSizePending.delete(dirPath);
+      }
+    };
+
+    const workerCount = Math.min(DIR_SIZE_CONCURRENCY, queue.length);
+    await Promise.all(Array.from({ length: workerCount }, async () => {
+      while (cursor < queue.length) {
+        const dirPath = queue[cursor++];
+        await runOne(dirPath);
+      }
+    }));
     return result;
   }
 

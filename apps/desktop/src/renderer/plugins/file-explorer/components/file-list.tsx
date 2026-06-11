@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FileEntry } from '@explore/shared';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useFileStore, useFilteredEntries } from '../store';
@@ -6,7 +6,7 @@ import { FileRow } from './file-row';
 import { ipc } from '../../../framework/bridge/ipc-client';
 import { useLayoutStore } from '../../../framework/store/layout-store';
 import { pluginManager, showNotification } from '../../../framework/plugin-system';
-import { FolderOpen, FolderPlus, RefreshCw, Trash2, Copy, ArrowRightLeft, Pencil, File, FilePlus, Folder, Clipboard, ClipboardCheck } from 'lucide-react';
+import { FolderOpen, FolderPlus, RefreshCw, Trash2, Copy, ArrowRightLeft, Pencil, File, FilePlus, Folder, Clipboard, ClipboardCheck, ExternalLink } from 'lucide-react';
 import {
   getFileOpToastType,
   resolveCopyConflictStrategy,
@@ -18,6 +18,11 @@ import type { FileConflictStrategy, FileOpResult } from '@explore/shared';
 interface FileListProps {
   side: 'left' | 'right';
 }
+
+const DIR_SIZE_VISIBLE_OVERSCAN = 12;
+const DIR_SIZE_INITIAL_ROWS = 36;
+const DIR_SIZE_IDLE_DELAY = 240;
+const FILE_ROW_HEIGHT = 30;
 
 function normalizePathForCompare(path: string): string {
   return path.replace(/[\\/]+$/, '').replace(/\//g, '\\').toLowerCase();
@@ -51,6 +56,8 @@ export function FileList({ side }: FileListProps) {
   const refresh = useFileStore((s) => s.refresh);
 
   const lastSelectedRef = useRef<string | null>(null);
+  const dirSizeRequestedRef = useRef<Set<string>>(new Set());
+  const suppressSelectionScrollRef = useRef(false);
   const [focusIdx, setFocusIdx] = useState(0);
   const focusIdxRef = useRef(0);
   focusIdxRef.current = focusIdx;
@@ -213,6 +220,17 @@ export function FileList({ side }: FileListProps) {
     useLayoutStore.getState().setPanelPath(other, contextMenu.single.path);
     closeMenu();
   }, [contextMenu, side, closeMenu]);
+
+  const ctxShowItemInFolder = useCallback(async () => {
+    if (!contextMenu?.single) return;
+    try {
+      await ipc.invoke('file:showItemInFolder', { path: contextMenu.single.path });
+    } catch (err: any) {
+      await showAlert(`打开所在文件夹失败：${err.message}`, 'error');
+    } finally {
+      closeMenu();
+    }
+  }, [contextMenu, closeMenu, showAlert]);
 
   const deletePaths = useCallback(async (paths: string[], permanent = false) => {
     if (paths.length === 0) return;
@@ -400,22 +418,62 @@ export function FileList({ side }: FileListProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterText, path]);
 
+  const getScrollElement = useCallback(() => containerRef.current, []);
+  const estimateRowSize = useCallback(() => FILE_ROW_HEIGHT, []);
+  const getVirtualItemKey = useCallback((index: number) => entries[index]?.path ?? index, [entries]);
   const virtualizer = useVirtualizer({
     count: entries.length,
-    getScrollElement: () => containerRef.current,
-    estimateSize: () => 30,
-    measureElement: (el) => el.getBoundingClientRect().height,
-    overscan: 10,
+    getScrollElement,
+    estimateSize: estimateRowSize,
+    getItemKey: getVirtualItemKey,
+    overscan: 8,
   });
+  const virtualItems = virtualizer.getVirtualItems();
+  const isScrolling = virtualizer.isScrolling;
+  const firstVisibleIndex = virtualItems[0]?.index ?? 0;
+  const lastVisibleIndex = virtualItems[virtualItems.length - 1]?.index ?? Math.min(entries.length - 1, DIR_SIZE_INITIAL_ROWS - 1);
+  const dirSizeStartIndex = Math.max(0, firstVisibleIndex - DIR_SIZE_VISIBLE_OVERSCAN);
+  const dirSizeEndIndex = Math.min(entries.length - 1, lastVisibleIndex + DIR_SIZE_VISIBLE_OVERSCAN);
+  const visibleDirSizePaths = useMemo(() => {
+    if (entries.length === 0) return [];
+    return entries
+      .slice(dirSizeStartIndex, dirSizeEndIndex + 1)
+      .filter((entry) => entry.isDirectory && !dirSizeMap[entry.path] && !dirSizeRequestedRef.current.has(entry.path))
+      .map((entry) => entry.path);
+  }, [entries, dirSizeMap, dirSizeStartIndex, dirSizeEndIndex]);
 
-  // 加载目录大小（首次请求 + 后台补算监听）
   useEffect(() => {
-    const dirs = entries.filter((e) => e.isDirectory).map((e) => e.path);
-    if (dirs.length === 0) return;
-    ipc.invoke('file:dirSizes', { paths: dirs }).then((sizes) => {
-      setDirSizes(sizes);
-    });
-  }, [entries, setDirSizes]);
+    dirSizeRequestedRef.current.clear();
+  }, [path, filterText]);
+
+  // 只加载可见范围附近的目录大小，避免进入大目录时瞬时递归扫描所有子目录。
+  useEffect(() => {
+    if (isScrolling) return;
+    if (visibleDirSizePaths.length === 0) return;
+    for (const dirPath of visibleDirSizePaths) {
+      dirSizeRequestedRef.current.add(dirPath);
+    }
+    let started = false;
+    const timer = window.setTimeout(() => {
+      started = true;
+      ipc.invoke('file:dirSizes', { paths: visibleDirSizePaths }).then((sizes) => {
+        setDirSizes(sizes);
+      }).catch(() => {
+        for (const dirPath of visibleDirSizePaths) {
+          dirSizeRequestedRef.current.delete(dirPath);
+        }
+      });
+    }, DIR_SIZE_IDLE_DELAY);
+
+    return () => {
+      window.clearTimeout(timer);
+      if (!started) {
+        for (const dirPath of visibleDirSizePaths) {
+          dirSizeRequestedRef.current.delete(dirPath);
+        }
+      }
+    };
+  }, [isScrolling, visibleDirSizePaths, setDirSizes]);
 
   // 后台补算结果推送
   useEffect(() => {
@@ -470,6 +528,7 @@ export function FileList({ side }: FileListProps) {
     (idx: number) => {
       const entry = entries[idx];
       if (!entry) return;
+      suppressSelectionScrollRef.current = true;
       selectSingle(side, entry.path);
       setFocusIdx(idx);
       focusIdxRef.current = idx;
@@ -483,12 +542,126 @@ export function FileList({ side }: FileListProps) {
       const entry = entries[idx];
       if (!entry) return;
       const anchor = getRangeAnchor() ?? entry.path;
+      suppressSelectionScrollRef.current = true;
       selectRange(side, anchor, entry.path, entries.map((item) => item.path));
       setFocusIdx(idx);
       focusIdxRef.current = idx;
       lastSelectedRef.current = anchor;
     },
     [entries, getRangeAnchor, selectRange, side],
+  );
+
+  const handleRowClick = useCallback(
+    (entry: FileEntry, idx: number, e: React.MouseEvent) => {
+      if (e.shiftKey) {
+        e.preventDefault();
+        selectRangeToIndex(idx);
+      } else if (e.ctrlKey || e.metaKey) {
+        suppressSelectionScrollRef.current = true;
+        toggleSelect(side, entry.path);
+        setFocusIdx(idx);
+        focusIdxRef.current = idx;
+        lastSelectedRef.current = entry.path;
+      } else {
+        selectSingleAtIndex(idx);
+      }
+    },
+    [selectRangeToIndex, selectSingleAtIndex, side, toggleSelect],
+  );
+
+  const handleRowDoubleClick = useCallback(
+    (entry: FileEntry) => {
+      if (entry.isDirectory) {
+        navigateToPath(entry.path);
+      } else {
+        openFile(entry);
+      }
+    },
+    [navigateToPath, openFile],
+  );
+
+  const handleRowContextMenu = useCallback(
+    (entry: FileEntry, idx: number, e: React.MouseEvent) => {
+      e.preventDefault();
+      const wasSelected = selected.has(entry.path);
+      const nextSelectedCount = wasSelected ? selected.size : 1;
+      if (!wasSelected) {
+        suppressSelectionScrollRef.current = true;
+        clearSelection(side);
+        toggleSelect(side, entry.path);
+      }
+      setFocusIdx(idx);
+      focusIdxRef.current = idx;
+      lastSelectedRef.current = entry.path;
+      setContextMenu({
+        x: e.clientX, y: e.clientY,
+        single: nextSelectedCount <= 1 ? entry : undefined,
+        count: nextSelectedCount,
+      });
+    },
+    [clearSelection, selected, side, toggleSelect],
+  );
+
+  const handleRowDragStart = useCallback(
+    (entry: FileEntry, _idx: number, e: React.DragEvent) => {
+      const paths = selected.has(entry.path)
+        ? [...selected]
+        : [entry.path];
+      e.dataTransfer.setData('application/x-explore-files', JSON.stringify(paths));
+    },
+    [selected],
+  );
+
+  const handleRowDragEnter = useCallback((entry: FileEntry) => {
+    if (entry.isDirectory) setDragOverPath(entry.path);
+  }, []);
+
+  const handleRowDragLeave = useCallback(() => {
+    setDragOverPath(null);
+  }, []);
+
+  const handleRowDrop = useCallback(
+    async (entry: FileEntry, _idx: number, e: React.DragEvent) => {
+      const data = e.dataTransfer.getData('application/x-explore-files');
+      if (!data) return;
+      const sources: string[] = JSON.parse(data);
+      if (sources.length === 0) return;
+
+      // 同目录忽略
+      if (sources.every((s) => {
+        const parent = s.replace(/[/\\][^/\\]*$/, '');
+        return parent === entry.path;
+      })) return;
+
+      // 拖到自己子目录 -> 阻止
+      if (sources.some((s) => entry.path.startsWith(s + '\\') || entry.path.startsWith(s + '/'))) return;
+
+      const isMove = e.ctrlKey || e.metaKey;
+      try {
+        const conflictStrategy = await chooseConflictStrategy(sources, entry.path);
+        if (!conflictStrategy) return;
+        const result = isMove
+          ? await runFileOperation(
+              'file:move',
+              { sources, destDir: entry.path, conflictStrategy },
+              '正在移动...',
+            )
+          : await runFileOperation(
+              'file:copy',
+              { sources, destDir: entry.path, conflictStrategy },
+              '正在复制...',
+            );
+        await reportFileOperationResult(isMove ? 'Move' : 'Copy', result);
+      } catch (err: any) {
+        await showAlert(`操作失败：${err.message}`, 'error');
+      }
+      refresh(side);
+      const otherSide = side === 'left' ? 'right' : 'left';
+      useFileStore.getState().refresh(otherSide);
+      setDropFlashPath(entry.path);
+      setTimeout(() => setDropFlashPath(null), 600);
+    },
+    [chooseConflictStrategy, refresh, reportFileOperationResult, runFileOperation, showAlert, side],
   );
 
   // ── 键盘事件 ──
@@ -505,12 +678,6 @@ export function FileList({ side }: FileListProps) {
       const key = e.key;
       const state = useFileStore.getState()[side];
 
-      // 快速筛选：字母/数字/点号
-      if (key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
-        setFilter(side, state.filterText + key);
-        return;
-      }
-
       // Shift+数字：切换标签
       if (e.shiftKey && e.code >= 'Digit1' && e.code <= 'Digit9') {
         e.preventDefault();
@@ -522,6 +689,12 @@ export function FileList({ side }: FileListProps) {
           navigateTo(side, target.path);
           useLayoutStore.getState().setPanelPath(side, target.path);
         }
+        return;
+      }
+
+      // 快速筛选：允许常见文件名字符，包括 Shift 组合输入的 _、-、空格、括号等。
+      if (key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        setFilter(side, state.filterText + key);
         return;
       }
 
@@ -815,6 +988,10 @@ export function FileList({ side }: FileListProps) {
 
   // 外部动作选中文件时，同步焦点并滚动到该文件
   useEffect(() => {
+    if (suppressSelectionScrollRef.current) {
+      suppressSelectionScrollRef.current = false;
+      return;
+    }
     if (selected.size !== 1) return;
     const selectedPath = [...selected][0];
     const idx = entries.findIndex((entry) => entry.path === selectedPath);
@@ -887,109 +1064,37 @@ export function FileList({ side }: FileListProps) {
         className="relative"
         style={{ height: `${virtualizer.getTotalSize()}px` }}
       >
-        {virtualizer.getVirtualItems().map((virtualItem) => {
+        {virtualItems.map((virtualItem) => {
           const idx = virtualItem.index;
           const entry = entries[idx];
           return (
             <div
               key={entry.path}
-              ref={virtualizer.measureElement}
               data-index={idx}
               className="absolute top-0 left-0 w-full"
               style={{
-                transform: `translateY(${virtualItem.start}px)`,
+                height: `${FILE_ROW_HEIGHT}px`,
+                transform: `translate3d(0, ${virtualItem.start}px, 0)`,
+                willChange: 'transform',
               }}
             >
               <FileRow
                 entry={entry}
+                index={idx}
                 isSelected={selected.has(entry.path)}
                 isActive={idx === focusIdx}
                 disableHover={disableHover}
                 highlight={filterText}
                 dirSize={dirSizeMap[entry.path]}
-                onClick={(e: React.MouseEvent) => {
-                  if (e.shiftKey) {
-                    e.preventDefault();
-                    selectRangeToIndex(idx);
-                  } else if (e.ctrlKey || e.metaKey) {
-                    toggleSelect(side, entry.path);
-                    setFocusIdx(idx);
-                    focusIdxRef.current = idx;
-                    lastSelectedRef.current = entry.path;
-                  } else {
-                    selectSingleAtIndex(idx);
-                  }
-                }}
-                onDoubleClick={() => {
-                  if (entry.isDirectory) {
-                    navigateToPath(entry.path);
-                  } else {
-                    openFile(entry);
-                  }
-                }}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  if (!selected.has(entry.path)) {
-                    clearSelection(side);
-                    toggleSelect(side, entry.path);
-                  }
-                  const selCount = selected.size || 1;
-                  setContextMenu({
-                    x: e.clientX, y: e.clientY,
-                    single: selCount <= 1 ? entry : undefined,
-                    count: selCount,
-                  });
-                }}
-                onDragStart={(e) => {
-                  const paths = selected.has(entry.path)
-                    ? [...selected]
-                    : [entry.path];
-                  e.dataTransfer.setData('application/x-explore-files', JSON.stringify(paths));
-                }}
+                onClick={handleRowClick}
+                onDoubleClick={handleRowDoubleClick}
+                onContextMenu={handleRowContextMenu}
+                onDragStart={handleRowDragStart}
                 dragOver={dragOverPath === entry.path}
                 dropFlash={dropFlashPath === entry.path}
-                onDragEnterRow={() => entry.isDirectory && setDragOverPath(entry.path)}
-                onDragLeaveRow={() => setDragOverPath(null)}
-                onDrop={async (e) => {
-                  const data = e.dataTransfer.getData('application/x-explore-files');
-                  if (!data) return;
-                  const sources: string[] = JSON.parse(data);
-                  if (sources.length === 0) return;
-
-                  // 同目录忽略
-                  if (sources.every((s) => {
-                    const parent = s.replace(/[/\\][^/\\]*$/, '');
-                    return parent === entry.path;
-                  })) return;
-
-                  // 拖到自己子目录 → 阻止
-                  if (sources.some((s) => entry.path.startsWith(s + '\\') || entry.path.startsWith(s + '/'))) return;
-
-                  const isMove = e.ctrlKey || e.metaKey;
-                  try {
-                    const conflictStrategy = await chooseConflictStrategy(sources, entry.path);
-                    if (!conflictStrategy) return;
-                    const result = isMove
-                      ? await runFileOperation(
-                          'file:move',
-                          { sources, destDir: entry.path, conflictStrategy },
-                          '正在移动...',
-                        )
-                      : await runFileOperation(
-                          'file:copy',
-                          { sources, destDir: entry.path, conflictStrategy },
-                          '正在复制...',
-                        );
-                    await reportFileOperationResult(isMove ? 'Move' : 'Copy', result);
-                  } catch (err: any) {
-                    await showAlert(`操作失败：${err.message}`, 'error');
-                  }
-                  refresh(side);
-                  const otherSide = side === 'left' ? 'right' : 'left';
-                  useFileStore.getState().refresh(otherSide);
-                  setDropFlashPath(entry.path);
-                  setTimeout(() => setDropFlashPath(null), 600);
-                }}
+                onDragEnterRow={handleRowDragEnter}
+                onDragLeaveRow={handleRowDragLeave}
+                onDrop={handleRowDrop}
               />
             </div>
           );
@@ -1156,6 +1261,9 @@ export function FileList({ side }: FileListProps) {
               {contextMenu.single.isDirectory && (
                 <MenuBtn onClick={ctxOpenOther}>↗️ 在另一侧打开</MenuBtn>
               )}
+              <MenuBtn onClick={ctxShowItemInFolder}>
+                <ExternalLink className="w-3.5 h-3.5" /> 打开所在文件夹
+              </MenuBtn>
               <MenuSep />
               <MenuBtn onClick={ctxCopy}><Copy className="w-3.5 h-3.5" /> 复制到另一侧</MenuBtn>
               <MenuBtn onClick={ctxMove}><ArrowRightLeft className="w-3.5 h-3.5" /> 移动到另一侧</MenuBtn>

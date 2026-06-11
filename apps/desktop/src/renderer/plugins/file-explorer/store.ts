@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useMemo } from 'react';
 import type { FileEntry, SortConfig, DirSizeResult } from '@explore/shared';
 import { pinyin } from 'pinyin-pro';
 import { getIpcErrorMessage, ipc } from '../../framework/bridge/ipc-client';
@@ -434,21 +435,24 @@ function matchPinyinMixed(input: string, words: string[]): boolean {
 
 /** 获取指定面板筛选后的文件列表 */
 export function useFilteredEntries(side: 'left' | 'right') {
-  const panel = useFileStore((s) => s[side]);
-  if (!panel.filterText) return panel.entries;
-  const lower = panel.filterText.toLowerCase();
-  return panel.entries.filter((e) => {
-    if (e.name.toLowerCase().includes(lower)) return true;
-    if (getFileTypeSearchText(e).includes(lower)) return true;
-    // 只有包含中文才做拼音匹配，避免纯英文文本被 pinyin-pro 逐字符拆分后误匹配
-    if (!/[一-鿿]/.test(e.name)) return false;
-    const full = pinyin(e.name, { toneType: 'none' }).replace(/\s+/g, '').toLowerCase();
-    if (full.includes(lower)) return true;
-    const initials = pinyin(e.name, { pattern: 'first', toneType: 'none' }).replace(/\s+/g, '').toLowerCase();
-    if (initials.includes(lower)) return true;
-    const words = pinyin(e.name, { toneType: 'none', type: 'array' }).map((w: string) => w.toLowerCase());
-    return matchPinyinMixed(lower, words);
-  });
+  const entries = useFileStore((s) => s[side].entries);
+  const filterText = useFileStore((s) => s[side].filterText);
+  return useMemo(() => {
+    if (!filterText) return entries;
+    const lower = filterText.toLowerCase();
+    return entries.filter((e) => {
+      if (e.name.toLowerCase().includes(lower)) return true;
+      if (getFileTypeSearchText(e).includes(lower)) return true;
+      // 只有包含中文才做拼音匹配，避免纯英文文本被 pinyin-pro 逐字符拆分后误匹配
+      if (!/[一-鿿]/.test(e.name)) return false;
+      const full = pinyin(e.name, { toneType: 'none' }).replace(/\s+/g, '').toLowerCase();
+      if (full.includes(lower)) return true;
+      const initials = pinyin(e.name, { pattern: 'first', toneType: 'none' }).replace(/\s+/g, '').toLowerCase();
+      if (initials.includes(lower)) return true;
+      const words = pinyin(e.name, { toneType: 'none', type: 'array' }).map((w: string) => w.toLowerCase());
+      return matchPinyinMixed(lower, words);
+    });
+  }, [entries, filterText]);
 }
 
 export interface TabGroup {
