@@ -595,6 +595,10 @@ export class FileService {
   private makeComparator(sort: SortConfig): (a: FileEntry, b: FileEntry) => number {
     const dir = sort.direction === 'asc' ? 1 : -1;
     return (a, b) => {
+      if (a.isDirectory !== b.isDirectory) {
+        return a.isDirectory ? -1 : 1;
+      }
+
       let cmp = 0;
       switch (sort.key) {
         case 'name':

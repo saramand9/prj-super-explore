@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { useMemo } from 'react';
-import type { FileEntry, SortConfig, DirSizeResult } from '@explore/shared';
+import type { FileEntry, SortConfig, DirSizeResult, IpcErrorInfo } from '@explore/shared';
 import { pinyin } from 'pinyin-pro';
-import { getIpcErrorMessage, ipc } from '../../framework/bridge/ipc-client';
+import { getIpcErrorMessage, IpcClientError, ipc } from '../../framework/bridge/ipc-client';
 import { getFileTypeSearchText } from './utils/file-entry-type';
 
 export interface Tab {
@@ -18,6 +18,7 @@ interface PanelFileState {
   entries: FileEntry[];
   loading: boolean;
   error: string | null;
+  errorInfo: IpcErrorInfo | null;
   filterText: string;
   selected: Set<string>;
   sort: SortConfig;
@@ -77,6 +78,7 @@ function defaultPanel(): PanelFileState {
     entries: [],
     loading: false,
     error: null,
+    errorInfo: null,
     filterText: '',
     selected: new Set(),
     sort: { key: 'name', direction: 'asc' },
@@ -109,6 +111,7 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
         ...s[side],
         loading: true,
         error: null,
+        errorInfo: null,
         path,
         filterText: '',
         selected: new Set(),
@@ -127,7 +130,7 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
 
     try {
       const entries = await loadDir(path, panel.sort, panel.showHidden);
-      set((s) => ({ [side]: { ...s[side], entries, loading: false, error: null } }));
+      set((s) => ({ [side]: { ...s[side], entries, loading: false, error: null, errorInfo: null } }));
     } catch (err) {
       set((s) => ({
         [side]: {
@@ -135,6 +138,7 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
           loading: false,
           entries: [],
           error: getIpcErrorMessage(err, '目录加载失败'),
+          errorInfo: err instanceof IpcClientError ? err.info : null,
         },
       }));
     }
@@ -173,16 +177,17 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
   refresh: async (side) => {
     const panel = get()[side];
     if (!panel.path) return;
-    set((s) => ({ [side]: { ...s[side], loading: true, error: null } }));
+    set((s) => ({ [side]: { ...s[side], loading: true, error: null, errorInfo: null } }));
     try {
       const entries = await loadDir(panel.path, panel.sort, panel.showHidden);
-      set((s) => ({ [side]: { ...s[side], entries, loading: false, error: null } }));
+      set((s) => ({ [side]: { ...s[side], entries, loading: false, error: null, errorInfo: null } }));
     } catch (err) {
       set((s) => ({
         [side]: {
           ...s[side],
           loading: false,
           error: getIpcErrorMessage(err, '目录刷新失败'),
+          errorInfo: err instanceof IpcClientError ? err.info : null,
         },
       }));
     }

@@ -331,74 +331,48 @@ export function TabBar({ side, keepEmpty = false, onTabClick }: TabBarProps) {
             {contextMenu.tab.path}
           </div>
           {contextMenu.tab.pinned ? (
-            <button
-              className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
-            >
-              <Pin className="w-3.5 h-3.5" /> Pin tab
-            </button>
+            <>
+              <button
+                className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
+                onClick={handleUnpin}
+              >
+                <PinOff className="w-3.5 h-3.5" /> 取消固定
+              </button>
+              <button
+                className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
+                onClick={handleRepin}
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> 重新固定到当前位置
+              </button>
+            </>
           ) : (
             <button
               className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
               onClick={handlePin}
             >
-              <Pin className="w-3.5 h-3.5" /> Pin tab
+              <Pin className="w-3.5 h-3.5" /> 固定标签
             </button>
           )}
-          {contextMenu.tab.pinned ? (
-            <button
-              className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
-              onClick={handleUnpin}
-            >
-              <PinOff className="w-3.5 h-3.5" /> Unpin tab
-            </button>
-          ) : (
-            <button
-              className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
-            >
-              <PinOff className="w-3.5 h-3.5" /> Unpin tab
-            </button>
-          )}
-          {contextMenu.tab.pinned ? (
-            <button
-              className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
-              onClick={handleRepin}
-            >
-              <RefreshCw className="w-3.5 h-3.5" /> Re-pin tab
-            </button>
-          ) : (
-            <button
-              className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
-            >
-              <RefreshCw className="w-3.5 h-3.5" /> Re-pin tab
-            </button>
-          )}
-          <button
-            className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
-            onClick={handleRename}
-          >
-            <Pencil className="w-3.5 h-3.5" /> Rename tab
-          </button>
+          <div className="border-t border-border/30 my-0.5" />
           <button
             className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
             onClick={handleFork}
           >
-            <Copy className="w-3.5 h-3.5" /> Clone tab
+            <Copy className="w-3.5 h-3.5" /> 克隆标签
           </button>
-          {contextMenu.tab.pinned ? (
-            <button
-              className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
-              onClick={handleClose}
-            >
-              <X className="w-3.5 h-3.5" /> Close tab
-            </button>
-          ) : (
-            <button
-              className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
-              onClick={handleClose}
-            >
-              <X className="w-3.5 h-3.5" /> Close tab
-            </button>
-          )}
+          <button
+            className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
+            onClick={handleRename}
+          >
+            <Pencil className="w-3.5 h-3.5" /> 重命名
+          </button>
+          <div className="border-t border-border/30 my-0.5" />
+          <button
+            className="w-full text-left px-3 py-1.5 hover:bg-accent/10 text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
+            onClick={handleClose}
+          >
+            <X className="w-3.5 h-3.5" /> 关闭标签
+          </button>
         </div>
       )}
     </div>

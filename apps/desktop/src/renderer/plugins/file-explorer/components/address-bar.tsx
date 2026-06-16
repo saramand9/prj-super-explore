@@ -196,7 +196,7 @@ export function AddressBar({ side, pathOverride, onNavigate }: AddressBarProps) 
               <span
                 className={`hover:text-accent hover:bg-accent/10 rounded px-0.5 cursor-pointer ${
                   isLast
-                    ? 'text-text-primary font-medium shrink min-w-0 truncate inline-block max-w-[180px] align-bottom'
+                    ? 'text-text-primary font-medium shrink-0 whitespace-nowrap inline-block align-bottom'
                     : 'text-text-secondary shrink min-w-0 truncate inline-block max-w-[140px] align-bottom'
                 }`}
                 onClick={(e) => {
@@ -213,13 +213,13 @@ export function AddressBar({ side, pathOverride, onNavigate }: AddressBarProps) 
           return (
         <div
           ref={containerRef}
-          className="flex items-center gap-0.5 cursor-text flex-1 min-w-0 overflow-hidden whitespace-nowrap"
+          className="flex items-center gap-0.5 cursor-text flex-1 min-w-0 overflow-x-auto overflow-y-hidden whitespace-nowrap scrollbar-none"
           onClick={startEdit}
           title="Click to edit path"
         >
           {expanded ? (
             /* 展开模式 — 所有段自然换行 */
-            <div className="flex items-center gap-0.5 flex-wrap min-w-0 overflow-hidden">
+            <div className="flex items-center gap-0.5 flex-wrap min-w-0 overflow-x-auto overflow-y-hidden scrollbar-none">
               {displayParts.map((part, i) =>
                 renderSegment(part, i, i === displayParts.length - 1),
               )}
@@ -264,15 +264,20 @@ export function AddressBar({ side, pathOverride, onNavigate }: AddressBarProps) 
                 // 不需要前导分隔符：是第一个末段 且 前面没有任何段（无前缀 + 未折叠）
                 const skipSep = i === 0 && prefixParts.length === 0 && !isCollapsed;
                 return (
-                  <span key={part.fullPath} className="flex items-center gap-0.5 min-w-0 overflow-hidden">
+                  <span
+                    key={part.fullPath}
+                    className={`flex items-center gap-0.5 ${
+                      i === lastParts.length - 1 ? 'shrink-0' : 'min-w-0 overflow-hidden'
+                    }`}
+                  >
                     {!skipSep && (
                       <span className="text-text-muted/40 shrink-0">{sep}</span>
                     )}
                     <span
-                      className={`hover:text-accent hover:bg-accent/10 rounded px-0.5 cursor-pointer shrink min-w-0 truncate inline-block ${
+                      className={`hover:text-accent hover:bg-accent/10 rounded px-0.5 cursor-pointer inline-block ${
                         i === lastParts.length - 1
-                          ? 'text-text-primary font-medium max-w-[180px]'
-                          : 'text-text-secondary max-w-[120px]'
+                          ? 'text-text-primary font-medium shrink-0 whitespace-nowrap'
+                          : 'text-text-secondary shrink min-w-0 truncate max-w-[120px]'
                       }`}
                       onClick={(e) => {
                         e.stopPropagation();

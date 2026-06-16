@@ -31,6 +31,22 @@ describe('FileService file operations', () => {
     vi.clearAllMocks();
   });
 
+  it('keeps directories before files when sorting directory entries', async () => {
+    await mkdir(join(root, 'z-folder'));
+    await mkdir(join(root, 'a-folder'));
+    await writeFile(join(root, 'z-file.txt'), 'z', 'utf8');
+    await writeFile(join(root, 'a-file.txt'), 'a', 'utf8');
+
+    const entries = await service.readDir(root, { key: 'name', direction: 'desc' });
+
+    expect(entries.map((entry) => entry.name)).toEqual([
+      'z-folder',
+      'a-folder',
+      'z-file.txt',
+      'a-file.txt',
+    ]);
+  });
+
   it('copies files and directories with Chinese and space paths', async () => {
     const sourceDir = join(root, '源 目录');
     const destDir = join(root, '目标 space');

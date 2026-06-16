@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { FileEntry } from '@explore/shared';
+import type { FileEntry, IpcErrorInfo } from '@explore/shared';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useFileStore, useFilteredEntries } from '../store';
 import { FileRow } from './file-row';
 import { ipc } from '../../../framework/bridge/ipc-client';
 import { useLayoutStore } from '../../../framework/store/layout-store';
 import { pluginManager, showNotification } from '../../../framework/plugin-system';
-import { FolderOpen, FolderPlus, RefreshCw, Trash2, Copy, ArrowRightLeft, Pencil, File, FilePlus, Folder, Clipboard, ClipboardCheck, ExternalLink } from 'lucide-react';
+import { AlertTriangle, ArrowUp, ArrowUpRight, FolderOpen, FolderPlus, RefreshCw, Trash2, Copy, ArrowRightLeft, Pencil, File, FilePlus, Folder, Clipboard, ClipboardCheck, ExternalLink, X } from 'lucide-react';
 import {
   getFileOpToastType,
   resolveCopyConflictStrategy,
@@ -32,6 +32,47 @@ function isSameDirectory(a: string, b: string): boolean {
   return normalizePathForCompare(a) === normalizePathForCompare(b);
 }
 
+function parentPathOf(path: string): string | null {
+  const normalized = path.replace(/[\\/]+$/, '');
+  const idx = Math.max(normalized.lastIndexOf('\\'), normalized.lastIndexOf('/'));
+  if (idx < 0) return null;
+  const parent = normalized.slice(0, idx);
+  const sep = normalized[idx];
+  if (/^[A-Za-z]:$/.test(parent)) return `${parent}${sep}`;
+  if (!parent && normalized.startsWith(sep)) return sep;
+  return parent || null;
+}
+
+function getDirectoryErrorCopy(errorInfo: IpcErrorInfo | null): { title: string; message: string } {
+  switch (errorInfo?.code) {
+    case 'FILE_NOT_FOUND':
+      return {
+        title: '路径不可用',
+        message: '这个位置不存在，可能已被删除、重命名或移动。',
+      };
+    case 'PERMISSION_DENIED':
+      return {
+        title: '没有访问权限',
+        message: '当前用户没有权限打开这个位置。',
+      };
+    case 'PATH_TOO_LONG':
+      return {
+        title: '路径过长',
+        message: '系统无法访问这个过长的路径。',
+      };
+    default:
+      return {
+        title: '目录暂时无法打开',
+        message: '请重试，或选择其他文件夹继续浏览。',
+      };
+  }
+}
+
+function getDirectoryErrorDetails(errorInfo: IpcErrorInfo | null, error: string): string | null {
+  if (errorInfo?.details) return errorInfo.details;
+  return errorInfo ? null : error;
+}
+
 export function FileList({ side }: FileListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const entries = useFilteredEntries(side);
@@ -40,6 +81,7 @@ export function FileList({ side }: FileListProps) {
   const filterText = useFileStore((s) => s[side].filterText);
   const loading = useFileStore((s) => s[side].loading);
   const error = useFileStore((s) => s[side].error);
+  const errorInfo = useFileStore((s) => s[side].errorInfo);
   const dirSizeMap = useFileStore((s) => s.dirSizeMap);
   const setDirSizes = useFileStore((s) => s.setDirSizes);
 
@@ -286,55 +328,56 @@ export function FileList({ side }: FileListProps) {
     closeMenu();
   }, [contextMenu, side, refresh, closeMenu, showPrompt, showAlert]);
 
-  const ctxCopy = useCallback(async () => {
-    if (!contextMenu) return;
-    const paths = contextMenu.single
-      ? [contextMenu.single.path]
-      : [...(useFileStore.getState()[side].selected)];
+  const transferToOtherSide = useCallback(async (
+    mode: 'copy' | 'move',
+    paths: string[],
+  ) => {
     const other = side === 'left' ? 'right' : 'left';
     const dest = useLayoutStore.getState().layout[other].path;
-    if (!dest || paths.length === 0) { closeMenu(); return; }
+    if (!dest || paths.length === 0) return;
     try {
       const conflictStrategy = await chooseConflictStrategy(paths, dest);
-      if (!conflictStrategy) { closeMenu(); return; }
+      if (!conflictStrategy) return;
+      const isCopy = mode === 'copy';
       const result = await runFileOperation(
-        'file:copy',
+        isCopy ? 'file:copy' : 'file:move',
         { sources: paths, destDir: dest, conflictStrategy },
-        '正在复制...',
+        isCopy ? '正在复制...' : '正在移动...',
       );
-      await reportFileOperationResult('Copy', result);
+      await reportFileOperationResult(isCopy ? 'Copy' : 'Move', result);
       refresh(side);
       useFileStore.getState().refresh(other);
     } catch (err: any) {
-      await showAlert(`复制失败：${err.message}`, 'error');
+      await showAlert(`${mode === 'copy' ? '复制' : '移动'}失败：${err.message}`, 'error');
     }
+  }, [side, refresh, chooseConflictStrategy, showAlert, runFileOperation, reportFileOperationResult]);
+
+  const getContextPaths = useCallback(() => {
+    if (!contextMenu) return [];
+    return contextMenu.single
+      ? [contextMenu.single.path]
+      : [...(useFileStore.getState()[side].selected)];
+  }, [contextMenu, side]);
+
+  const transferSelection = useCallback(
+    async (mode: 'copy' | 'move') => {
+      const paths = [...(useFileStore.getState()[side].selected)];
+      await transferToOtherSide(mode, paths);
+    },
+    [side, transferToOtherSide],
+  );
+
+  const ctxCopy = useCallback(async () => {
+    if (!contextMenu) return;
+    await transferToOtherSide('copy', getContextPaths());
     closeMenu();
-  }, [contextMenu, side, refresh, closeMenu, chooseConflictStrategy, showAlert, runFileOperation, reportFileOperationResult]);
+  }, [contextMenu, closeMenu, transferToOtherSide, getContextPaths]);
 
   const ctxMove = useCallback(async () => {
     if (!contextMenu) return;
-    const paths = contextMenu.single
-      ? [contextMenu.single.path]
-      : [...(useFileStore.getState()[side].selected)];
-    const other = side === 'left' ? 'right' : 'left';
-    const dest = useLayoutStore.getState().layout[other].path;
-    if (!dest || paths.length === 0) { closeMenu(); return; }
-    try {
-      const conflictStrategy = await chooseConflictStrategy(paths, dest);
-      if (!conflictStrategy) { closeMenu(); return; }
-      const result = await runFileOperation(
-        'file:move',
-        { sources: paths, destDir: dest, conflictStrategy },
-        '正在移动...',
-      );
-      await reportFileOperationResult('Move', result);
-      refresh(side);
-      useFileStore.getState().refresh(other);
-    } catch (err: any) {
-      await showAlert(`移动失败：${err.message}`, 'error');
-    }
+    await transferToOtherSide('move', getContextPaths());
     closeMenu();
-  }, [contextMenu, side, refresh, closeMenu, chooseConflictStrategy, showAlert, runFileOperation, reportFileOperationResult]);
+  }, [contextMenu, closeMenu, transferToOtherSide, getContextPaths]);
 
   const ctxCopyName = useCallback(() => {
     if (!contextMenu) return;
@@ -356,13 +399,10 @@ export function FileList({ side }: FileListProps) {
 
   const ctxNewFolder = useCallback(async () => {
     const dir = useFileStore.getState()[side].path;
-    console.log('[ctxNewFolder] dir:', dir);
     if (!dir) { closeMenu(); return; }
     const name = await showPrompt('文件夹名称：', '新建文件夹');
-    console.log('[ctxNewFolder] name:', name);
     if (!name) { closeMenu(); return; }
     const result = await ipc.invoke('file:mkdir', { parentPath: dir, name });
-    console.log('[ctxNewFolder] result:', result);
     if (!result.success) { await showAlert(`操作失败：${result.error}`, 'error'); closeMenu(); return; }
     refresh(side);
     refreshPeerIfSameDirectory(dir);
@@ -503,9 +543,13 @@ export function FileList({ side }: FileListProps) {
   // ── Ctrl+O 打开文件夹 ──
 
   const handleOpenFolder = useCallback(async () => {
-    const currentPath = useFileStore.getState()[side].path;
+    const state = useFileStore.getState()[side];
+    const currentPath = state.path;
+    const defaultPath = state.errorInfo?.code === 'FILE_NOT_FOUND' && currentPath
+      ? parentPathOf(state.errorInfo.path ?? currentPath) ?? currentPath
+      : currentPath;
     const result = await ipc.invoke('dialog:openFolder', {
-      defaultPath: currentPath ?? undefined,
+      defaultPath: defaultPath ?? undefined,
     });
     if (result) {
       useFileStore.getState().addTab(side, result);
@@ -513,6 +557,14 @@ export function FileList({ side }: FileListProps) {
       syncToLayout(result);
     }
   }, [side, navigateTo, syncToLayout]);
+
+  const handleNavigateToErrorParent = useCallback(async () => {
+    const state = useFileStore.getState()[side];
+    const errorPath = state.errorInfo?.path ?? state.path;
+    const parent = errorPath ? parentPathOf(errorPath) : null;
+    if (!parent) return;
+    await navigateToPath(parent);
+  }, [side, navigateToPath]);
 
   const getRangeAnchor = useCallback(() => {
     const visiblePaths = new Set(entries.map((entry) => entry.path));
@@ -1013,17 +1065,60 @@ export function FileList({ side }: FileListProps) {
   }
 
   if (error) {
+    const copy = getDirectoryErrorCopy(errorInfo);
+    const errorPath = errorInfo?.path ?? path;
+    const parentPath = errorPath ? parentPathOf(errorPath) : null;
+    const details = getDirectoryErrorDetails(errorInfo, error);
+
     return (
-      <div className="h-full flex items-center justify-center px-6 text-sm">
-        <div className="max-w-[520px] text-center">
-          <div className="text-red-400 font-medium mb-2">目录加载失败</div>
-          <div className="text-text-secondary whitespace-pre-wrap break-words">{error}</div>
-          <button
-            className="mt-4 px-3 py-1.5 bg-accent/20 hover:bg-accent/40 text-text-primary rounded text-xs transition-colors"
-            onClick={() => refresh(side)}
-          >
-            重试
-          </button>
+      <div className="h-full flex items-center justify-center px-6 text-sm text-center">
+        <div className="max-w-[560px]">
+          <div className="mx-auto mb-3 flex h-9 w-9 items-center justify-center rounded bg-red-500/10 text-red-300">
+            <AlertTriangle className="h-5 w-5" />
+          </div>
+          <div className="text-text-primary font-medium mb-1">{copy.title}</div>
+          <div className="text-text-secondary mb-3">{copy.message}</div>
+          {errorPath && (
+            <div
+              className="mx-auto mb-4 max-w-[min(520px,80vw)] select-text break-all rounded border border-border/40 bg-surface-lighter/40 px-2 py-1.5 text-xs text-text-muted"
+              title={errorPath}
+            >
+              {errorPath}
+            </div>
+          )}
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {parentPath && (
+              <button
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-accent/20 hover:bg-accent/40 text-text-primary rounded text-xs transition-colors"
+                onClick={handleNavigateToErrorParent}
+              >
+                <ArrowUp className="w-3.5 h-3.5" />
+                转到上一级
+              </button>
+            )}
+            <button
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface-lighter hover:bg-white/10 text-text-primary rounded text-xs transition-colors"
+              onClick={handleOpenFolder}
+            >
+              <FolderOpen className="w-3.5 h-3.5" />
+              选择文件夹
+            </button>
+            <button
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface-lighter hover:bg-white/10 text-text-primary rounded text-xs transition-colors"
+              onClick={() => refresh(side)}
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              重试
+            </button>
+          </div>
+          {details && (
+            <details className="mt-4 text-left text-xs text-text-muted">
+              <summary className="inline cursor-pointer hover:text-text-secondary">技术细节</summary>
+              <div className="mt-2 max-h-24 overflow-auto whitespace-pre-wrap break-words rounded border border-border/30 bg-surface-lighter/30 px-2 py-1.5">
+                {details}
+              </div>
+            </details>
+          )}
         </div>
       </div>
     );
@@ -1033,7 +1128,9 @@ export function FileList({ side }: FileListProps) {
     return (
       <div className="h-full flex items-center justify-center text-text-muted text-sm">
         <div className="text-center">
-          <div className="text-3xl mb-2">📂</div>
+          <div className="mx-auto mb-3 flex h-9 w-9 items-center justify-center rounded bg-accent/10 text-accent">
+            <FolderOpen className="h-5 w-5" />
+          </div>
           <button
             className="px-3 py-1.5 bg-accent/20 hover:bg-accent/40 text-text-primary rounded text-xs transition-colors"
             onClick={handleOpenFolder}
@@ -1047,63 +1144,94 @@ export function FileList({ side }: FileListProps) {
   }
 
   return (<>
-    <div ref={containerRef} className="h-full overflow-auto" onContextMenu={(e) => {
-      if (e.target === containerRef.current || (e.target as HTMLElement).classList.contains('relative')) {
-        e.preventDefault();
-        setContextMenu({ x: e.clientX, y: e.clientY, count: 0 });
-      }
-    }}>
-      <SortHeader side={side} />
-      {filterText && (
-        <div className="sticky top-7 z-10 px-2 py-0.5 bg-accent/80 text-white text-xs">
-          筛选：“{filterText}”（{entries.length} 项）
-        </div>
-      )}
+    <div className="relative h-full">
+      <div ref={containerRef} className={`h-full overflow-auto ${selected.size > 0 ? 'pb-10' : ''}`} onContextMenu={(e) => {
+        if (e.target === containerRef.current || (e.target as HTMLElement).classList.contains('relative')) {
+          e.preventDefault();
+          setContextMenu({ x: e.clientX, y: e.clientY, count: 0 });
+        }
+      }}>
+        <SortHeader side={side} />
+        {filterText && (
+          <div className="sticky top-7 z-10 px-2 py-0.5 bg-accent/80 text-white text-xs">
+            筛选：“{filterText}”（{entries.length} 项）
+          </div>
+        )}
 
-      <div
-        className="relative"
-        style={{ height: `${virtualizer.getTotalSize()}px` }}
-      >
-        {virtualItems.map((virtualItem) => {
-          const idx = virtualItem.index;
-          const entry = entries[idx];
-          return (
-            <div
-              key={entry.path}
-              data-index={idx}
-              className="absolute top-0 left-0 w-full"
-              style={{
-                height: `${FILE_ROW_HEIGHT}px`,
-                transform: `translate3d(0, ${virtualItem.start}px, 0)`,
-                willChange: 'transform',
-              }}
-            >
-              <FileRow
-                entry={entry}
-                index={idx}
-                isSelected={selected.has(entry.path)}
-                isActive={idx === focusIdx}
-                disableHover={disableHover}
-                highlight={filterText}
-                dirSize={dirSizeMap[entry.path]}
-                onClick={handleRowClick}
-                onDoubleClick={handleRowDoubleClick}
-                onContextMenu={handleRowContextMenu}
-                onDragStart={handleRowDragStart}
-                dragOver={dragOverPath === entry.path}
-                dropFlash={dropFlashPath === entry.path}
-                onDragEnterRow={handleRowDragEnter}
-                onDragLeaveRow={handleRowDragLeave}
-                onDrop={handleRowDrop}
-              />
-            </div>
-          );
-        })}
+        <div
+          className="relative"
+          style={{ height: `${virtualizer.getTotalSize()}px` }}
+        >
+          {virtualItems.map((virtualItem) => {
+            const idx = virtualItem.index;
+            const entry = entries[idx];
+            return (
+              <div
+                key={entry.path}
+                data-index={idx}
+                className="absolute top-0 left-0 w-full"
+                style={{
+                  height: `${FILE_ROW_HEIGHT}px`,
+                  transform: `translate3d(0, ${virtualItem.start}px, 0)`,
+                  willChange: 'transform',
+                }}
+              >
+                <FileRow
+                  entry={entry}
+                  index={idx}
+                  isSelected={selected.has(entry.path)}
+                  isActive={idx === focusIdx}
+                  disableHover={disableHover}
+                  highlight={filterText}
+                  dirSize={dirSizeMap[entry.path]}
+                  onClick={handleRowClick}
+                  onDoubleClick={handleRowDoubleClick}
+                  onContextMenu={handleRowContextMenu}
+                  onDragStart={handleRowDragStart}
+                  dragOver={dragOverPath === entry.path}
+                  dropFlash={dropFlashPath === entry.path}
+                  onDragEnterRow={handleRowDragEnter}
+                  onDragLeaveRow={handleRowDragLeave}
+                  onDrop={handleRowDrop}
+                />
+              </div>
+            );
+          })}
+        </div>
+
+        {entries.length === 0 && !loading && (
+          <div className="text-center text-text-muted mt-8">
+            {filterText ? '未找到匹配' : '空文件夹'}
+          </div>
+        )}
       </div>
 
-      {entries.length === 0 && !loading && (
-        <div className="text-center text-text-muted mt-8">
-          {filterText ? '未找到匹配' : '空文件夹'}
+      {selected.size > 0 && (
+        <div className="absolute bottom-2 left-2 right-2 z-20 flex h-8 items-center gap-2 rounded border border-border/60 bg-surface-light/95 px-2 text-xs shadow-lg">
+          <span className="text-text-primary font-medium">{selected.size} 项已选中</span>
+          <span className="text-text-muted">已准备传输</span>
+          <span className="flex-1" />
+          <button
+            className="inline-flex items-center gap-1 rounded px-2 py-1 text-text-secondary hover:bg-accent/15 hover:text-text-primary transition-colors"
+            onClick={() => transferSelection('copy')}
+          >
+            <Copy className="h-3.5 w-3.5" />
+            复制到另一侧
+          </button>
+          <button
+            className="inline-flex items-center gap-1 rounded px-2 py-1 text-text-secondary hover:bg-accent/15 hover:text-text-primary transition-colors"
+            onClick={() => transferSelection('move')}
+          >
+            <ArrowRightLeft className="h-3.5 w-3.5" />
+            移动到另一侧
+          </button>
+          <button
+            className="inline-flex items-center rounded p-1 text-text-muted hover:bg-white/5 hover:text-text-primary transition-colors"
+            onClick={() => clearSelection(side)}
+            title="清除选择"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
         </div>
       )}
     </div>
@@ -1242,11 +1370,11 @@ export function FileList({ side }: FileListProps) {
           {/* 空白区域 */}
           {contextMenu.count === 0 && (
             <>
-              <MenuBtn onClick={handleOpenFolder}><FolderOpen className="w-3.5 h-3.5" /> 打开文件夹...</MenuBtn>
               <MenuBtn onClick={ctxNewFolder}><FolderPlus className="w-3.5 h-3.5" /> 新建文件夹</MenuBtn>
               <MenuBtn onClick={ctxNewFile}><FilePlus className="w-3.5 h-3.5" /> 新建文件</MenuBtn>
               <MenuSep />
               <MenuBtn onClick={ctxRefresh}><RefreshCw className="w-3.5 h-3.5" /> 刷新</MenuBtn>
+              <MenuBtn onClick={handleOpenFolder}><FolderOpen className="w-3.5 h-3.5" /> 打开文件夹...</MenuBtn>
               <MenuSep />
               <MenuBtn onClick={ctxEmptyFolder}><Trash2 className="w-3.5 h-3.5" /> 清空文件夹</MenuBtn>
             </>
@@ -1259,11 +1387,8 @@ export function FileList({ side }: FileListProps) {
                 {' '}{contextMenu.single.isDirectory ? '打开' : '打开文件'}
               </MenuBtn>
               {contextMenu.single.isDirectory && (
-                <MenuBtn onClick={ctxOpenOther}>↗️ 在另一侧打开</MenuBtn>
+                <MenuBtn onClick={ctxOpenOther}><ArrowUpRight className="w-3.5 h-3.5" /> 在另一侧打开</MenuBtn>
               )}
-              <MenuBtn onClick={ctxShowItemInFolder}>
-                <ExternalLink className="w-3.5 h-3.5" /> 打开所在文件夹
-              </MenuBtn>
               <MenuSep />
               <MenuBtn onClick={ctxCopy}><Copy className="w-3.5 h-3.5" /> 复制到另一侧</MenuBtn>
               <MenuBtn onClick={ctxMove}><ArrowRightLeft className="w-3.5 h-3.5" /> 移动到另一侧</MenuBtn>
@@ -1272,6 +1397,9 @@ export function FileList({ side }: FileListProps) {
               <MenuBtn onClick={ctxDelete}><Trash2 className="w-3.5 h-3.5" /> 删除</MenuBtn>
               <MenuBtn onClick={ctxPermanentDelete}><Trash2 className="w-3.5 h-3.5" /> 永久删除</MenuBtn>
               <MenuSep />
+              <MenuBtn onClick={ctxShowItemInFolder}>
+                <ExternalLink className="w-3.5 h-3.5" /> 打开所在文件夹
+              </MenuBtn>
               <MenuBtn onClick={ctxCopyName}><Clipboard className="w-3.5 h-3.5" /> 复制文件名</MenuBtn>
               <MenuBtn onClick={ctxCopyPath}><ClipboardCheck className="w-3.5 h-3.5" /> 复制路径</MenuBtn>
             </>
