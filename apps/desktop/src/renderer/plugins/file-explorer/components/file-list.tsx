@@ -576,17 +576,24 @@ export function FileList({ side }: FileListProps) {
     return entries[focusIdxRef.current]?.path ?? entries[0]?.path ?? null;
   }, [entries, selected]);
 
-  const selectSingleAtIndex = useCallback(
-    (idx: number) => {
-      const entry = entries[idx];
-      if (!entry) return;
+  const selectSingleEntryAtIndex = useCallback(
+    (entry: FileEntry, idx: number) => {
       suppressSelectionScrollRef.current = true;
       selectSingle(side, entry.path);
       setFocusIdx(idx);
       focusIdxRef.current = idx;
       lastSelectedRef.current = entry.path;
     },
-    [entries, selectSingle, side],
+    [selectSingle, side],
+  );
+
+  const selectSingleAtIndex = useCallback(
+    (idx: number) => {
+      const entry = entries[idx];
+      if (!entry) return;
+      selectSingleEntryAtIndex(entry, idx);
+    },
+    [entries, selectSingleEntryAtIndex],
   );
 
   const selectRangeToIndex = useCallback(
@@ -615,28 +622,30 @@ export function FileList({ side }: FileListProps) {
         focusIdxRef.current = idx;
         lastSelectedRef.current = entry.path;
       } else {
-        selectSingleAtIndex(idx);
+        selectSingleEntryAtIndex(entry, idx);
       }
     },
-    [selectRangeToIndex, selectSingleAtIndex, side, toggleSelect],
+    [selectRangeToIndex, selectSingleEntryAtIndex, side, toggleSelect],
   );
 
   const handleRowDoubleClick = useCallback(
     (entry: FileEntry) => {
       if (entry.isDirectory) {
+        clearSelection(side);
         navigateToPath(entry.path);
       } else {
         openFile(entry);
       }
     },
-    [navigateToPath, openFile],
+    [clearSelection, navigateToPath, openFile, side],
   );
 
   const handleRowContextMenu = useCallback(
     (entry: FileEntry, idx: number, e: React.MouseEvent) => {
       e.preventDefault();
-      const wasSelected = selected.has(entry.path);
-      const nextSelectedCount = wasSelected ? selected.size : 1;
+      const currentSelected = useFileStore.getState()[side].selected;
+      const wasSelected = currentSelected.has(entry.path);
+      const nextSelectedCount = wasSelected ? currentSelected.size : 1;
       if (!wasSelected) {
         suppressSelectionScrollRef.current = true;
         clearSelection(side);
@@ -651,17 +660,18 @@ export function FileList({ side }: FileListProps) {
         count: nextSelectedCount,
       });
     },
-    [clearSelection, selected, side, toggleSelect],
+    [clearSelection, side, toggleSelect],
   );
 
   const handleRowDragStart = useCallback(
     (entry: FileEntry, _idx: number, e: React.DragEvent) => {
-      const paths = selected.has(entry.path)
-        ? [...selected]
+      const currentSelected = useFileStore.getState()[side].selected;
+      const paths = currentSelected.has(entry.path)
+        ? [...currentSelected]
         : [entry.path];
       e.dataTransfer.setData('application/x-explore-files', JSON.stringify(paths));
     },
-    [selected],
+    [side],
   );
 
   const handleRowDragEnter = useCallback((entry: FileEntry) => {
@@ -1021,7 +1031,7 @@ export function FileList({ side }: FileListProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [side, filterText, path, entries, selected, setFilter, clearSelection, selectAll, selectSingle, selectSingleAtIndex, selectRangeToIndex, navigateToPath, navigateTo, refresh, handleOpenFolder, chooseConflictStrategy, showAlert, runFileOperation, deletePaths, reportFileOperationResult, pinTab, unpinTab, repinTab]);
+  }, [side, filterText, path, entries, setFilter, clearSelection, selectAll, selectSingle, selectSingleAtIndex, selectRangeToIndex, navigateToPath, navigateTo, refresh, handleOpenFolder, chooseConflictStrategy, showAlert, runFileOperation, deletePaths, reportFileOperationResult, pinTab, unpinTab, repinTab]);
 
   // 键盘操作后禁 hover，鼠标移动恢复
   useEffect(() => {
@@ -1033,10 +1043,14 @@ export function FileList({ side }: FileListProps) {
 
   // 聚焦项变化时滚动到可视区
   useEffect(() => {
-    if (entries.length > 0 && focusIdx < entries.length) {
+    if (
+      entries.length > 0 &&
+      focusIdx < entries.length &&
+      (focusIdx < firstVisibleIndex || focusIdx > lastVisibleIndex)
+    ) {
       virtualizer.scrollToIndex(focusIdx, { align: 'auto' });
     }
-  }, [focusIdx, entries.length, virtualizer]);
+  }, [focusIdx, entries.length, firstVisibleIndex, lastVisibleIndex, virtualizer]);
 
   // 外部动作选中文件时，同步焦点并滚动到该文件
   useEffect(() => {
