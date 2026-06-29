@@ -296,6 +296,10 @@ export interface IpcEvents {
   };
   'launcher:show': void;
   'launcher:hide': void;
+  'navigation:command': {
+    action: 'back' | 'forward';
+    source: 'app-command';
+  };
   'file:dirSizeUpdate': {
     path: string;
     size: number;

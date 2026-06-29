@@ -105,6 +105,9 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
 
   navigateTo: async (side, path, addToHistory = true) => {
     const panel = get()[side];
+    const isPathChange = panel.path !== path;
+    const shouldAddHistory = addToHistory && isPathChange && Boolean(panel.path);
+    const shouldClearForwardStack = addToHistory && isPathChange;
 
     set((s) => ({
       [side]: {
@@ -119,12 +122,10 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
         tabs: s[side].tabs.map((t) =>
           t.id === s[side].activeTabId ? { ...t, path } : t,
         ),
-        backStack: addToHistory && panel.path
-          ? (s[side].tabs.some((t) => t.pinned)
-              ? s[side].backStack
-              : [...s[side].backStack, panel.path])
+        backStack: shouldAddHistory && panel.path
+          ? [...s[side].backStack, panel.path]
           : s[side].backStack,
-        forwardStack: addToHistory ? [] : panel.forwardStack,
+        forwardStack: shouldClearForwardStack ? [] : s[side].forwardStack,
       },
     }));
 

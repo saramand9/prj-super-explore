@@ -1,4 +1,5 @@
 import { BrowserWindow, screen } from 'electron';
+import type { IpcEvents } from '@explore/shared';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { is } from '@electron-toolkit/utils';
@@ -31,6 +32,21 @@ export class WindowService implements Service {
 
     this.mainWindow.on('ready-to-show', () => {
       this.mainWindow?.show();
+    });
+
+    this.mainWindow.on('app-command', (event, command) => {
+      const action = command === 'browser-backward'
+        ? 'back'
+        : command === 'browser-forward'
+          ? 'forward'
+          : null;
+      if (!action) return;
+
+      event.preventDefault();
+      this.mainWindow?.webContents.send('navigation:command', {
+        action,
+        source: 'app-command',
+      } satisfies IpcEvents['navigation:command']);
     });
 
     if (is.dev) {

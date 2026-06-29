@@ -23,6 +23,7 @@ const DIR_SIZE_VISIBLE_OVERSCAN = 12;
 const DIR_SIZE_INITIAL_ROWS = 36;
 const DIR_SIZE_IDLE_DELAY = 240;
 const FILE_ROW_HEIGHT = 30;
+const SELECTION_ACTION_BAR_DELAY_MS = 280;
 
 function normalizePathForCompare(path: string): string {
   return path.replace(/[\\/]+$/, '').replace(/\//g, '\\').toLowerCase();
@@ -107,6 +108,8 @@ export function FileList({ side }: FileListProps) {
   const [dropFlashPath, setDropFlashPath] = useState<string | null>(null);
   const lastBackspaceRef = useRef<string | null>(null);
   const [disableHover, setDisableHover] = useState(false);
+  const selectionActionsTimerRef = useRef<number | null>(null);
+  const [selectionActionsVisible, setSelectionActionsVisible] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     x: number; y: number;
     single?: FileEntry;
@@ -458,6 +461,31 @@ export function FileList({ side }: FileListProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterText, path]);
 
+  useEffect(() => {
+    if (selectionActionsTimerRef.current !== null) {
+      window.clearTimeout(selectionActionsTimerRef.current);
+      selectionActionsTimerRef.current = null;
+    }
+
+    if (selected.size === 0) {
+      setSelectionActionsVisible(false);
+      return;
+    }
+
+    setSelectionActionsVisible(false);
+    selectionActionsTimerRef.current = window.setTimeout(() => {
+      setSelectionActionsVisible(true);
+      selectionActionsTimerRef.current = null;
+    }, SELECTION_ACTION_BAR_DELAY_MS);
+
+    return () => {
+      if (selectionActionsTimerRef.current !== null) {
+        window.clearTimeout(selectionActionsTimerRef.current);
+        selectionActionsTimerRef.current = null;
+      }
+    };
+  }, [selected, path]);
+
   const getScrollElement = useCallback(() => containerRef.current, []);
   const estimateRowSize = useCallback(() => FILE_ROW_HEIGHT, []);
   const getVirtualItemKey = useCallback((index: number) => entries[index]?.path ?? index, [entries]);
@@ -630,6 +658,12 @@ export function FileList({ side }: FileListProps) {
 
   const handleRowDoubleClick = useCallback(
     (entry: FileEntry) => {
+      if (selectionActionsTimerRef.current !== null) {
+        window.clearTimeout(selectionActionsTimerRef.current);
+        selectionActionsTimerRef.current = null;
+      }
+      setSelectionActionsVisible(false);
+
       if (entry.isDirectory) {
         clearSelection(side);
         navigateToPath(entry.path);
@@ -1159,7 +1193,7 @@ export function FileList({ side }: FileListProps) {
 
   return (<>
     <div className="relative h-full">
-      <div ref={containerRef} className={`h-full overflow-auto ${selected.size > 0 ? 'pb-10' : ''}`} onContextMenu={(e) => {
+      <div ref={containerRef} className={`h-full overflow-auto ${selected.size > 0 && selectionActionsVisible ? 'pb-10' : ''}`} onContextMenu={(e) => {
         if (e.target === containerRef.current || (e.target as HTMLElement).classList.contains('relative')) {
           e.preventDefault();
           setContextMenu({ x: e.clientX, y: e.clientY, count: 0 });
@@ -1220,7 +1254,7 @@ export function FileList({ side }: FileListProps) {
         )}
       </div>
 
-      {selected.size > 0 && (
+      {selected.size > 0 && selectionActionsVisible && (
         <div className="absolute bottom-2 left-2 right-2 z-20 flex h-8 items-center gap-2 rounded border border-border/60 bg-surface-light/95 px-2 text-xs shadow-lg">
           <span className="text-text-primary font-medium">{selected.size} 项已选中</span>
           <span className="text-text-muted">已准备传输</span>
