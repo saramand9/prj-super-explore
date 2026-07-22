@@ -1,4 +1,5 @@
 import type { FileEntry } from '@explore/shared';
+import { pinyin } from 'pinyin-pro';
 
 interface TrieNode {
   children: Map<string, TrieNode>;
@@ -20,6 +21,9 @@ export class FileSearchIndex {
   // 条目存储（用数字 ID 去重）
   private entryStore: FileEntry[] = [];
   private entryIdMap = new Map<string, number>(); // path → id
+
+  // Cached phonetic variants used by trigram and substring searches.
+  private pinyinData = new Map<number, { full: string; initials: string }>();
 
   private _ready = false;
 
@@ -54,20 +58,16 @@ export class FileSearchIndex {
 
       // 拼音扩展
       if (/[一-鿿]/.test(name)) {
-        try {
-          const { pinyin } = require('pinyin-pro');
-          const py = pinyin(name).toLowerCase().replace(/\s+/g, '');
-          keys.push(py); // 全拼
-          keys.push(py.replace(/[^a-z]/g, '')); // 纯字母
-          const initials = pinyin(name)
-            .split(/\s+/)
-            .map((s: string) => s[0])
-            .join('')
-            .toLowerCase();
-          keys.push(initials); // 首字母
-        } catch {
-          /* ignore */
-        }
+        const full = pinyin(name, { toneType: 'none' }).toLowerCase().replace(/\s+/g, '');
+        const lettersOnly = full.replace(/[^a-z]/g, '');
+        const initials = pinyin(name, { pattern: 'first', toneType: 'none' })
+          .toLowerCase()
+          .replace(/\s+/g, '');
+
+        keys.push(full); // 全拼
+        keys.push(lettersOnly); // 纯字母
+        keys.push(initials); // 首字母
+        this.pinyinData.set(i, { full, initials });
       }
 
       // 插入 Prefix Trie
@@ -75,8 +75,13 @@ export class FileSearchIndex {
         this.insertTrie(key, i);
       }
 
-      // 插入 Trigram Index（只用原始名，不重复处理拼音变体）
+      // 插入 Trigram Index（原始名 + 拼音变体）
       this.insertTrigrams(name, i);
+      const phonetic = this.pinyinData.get(i);
+      if (phonetic) {
+        this.insertTrigrams(phonetic.full, i);
+        this.insertTrigrams(phonetic.initials, i);
+      }
     }
 
     this._ready = true;
@@ -108,6 +113,7 @@ export class FileSearchIndex {
     this.trigramIndex.clear();
     this.entryStore = [];
     this.entryIdMap.clear();
+    this.pinyinData.clear();
     this._ready = false;
   }
 
@@ -189,13 +195,14 @@ export class FileSearchIndex {
     const trigrams = this.makeNgrams(query, 3);
 
     // 查每个 trigram 的倒排列表
-    const postings = trigrams
-      .map((tri) => this.trigramIndex.get(tri))
-      .filter(Boolean) as Set<number>[];
-
-    if (postings.length === 0) {
-      // 无精确 trigram 匹配，回退到全量子串匹配
-      return this.fallbackSubstring(query, max);
+    const postings: Set<number>[] = [];
+    for (const tri of trigrams) {
+      const posting = this.trigramIndex.get(tri);
+      if (!posting) {
+        // 任一片段缺失都不可能是完整子串，转入拼音回退检查。
+        return this.fallbackSubstring(query, max);
+      }
+      postings.push(posting);
     }
 
     // 取交集
@@ -212,9 +219,16 @@ export class FileSearchIndex {
     // 按 trigram 命中数量排序（重叠度越高越相关）
     const scored = [...intersection].map((id) => {
       const name = this.entryStore[id].name.toLowerCase();
+      const phonetic = this.pinyinData.get(id);
       let overlap = 0;
       for (const tri of trigrams) {
         if (name.includes(tri)) overlap++;
+        else if (
+          phonetic &&
+          (phonetic.full.includes(tri) || phonetic.initials.includes(tri))
+        ) {
+          overlap++;
+        }
       }
       return { id, overlap };
     });
@@ -243,13 +257,25 @@ export class FileSearchIndex {
     return result;
   }
 
-  /** 回退：全量子串匹配 */
+  /** 回退：全量子串匹配（含拼音） */
   private fallbackSubstring(query: string, max: number): FileEntry[] {
     const result: FileEntry[] = [];
     const lower = query;
-    for (const entry of this.entryStore) {
+    const isAsciiQuery = /^[a-z0-9]+$/.test(lower);
+
+    for (let id = 0; id < this.entryStore.length; id++) {
       if (result.length >= max) break;
+      const entry = this.entryStore[id];
       if (entry.name.toLowerCase().includes(lower)) {
+        result.push(entry);
+        continue;
+      }
+
+      const phonetic = isAsciiQuery ? this.pinyinData.get(id) : undefined;
+      if (
+        phonetic &&
+        (phonetic.full.includes(lower) || phonetic.initials.includes(lower))
+      ) {
         result.push(entry);
       }
     }
