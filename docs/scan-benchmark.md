@@ -1,25 +1,48 @@
-# 目录扫描与文件名索引基准
+# Directory scanning and filename-index benchmark
 
-运行：`pnpm benchmark:scan`。
+Run `pnpm benchmark:scan` explicitly. The benchmark creates real temporary
+10,000- and 100,000-file fixtures, with 1,000 empty files per directory and
+Chinese names for 10% of files. It cleans up fixtures after each run and performs
+substantial disk writes.
 
-脚本在系统临时目录创建真实文件，分别测试 1 万、10 万文件。每个子目录包含 1000 个空文件，其中 10% 使用中文名。每轮结束后清理生成目录。此命令独立于日常单元测试，运行会产生较多磁盘写入。
+## Recorded results
 
-记录于 2026-09-22：Windows x64，Intel Core i5-14400，Node.js 24.19.0。
+These are the existing measurements recorded on September 22, 2026, not a new
+benchmark run: Windows x64, Intel Core i5-14400, Node.js 24.19.0.
 
-| 指标 | 1 万文件 | 10 万文件 |
+| Measurement | 10,000 files | 100,000 files |
 | --- | ---: | ---: |
-| 扫描项数（含子目录） | 10,010 | 100,100 |
-| 首批数据到达 | 7 ms | 6 ms |
-| 遍历并增量建索引 | 291 ms | 3,252 ms |
-| 单批建索引最大耗时 | 5.10 ms | 8.75 ms |
-| 五种查询中的最大耗时 | 0.43 ms | 0.23 ms |
-| 首批回调中取消到遍历返回 | 0.65 ms | 0.29 ms |
-| 测量时 Node 堆占用 | 69 MiB | 346 MiB |
+| Entries including subdirectories | 10,010 | 100,100 |
+| First batch received | 7 ms | 6 ms |
+| Traversal and incremental indexing | 291 ms | 3,252 ms |
+| Maximum single-batch indexing time | 5.10 ms | 8.75 ms |
+| Maximum of five query times | 0.43 ms | 0.23 ms |
+| Cancellation to traversal return after first batch | 0.65 ms | 0.29 ms |
+| Node heap used during measurement | 69 MiB | 346 MiB |
 
-查询涵盖普通前缀、拼音首字母、中文名、特定文件名和通配符，每次最多返回 50 项。基准同时校验扫描总数、索引总数、查询命中和取消状态。实现从最小的倒排集合查找，只保留所需的最佳匹配，避免宽泛查询复制、排序全部候选。
+Queries cover ordinary prefixes, pinyin initials, Chinese names, exact filenames
+and wildcards, returning at most 50 entries. The benchmark also checks scan and
+index counts, query hits and cancellation. The engine starts with the smallest
+posting set and retains only the best requested matches instead of copying and
+sorting all candidates.
 
-这里测量的是引擎：扫描回调同步追加索引；正式界面通过 IPC 把批次发送给独立 Worker，逐批确认。数据不包含 IPC、Worker 启动、界面渲染与窗口操作的耗时。文件刚创建，属于本机热缓存结果；表中为一次运行值，不能当作冷盘、网络盘或任意硬件的性能承诺。
+## Interpretation and limits
 
-堆占用来自整个 Vitest 进程的 `heapUsed`，未强制垃圾回收，包含运行器和可能尚未回收的对象，并非应用整体内存或索引单独的保留大小。10 万项仍有明显内存成本；当前扫描上限为 20 万项，更大范围应缩小目录。
+This measures the engine: scan callbacks synchronously append to the index.
+The production interface sends batches over IPC to a separate worker with
+batch acknowledgements. These measurements exclude IPC, worker startup,
+rendering and window operations.
 
-取消在批次和文件访问之间检查。若底层文件系统调用已经阻塞，无法据此推断断开网络盘的取消延迟。真实界面的扫描中查询、停止保留结果、重新扫描由 Electron 端到端测试另行覆盖；循环 junction、无法读取的子目录和扫描上限由单元测试覆盖。
+Files were newly created and in a warm local cache. Each value is from one
+recorded run, not a cold-disk, network-share or arbitrary-hardware guarantee.
+
+Heap usage is the entire Vitest process's `heapUsed`, without forced garbage
+collection. It includes the runner and potentially uncollected objects, not just
+the retained index or total application memory. The 100,000-entry case has a
+material memory cost; the application caps scans at 200,000 entries.
+
+Cancellation is checked between batches and file operations. A blocked
+filesystem call means these results cannot establish cancellation latency on a
+disconnected share. Electron end-to-end tests separately cover querying while
+scanning, stopping without losing results and rescanning. Unit tests cover
+junction loops, unreadable child directories and scan limits.

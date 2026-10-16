@@ -1,0 +1,47 @@
+name: Bug report
+description: Report a reproducible problem using sample files.
+title: "bug: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not report security vulnerabilities here. Read SECURITY.md first.
+        Remove credentials, personal paths and real user files from attachments.
+  - type: input
+    id: version
+    attributes:
+      label: Explore version or commit
+      placeholder: "1.0.1 or a commit ID"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Windows version and installation method
+      placeholder: "Windows 11 x64, installer or development build"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Use a small, disposable sample directory.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostics or screenshots
+      description: Review all paths and logs before attaching them.

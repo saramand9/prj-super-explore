@@ -1,86 +1,173 @@
 # Explore
 
-面向 Windows 的本地文件管理器，支持双栏浏览、标签页与工作空间、拼音文件检索、全文搜索和文件预览。
+A Windows file manager for finding, previewing and organizing files without
+losing your place.
 
-## 开发与验证
+[Download for Windows](https://dl.10yyds.cloud/explore/releases/1.0.1/windows-x64/Explore-Setup-1.0.1-windows-x64.exe)
+ | [Getting started](#getting-started)
+ | [Contributing](CONTRIBUTING.md)
+ | [Security](SECURITY.md)
 
-使用 Windows、Node.js 22 或更新版本，以及 `pnpm 10.31.0`。项目使用 `pnpm-lock.yaml` 锁定依赖。
+![Explore showing the same sample directory in two independent panes](docs/assets/dual-pane.webp)
+
+*Real application screenshot using synthetic files in a dedicated demo directory.
+The current interface is primarily Chinese; this README and contributor-facing
+guides are in English.*
+
+> Public launch is in preparation. A project license has not yet been approved.
+> Visibility alone is not a license grant. See [License](#license) and the
+> [maintainer readiness review](docs/maintainers/open-source-readiness.md).
+
+## Why Explore?
+
+- **Keep a workspace for each project.** Restore folders and tabs in both panes
+  when switching tasks.
+- **Find Chinese filenames with pinyin.** Search by full pinyin, initials or mixed
+  input within a directory and its subdirectories.
+- **Organize side by side.** Open the same directory in two independent panes,
+  then keep one as your source while navigating to a destination in the other.
+- **Inspect without switching applications.** Preview code, Markdown, CSV and
+  logs, and navigate literal full-text search results.
+- **Work with tabs and shortcuts.** Pin, clone, rename and search tabs; copy or
+  move selected files to the opposite pane.
+- **Make the interface comfortable.** Choose among ten desktop themes and adjust
+  text scale and pane layout.
+
+Explore is a local file manager, not a backup service. External plugins are
+trusted local code, not sandboxed extensions.
+
+## Download
+
+The current Windows x64 installer is **1.0.1**, released **October 16, 2026**.
+
+- [Windows installer, 81.6 MiB](https://dl.10yyds.cloud/explore/releases/1.0.1/windows-x64/Explore-Setup-1.0.1-windows-x64.exe)
+- [SHA-256 checksum file](https://dl.10yyds.cloud/explore/releases/1.0.1/windows-x64/Explore-Setup-1.0.1-windows-x64.exe.sha256)
+
+Expected SHA-256:
+
+```text
+18b358ecbe9e52d14b54258b67caef345e04e441782d78a6c5df66def8258e49
+```
+
+Verify a downloaded installer in PowerShell:
 
 ```powershell
+Get-FileHash -Algorithm SHA256 .\Explore-Setup-1.0.1-windows-x64.exe
+```
+
+Installers are currently unsigned. A checksum is useful for integrity checking
+but is not an independent publisher signature. The prebuilt installer predates
+this documentation/history preparation; rebuilding this branch is a separate
+development workflow, not a claim that a new binary has been released.
+
+### System requirements
+
+- Windows 10 or later, x64.
+- 4 GB RAM recommended.
+- Approximately 500 MB of available disk space.
+
+Node.js and pnpm are needed to build from source, not to use the installer.
+macOS and Linux releases are not currently validated or distributed.
+
+## Getting started
+
+1. Install and launch Explore.
+2. Open a directory in each pane, or open the same directory in both panes to
+   organize its contents independently.
+3. Create a named workspace to keep that task's folders and tabs together.
+4. Use filename search to locate a file, or full-text search to inspect contents.
+5. Preview a result, then copy or move it only after checking the destination.
+
+Useful shortcuts:
+
+- `Ctrl+O`: open a folder.
+- `Ctrl+T`: create a tab.
+- `Ctrl+P`: search tabs.
+- `Ctrl+Shift+W`: search and switch workspaces.
+- `Ctrl+W`: close the current preview or tab.
+- `Ctrl+F`: open search for the current context.
+- `Ctrl+Shift+F`: open full-text search.
+- `F5` / `F6`: copy / move selected files to the opposite pane's folder.
+
+Internal dragging copies by default. Hold Shift to move; Ctrl explicitly keeps
+copy behavior. Full-text search is literal, not a regular-expression interface.
+Read [data, recovery and operational limits](docs/data-and-safety.md) before
+testing with important files.
+
+## Build from source
+
+Requirements: Windows x64, Node.js 22 or later and **pnpm 10.31.0**.
+
+```powershell
+git clone https://github.com/saramand9/prj-super-explore.git
+cd prj-super-explore
 pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-提交前运行：
+The repository is private until the maintainer completes the public-launch
+checklist, so cloning currently requires repository access.
 
 ```powershell
 pnpm typecheck
 pnpm test:unit
 pnpm test:e2e
+pnpm test:commit-policy
+pnpm check:commits
+pnpm build
 ```
 
-端到端测试会先构建应用，再启动 Electron；每次使用独立的临时配置与文件目录，结束后清理。测试覆盖文件导航、工作空间切换、搜索与预览，以及重命名冲突、立即关闭保存、配置损坏恢复、保存超时、扫描取消、面板恢复和重复启动。
-
-大目录基准单独运行，会在系统临时目录创建并清理 1 万、10 万个真实文件：
+For a packaged application or installer:
 
 ```powershell
-pnpm benchmark:scan
-```
-
-测量方法与记录见 [扫描性能基准](docs/scan-benchmark.md)。
-
-## 打包
-
-```powershell
-# 生成 Windows x64 应用目录，便于检查
 pnpm pack:dir
-
-# 生成 Windows x64 NSIS 安装程序
 pnpm pack:win
-
-# 打包后启动实际应用，验证搜索与关闭保存
 pnpm test:package
 ```
 
-产物位于 `apps/desktop/dist-electron/`。打包前后都会检查并运行随包附带的 ripgrep，避免开发机 PATH 中的搜索工具掩盖依赖缺失。
+Artifacts are written to `apps/desktop/dist-electron/`. The CI workflow runs
+Windows checks but does not automatically publish installers.
+See [development and packaging](docs/development.md) for isolated tests,
+ripgrep verification and troubleshooting.
 
-当前运行依赖不包含需要编译的 Node 原生扩展，因此打包禁用了 `npmRebuild`。将来引入 `.node` 扩展时，需要重新启用并验证对应的 Electron ABI。
+## Project structure
 
-首次安装依赖需要下载 Electron 和 ripgrep。如果搜索组件下载失败，修复网络后执行：
-
-```powershell
-pnpm --filter @explore/desktop rebuild @lvce-editor/ripgrep
-pnpm verify:search
+```text
+apps/desktop/       Electron main process, preload, React UI and tests
+packages/shared/    Shared IPC, configuration and plugin types
+docs/               User, developer and maintainer documentation
+scripts/            Repository checks and benchmark utilities
 ```
 
-`.github/workflows/windows-checks.yml` 配置了 Windows 下的类型检查、单元测试、端到端测试和打包后启动验证。它不会发布安装包。打包测试使用独立的 `--user-data-dir` 配置目录，并从 PATH 中排除开发工具，验证随包搜索是否可用。
+## Documentation
 
-## 设置与恢复
+- [Development and validation](docs/development.md)
+- [Local data, recovery and operational limits](docs/data-and-safety.md)
+- [Scan benchmark methodology](docs/scan-benchmark.md)
+- [Contributing and commit conventions](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
+- [Community code of conduct](CODE_OF_CONDUCT.md)
+- [Third-party notices and asset provenance](THIRD_PARTY_NOTICES.md)
 
-主题、字号和单双栏布局会自动保存。工作空间在浏览和修改标签后自动保存，正常关闭窗口时会等待最后一次保存完成。
+## Contributing and support
 
-配置保存在 Electron 的用户数据目录下的 `config/` 中；安装版 Windows 通常位于 `%APPDATA%/Explore/config/`。其中 `spaces.json` 存储工作空间，`config.json` 存储设置，`backups/` 保留最近的工作空间备份。
+Use the issue templates for reproducible bugs and focused feature proposals.
+Provide synthetic reproduction files and review logs/screenshots for private
+paths before sharing them. Do not report vulnerabilities publicly; follow
+[SECURITY.md](SECURITY.md).
 
-如果工作空间加载失败，界面会显示错误并暂停自动保存，避免用空白工作空间覆盖原文件。修复文件或磁盘访问问题后，可以点击“重试”。保存失败时关闭窗口，会提示返回重试或不保存退出。
+Commit subjects and bodies use English
+[Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local checks, the optional commit hook,
+pull request expectations and the license approval gate.
 
-关闭时超过 8 秒仍未完成保存，会提供“返回窗口”“重新等待保存”“不保存并退出”。返回后，迟到的保存响应不会再次关闭窗口。正常的保存失败确认框会等待用户决定。
+## License
 
-发生面板渲染错误时，可以重新加载该区域或复制诊断信息；界面进程崩溃或加载失败时，会提示重新加载。帮助菜单也提供“复制诊断信息”和“打开日志目录”。日志仅写入本机用户数据目录的 `logs/`，每个日志文件最多约 1 MiB，保留当前文件和一份轮转备份。诊断信息可能包含文件路径和错误堆栈，分享前可自行查看。
+**License selection is pending maintainer approval.** No MIT, Apache-2.0 or
+other project-wide license is implied by this README. Before public launch,
+the maintainer must add the chosen license, confirm contributor/employer rights,
+and resolve the provenance of bundled visual assets.
 
-同一个用户数据目录只允许一个应用实例写入配置；重复启动会恢复并聚焦现有窗口。
-
-## 扫描与文件操作边界
-
-`Ctrl+F` 文件名搜索会显示扫描进度，分批建立索引；尚未扫描完也可搜索已索引内容。索引构建和查询在 Worker 中执行。可以停止扫描并保留当前结果，或点击“重新扫描”。单次最多扫描 20 万项，达到上限会提示缩小目录范围；默认排除隐藏目录、`node_modules` 和系统回收站等目录。
-
-全文搜索也会逐步展示结果，停止后保留已有匹配。部分文件无法读取时，会保留可读文件的结果并显示提示详情。缺少原生搜索组件时仍提供基础搜索，并提示忽略规则可能不同。
-
-递归扫描与目录大小统计不跟随子目录中的符号链接和 Windows junction，避免循环和重复统计；复制目录会保留链接。跨卷移动完成复制后才删除源文件，复制失败或取消时保留源文件。失败的复制可能留下目标端的部分内容，可根据操作结果检查后处理。
-
-取消会阻止后续遍历，但无法强制中断操作系统已经阻塞的磁盘或网络盘调用。
-
-## 发布验证
-
-自动化检查之外，正式分发前仍需在干净的 Windows 环境验证安装、升级、卸载、无开发工具时的全文搜索，以及只读目录、断开的网络盘和大目录浏览。当前打包流程不包含代码签名或自动更新发布。
-
-外部插件可以通过应用接口访问本地文件，目前应仅加载可信插件；第三方插件的权限隔离需要单独设计。
+Third-party packages and bundled components retain their own licenses. See
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). This notice is not a substitute
+for the upstream license texts required for binary redistribution.
