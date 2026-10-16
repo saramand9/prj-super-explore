@@ -4,11 +4,15 @@ import { walkDirectory } from './directory-walker';
 export class ScanService {
   private jobs = new Map<string, AbortController>();
 
-  async scan(id: string, path: string, options: {
-    maxDepth?: number;
-    excludePatterns?: string[];
-    onBatch: (entries: FileEntry[], summary: ScanSummary) => void;
-  }): Promise<ScanSummary> {
+  async scan(
+    id: string,
+    path: string,
+    options: {
+      maxDepth?: number;
+      excludePatterns?: string[];
+      onBatch: (entries: FileEntry[], summary: ScanSummary) => void;
+    },
+  ): Promise<ScanSummary> {
     this.cancel(id);
     const controller = new AbortController();
     this.jobs.set(id, controller);
@@ -19,7 +23,9 @@ export class ScanService {
     }
   }
 
-  cancel(id: string): void { this.jobs.get(id)?.abort(); }
+  cancel(id: string): void {
+    this.jobs.get(id)?.abort();
+  }
 
   cancelOwner(owner: number): void {
     for (const [id, controller] of this.jobs) if (id.startsWith(`${owner}:`)) controller.abort();

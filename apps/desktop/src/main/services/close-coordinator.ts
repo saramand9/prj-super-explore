@@ -13,7 +13,10 @@ export class CloseCoordinator {
   private requestId = 0;
   private timer?: ReturnType<typeof setTimeout>;
 
-  constructor(private actions: CloseActions, private timeoutMs = 8000) {}
+  constructor(
+    private actions: CloseActions,
+    private timeoutMs = 8000,
+  ) {}
 
   begin(): void {
     if (this.waiting || this.prompting) return;
@@ -31,7 +34,10 @@ export class CloseCoordinator {
     if (!this.waiting || id !== this.requestId) return;
     clearTimeout(this.timer);
     this.waiting = false;
-    if (allow) { this.confirmed = true; this.actions.close(); }
+    if (allow) {
+      this.confirmed = true;
+      this.actions.close();
+    }
   }
 
   reset(): void {
@@ -51,6 +57,9 @@ export class CloseCoordinator {
     if (id !== this.requestId) return;
     this.prompting = false;
     if (choice === 'retry') this.begin();
-    else if (choice === 'discard') { this.confirmed = true; this.actions.close(); }
+    else if (choice === 'discard') {
+      this.confirmed = true;
+      this.actions.close();
+    }
   }
 }

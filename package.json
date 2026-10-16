@@ -1,7 +1,7 @@
 {
   "name": "explore",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "license": "MIT",
   "description": "A Windows file manager with dual-pane browsing, workspaces, pinyin search and previews.",
   "repository": {
@@ -17,7 +17,8 @@
     "dev": "pnpm --filter @explore/desktop dev",
     "build": "pnpm --filter @explore/desktop build",
     "preview": "pnpm --filter @explore/desktop preview",
-    "lint": "biome check .",
+    "lint": "biome lint .",
+    "format:check": "biome format .",
     "format": "biome format --write .",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm --filter @explore/desktop test",
@@ -28,9 +29,10 @@
     "verify:search": "pnpm --filter @explore/desktop verify:search",
     "check:commits": "node scripts/check-commit-messages.mjs --ref HEAD",
     "test:commit-policy": "node --test scripts/tests/check-commit-messages.test.mjs",
+    "test:release": "node --test scripts/tests/verify-release.test.mjs",
     "hooks:install": "git config --local core.hooksPath .githooks",
     "pack:dir": "pnpm --filter @explore/desktop pack:dir",
-    "pack:win": "pnpm --filter @explore/desktop pack"
+    "pack:win": "pnpm --filter @explore/desktop run pack"
   },
   "engines": {
     "node": ">=22.0.0",
@@ -44,6 +46,7 @@
     ]
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.15",
     "typescript": "^5.9.3"
   }
 }

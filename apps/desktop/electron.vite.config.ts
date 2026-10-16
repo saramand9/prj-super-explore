@@ -4,7 +4,7 @@ import { resolve } from 'path';
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin({ exclude: ['@explore/shared'] })],
     resolve: {
       alias: {
         '@explore/shared': resolve('../../packages/shared/src'),
@@ -12,12 +12,12 @@ export default defineConfig({
     },
     build: {
       rollupOptions: {
-        external: ['@explore/shared'],
+        external: [],
       },
     },
   },
   preload: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin({ exclude: ['@explore/shared'] })],
     resolve: {
       alias: {
         '@explore/shared': resolve('../../packages/shared/src'),
@@ -25,7 +25,8 @@ export default defineConfig({
     },
     build: {
       rollupOptions: {
-        external: ['@explore/shared'],
+        external: [],
+        output: { format: 'cjs', entryFileNames: 'index.cjs' },
       },
     },
   },
@@ -36,7 +37,17 @@ export default defineConfig({
         '@explore/shared': resolve('../../packages/shared/src'),
       },
     },
-    plugins: [react()],
+    plugins: [
+      react(),
+      {
+        name: 'development-csp',
+        apply: 'serve',
+        transformIndexHtml: (html) =>
+          html
+            .replace("script-src 'self' blob:", "script-src 'self' blob: 'unsafe-inline'")
+            .replace("connect-src 'none'", "connect-src 'self' ws://localhost:* ws://127.0.0.1:*"),
+      },
+    ],
     css: {
       postcss: resolve('postcss.config.js'),
     },

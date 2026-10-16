@@ -92,11 +92,7 @@ function defaultPanel(): PanelFileState {
   };
 }
 
-async function loadDir(
-  path: string,
-  sort: SortConfig,
-  showHidden: boolean,
-): Promise<FileEntry[]> {
+async function loadDir(path: string, sort: SortConfig, showHidden: boolean): Promise<FileEntry[]> {
   return ipc.invoke('file:readDir', { path, sort, showHidden });
 }
 
@@ -123,12 +119,8 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
         filterText: '',
         selected: new Set(),
         // 同步当前活跃标签的路径（只改 path，不改 label）
-        tabs: s[side].tabs.map((t) =>
-          t.id === s[side].activeTabId ? { ...t, path } : t,
-        ),
-        backStack: shouldAddHistory && panel.path
-          ? [...s[side].backStack, panel.path]
-          : s[side].backStack,
+        tabs: s[side].tabs.map((t) => (t.id === s[side].activeTabId ? { ...t, path } : t)),
+        backStack: shouldAddHistory && panel.path ? [...s[side].backStack, panel.path] : s[side].backStack,
         forwardStack: shouldClearForwardStack ? [] : s[side].forwardStack,
       },
     }));
@@ -210,8 +202,7 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
     }));
   },
 
-  setFilter: (side, text) =>
-    set((s) => ({ [side]: { ...s[side], filterText: text } })),
+  setFilter: (side, text) => set((s) => ({ [side]: { ...s[side], filterText: text } })),
 
   toggleSelect: (side, path) =>
     set((s) => {
@@ -235,24 +226,20 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
       return { [side]: { ...panel, selected } };
     }),
 
-  clearSelection: (side) =>
-    set((s) => ({ [side]: { ...s[side], selected: new Set() } })),
+  clearSelection: (side) => set((s) => ({ [side]: { ...s[side], selected: new Set() } })),
 
-  selectSingle: (side, path) =>
-    set((s) => ({ [side]: { ...s[side], selected: new Set([path]) } })),
+  selectSingle: (side, path) => set((s) => ({ [side]: { ...s[side], selected: new Set([path]) } })),
 
   selectAll: (side) =>
     set((s) => ({
       [side]: { ...s[side], selected: new Set(s[side].entries.map((e) => e.path)) },
     })),
 
-  setDirSizes: (sizes) =>
-    set((s) => ({ dirSizeMap: { ...s.dirSizeMap, ...sizes } })),
+  setDirSizes: (sizes) => set((s) => ({ dirSizeMap: { ...s.dirSizeMap, ...sizes } })),
 
   setSort: (side, key) => {
     const panel = get()[side];
-    const direction =
-      panel.sort.key === key && panel.sort.direction === 'asc' ? 'desc' : 'asc';
+    const direction = panel.sort.key === key && panel.sort.direction === 'asc' ? 'desc' : 'asc';
     set((s) => ({ [side]: { ...s[side], sort: { key, direction } } }));
     get().refresh(side);
   },
@@ -265,12 +252,22 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
   pinTab: (side, tabId) =>
     set((s) => {
       const currentPath = s[side].path;
-      const label = currentPath ? tabLabel(currentPath) : s[side].tabs.find((t) => t.id === tabId)?.label ?? '';
+      const label = currentPath
+        ? tabLabel(currentPath)
+        : (s[side].tabs.find((t) => t.id === tabId)?.label ?? '');
       return {
         [side]: {
           ...s[side],
           tabs: s[side].tabs.map((t) =>
-            t.id === tabId ? { ...t, pinned: true, path: currentPath ?? t.path, label, initialPath: currentPath ?? t.initialPath } : t,
+            t.id === tabId
+              ? {
+                  ...t,
+                  pinned: true,
+                  path: currentPath ?? t.path,
+                  label,
+                  initialPath: currentPath ?? t.initialPath,
+                }
+              : t,
           ),
           backStack: currentPath ? [currentPath] : s[side].backStack,
           forwardStack: [],
@@ -350,7 +347,13 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
     set((s) => {
       const tab = s[side].tabs.find((t) => t.id === tabId);
       if (!tab) return {};
-      const newTab: Tab = { id: nextTabId(), path: tab.path, label: tab.label, pinned: false, initialPath: tab.initialPath };
+      const newTab: Tab = {
+        id: nextTabId(),
+        path: tab.path,
+        label: tab.label,
+        pinned: false,
+        initialPath: tab.initialPath,
+      };
       return {
         [side]: {
           ...s[side],
@@ -392,8 +395,20 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
   loadPinnedTabs: async () => {
     try {
       const data = await ipc.invoke('tabs:load', undefined);
-      const pinnedLeft = data.left.map((t, i) => ({ id: `pinned-left-${i}`, path: t.path, label: t.label, pinned: true as const, initialPath: t.initialPath }));
-      const pinnedRight = data.right.map((t, i) => ({ id: `pinned-right-${i}`, path: t.path, label: t.label, pinned: true as const, initialPath: t.initialPath }));
+      const pinnedLeft = data.left.map((t, i) => ({
+        id: `pinned-left-${i}`,
+        path: t.path,
+        label: t.label,
+        pinned: true as const,
+        initialPath: t.initialPath,
+      }));
+      const pinnedRight = data.right.map((t, i) => ({
+        id: `pinned-right-${i}`,
+        path: t.path,
+        label: t.label,
+        pinned: true as const,
+        initialPath: t.initialPath,
+      }));
       set((s) => ({
         left: {
           ...s.left,
@@ -469,7 +484,9 @@ export function useFilteredEntries(side: 'left' | 'right') {
       if (!/[一-鿿]/.test(e.name)) return false;
       const full = pinyin(e.name, { toneType: 'none' }).replace(/\s+/g, '').toLowerCase();
       if (full.includes(lower)) return true;
-      const initials = pinyin(e.name, { pattern: 'first', toneType: 'none' }).replace(/\s+/g, '').toLowerCase();
+      const initials = pinyin(e.name, { pattern: 'first', toneType: 'none' })
+        .replace(/\s+/g, '')
+        .toLowerCase();
       if (initials.includes(lower)) return true;
       const words = pinyin(e.name, { toneType: 'none', type: 'array' }).map((w: string) => w.toLowerCase());
       return matchPinyinMixed(lower, words);
@@ -484,10 +501,7 @@ export interface TabGroup {
 }
 
 /** 拼音匹配高亮：返回每个字符是否匹配的分段 */
-export function highlightMatches(
-  name: string,
-  filter: string,
-): { text: string; match: boolean }[] {
+export function highlightMatches(name: string, filter: string): { text: string; match: boolean }[] {
   if (!filter) return [{ text: name, match: false }];
 
   const lowerName = name.toLowerCase();
@@ -505,9 +519,7 @@ export function highlightMatches(
   }
 
   // 2. 拼音全拼匹配：找出 filter 在连续拼音串中的位置，反推中文字符
-  const pyArray = pinyin(name, { toneType: 'none', type: 'array' }).map((w: string) =>
-    w.toLowerCase(),
-  );
+  const pyArray = pinyin(name, { toneType: 'none', type: 'array' }).map((w: string) => w.toLowerCase());
   const fullPy = pyArray.join('');
   const pyIdx = fullPy.indexOf(lowerFilter);
   if (pyIdx >= 0) {

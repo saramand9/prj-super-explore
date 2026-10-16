@@ -81,28 +81,20 @@ export function Launcher() {
             className="flex-1 bg-transparent text-lg text-text-primary placeholder:text-text-muted focus:outline-none"
             autoFocus
           />
-          {loading && (
-            <span className="text-text-muted text-xs animate-pulse">...</span>
-          )}
+          {loading && <span className="text-text-muted text-xs animate-pulse">...</span>}
         </div>
       </div>
 
       {/* Results */}
       <div className="flex-1 overflow-auto px-2 pb-2">
         {results.length === 0 && query && !loading && (
-          <div className="text-center text-text-muted py-8">
-            未找到“{query}”
-          </div>
+          <div className="text-center text-text-muted py-8">未找到“{query}”</div>
         )}
 
         {results.length === 0 && !query && (
           <div className="text-center text-text-muted py-8">
-            <div className="text-sm">
-              输入关键字搜索已索引目录中的文件
-            </div>
-            <div className="text-xs mt-2">
-              可在设置中配置索引路径
-            </div>
+            <div className="text-sm">输入关键字搜索已索引目录中的文件</div>
+            <div className="text-xs mt-2">可在设置中配置索引路径</div>
           </div>
         )}
 
@@ -118,15 +110,11 @@ export function Launcher() {
               useLauncherStore.setState({ selectedIndex: idx });
               openSelected();
             }}
-            onMouseEnter={() =>
-              useLauncherStore.setState({ selectedIndex: idx })
-            }
+            onMouseEnter={() => useLauncherStore.setState({ selectedIndex: idx })}
           >
             <span>{item.isDirectory ? '📁' : '📄'}</span>
             <span className="flex-1 truncate">{item.name}</span>
-            <span className="text-xs text-text-muted truncate max-w-[40%]">
-              {item.path}
-            </span>
+            <span className="text-xs text-text-muted truncate max-w-[40%]">{item.path}</span>
           </div>
         ))}
       </div>

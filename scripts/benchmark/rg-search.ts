@@ -21,8 +21,13 @@ const execFileP = promisify(execFile);
 // ripgrep 二进制路径 — node_modules 里 @lvce-editor/ripgrep/bin/rg.exe
 const RG_BIN = join(
   import.meta.dirname,
-  '..', '..',
-  'node_modules', '@lvce-editor', 'ripgrep', 'bin', 'rg.exe',
+  '..',
+  '..',
+  'node_modules',
+  '@lvce-editor',
+  'ripgrep',
+  'bin',
+  'rg.exe',
 );
 
 function parseRgOutput(stdout: string): Match[] {
@@ -40,9 +45,10 @@ function parseRgOutput(stdout: string): Match[] {
     if (firstColon === -1 || secondColon === -1) continue;
 
     const lineNo = parseInt(line.slice(firstColon + 1, secondColon), 10);
-    const colNo = thirdColon !== -1
-      ? parseInt(line.slice(secondColon + 1, thirdColon), 10)
-      : parseInt(line.slice(secondColon + 1), 10);
+    const colNo =
+      thirdColon !== -1
+        ? parseInt(line.slice(secondColon + 1, thirdColon), 10)
+        : parseInt(line.slice(secondColon + 1), 10);
 
     const text = thirdColon !== -1 ? line.slice(thirdColon + 1) : '';
 
@@ -64,19 +70,23 @@ export async function benchmarkRg(filePath: string, query: string) {
   try {
     // --no-heading 去掉文件头，只保留 line:col:text
     // --smart-case 智能大小写 (全小写→不敏感，含大写→敏感)
-    const { stdout: out } = await execFileP(RG_BIN, [
-      '--no-heading',
-      '--line-number',
-      '--column',
-      '--smart-case',
-      '--no-ignore',
-      '--no-config',
-      query,
-      filePath,
-    ], {
-      maxBuffer: 50 * 1024 * 1024, // 50MB buffer
-      timeout: 30000,
-    });
+    const { stdout: out } = await execFileP(
+      RG_BIN,
+      [
+        '--no-heading',
+        '--line-number',
+        '--column',
+        '--smart-case',
+        '--no-ignore',
+        '--no-config',
+        query,
+        filePath,
+      ],
+      {
+        maxBuffer: 50 * 1024 * 1024, // 50MB buffer
+        timeout: 30000,
+      },
+    );
     stdout = out;
   } catch (err: any) {
     // ripgrep exit code 1 = no matches, exit code 2 = error

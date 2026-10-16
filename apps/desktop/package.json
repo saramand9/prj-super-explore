@@ -1,6 +1,6 @@
 {
   "name": "@explore/desktop",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "license": "MIT",
   "description": "Explore for Windows: dual-pane file browsing, workspaces, search and previews.",
   "author": {
@@ -11,22 +11,39 @@
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "electron-vite build",
+    "build": "electron-vite build && node scripts/collect-licenses.mjs",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
     "test:e2e": "pnpm build && playwright test -c playwright.config.ts",
     "test:package": "pnpm pack:dir && playwright test -c playwright.package.config.ts",
+    "test:installer": "playwright test -c playwright.installer.config.ts",
     "benchmark:scan": "vitest run -c vitest.benchmark.config.ts",
     "verify:search": "node scripts/verify-search.mjs",
-    "pack:dir": "pnpm build && pnpm verify:search && electron-builder --win --x64 --dir && node scripts/verify-search.mjs --packaged",
-    "pack": "pnpm build && pnpm verify:search && electron-builder --win --x64 && node scripts/verify-search.mjs --packaged"
+    "pack:dir": "pnpm build && pnpm verify:search && electron-builder --win --x64 --dir --publish never && node scripts/verify-search.mjs --packaged",
+    "pack": "pnpm build && pnpm verify:search && electron-builder --win --x64 --publish never && node scripts/verify-search.mjs --packaged"
   },
   "build": {
     "appId": "com.explore.app",
     "productName": "Explore",
+    "artifactName": "Explore-Setup-${version}-windows-${arch}.${ext}",
     "npmRebuild": false,
+    "electronDist": "node_modules/electron/dist",
+    "extraResources": [
+      {
+        "from": "out/licenses",
+        "to": "licenses/components"
+      },
+      {
+        "from": "../../LICENSE",
+        "to": "licenses/Explore-MIT-LICENSE.txt"
+      },
+      {
+        "from": "../../THIRD_PARTY_NOTICES.md",
+        "to": "licenses/THIRD_PARTY_NOTICES.md"
+      }
+    ],
     "directories": {
       "output": "dist-electron"
     },
@@ -49,15 +66,15 @@
   },
   "dependencies": {
     "@lvce-editor/ripgrep": "^4.1.0",
-    "dompurify": "^3.4.13",
+    "dompurify": "^3.4.17",
     "highlight.js": "^11.11.1",
     "marked": "^18.0.4",
     "pinyin-pro": "^3.28.1"
   },
   "devDependencies": {
-    "@explore/shared": "workspace:*",
     "@electron-toolkit/preload": "^3.0.0",
     "@electron-toolkit/utils": "^3.0.0",
+    "@explore/shared": "workspace:*",
     "@playwright/test": "^1.60.0",
     "@tanstack/react-virtual": "^3.10.0",
     "@types/node": "^22.0.0",
@@ -67,8 +84,8 @@
     "autoprefixer": "^10.4.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
-    "electron": "^33.0.0",
-    "electron-builder": "^25.0.0",
+    "electron": "^44.8.0",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^2.3.0",
     "lucide-react": "^0.400.0",
     "postcss": "^8.4.0",

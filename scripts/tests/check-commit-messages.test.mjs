@@ -3,20 +3,39 @@ import test from 'node:test';
 import { validateMessage } from '../check-commit-messages.mjs';
 
 test('accepts English Conventional Commits with optional scope and body', () => {
-  for (const message of ['fix(search): match long pinyin queries\n', 'docs: explain Windows setup\n\nKeep instructions reproducible.\n', 'chore(history): merge upstream changes and retain pinyin fixes']) {
+  for (const message of [
+    'fix(search): match long pinyin queries\n',
+    'docs: explain Windows setup\n\nKeep instructions reproducible.\n',
+    'chore(history): merge upstream changes and retain pinyin fixes',
+  ]) {
     assert.deepEqual(validateMessage(message), []);
   }
 });
 test('accepts an explicit breaking-change explanation', () => {
-  assert.deepEqual(validateMessage('feat(ipc)!: require operation IDs\n\nBREAKING CHANGE: callers must provide an operation ID.'), []);
+  assert.deepEqual(
+    validateMessage(
+      'feat(ipc)!: require operation IDs\n\nBREAKING CHANGE: callers must provide an operation ID.',
+    ),
+    [],
+  );
 });
 test('rejects unstructured, debug and non-English messages', () => {
-  for (const message of ['update', 'Merge branch master', 'debug: add logs', 'fix: \u4fee\u590d\u641c\u7d22', 'fix: repair search\n\n\u4fee\u590d']) {
+  for (const message of [
+    'update',
+    'Merge branch master',
+    'debug: add logs',
+    'fix: \u4fee\u590d\u641c\u7d22',
+    'fix: repair search\n\n\u4fee\u590d',
+  ]) {
     assert.ok(validateMessage(message).length, message);
   }
 });
 test('rejects overlong subjects, trailing periods and missing blank lines', () => {
-  for (const message of ['fix: ' + 'a'.repeat(70), 'fix: repair search.', 'fix: repair search\nBody without a separator']) {
+  for (const message of [
+    'fix: ' + 'a'.repeat(70),
+    'fix: repair search.',
+    'fix: repair search\nBody without a separator',
+  ]) {
     assert.ok(validateMessage(message).length, message);
   }
 });

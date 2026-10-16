@@ -159,13 +159,14 @@ export function MenuBar() {
                 sources,
                 targetPath,
                 (p) => ipc.invoke('file:readDir', { path: p }),
-                (message, buttons) => appDialog.choice({
-                  title: '同名冲突',
-                  message,
-                  buttons,
-                  defaultId: 'rename',
-                  cancelId: 'cancel',
-                }),
+                (message, buttons) =>
+                  appDialog.choice({
+                    title: '同名冲突',
+                    message,
+                    buttons,
+                    defaultId: 'rename',
+                    cancelId: 'cancel',
+                  }),
               );
               if (!conflictStrategy) return;
               const result = await ipc.invoke('file:copy', {
@@ -198,13 +199,14 @@ export function MenuBar() {
                 sources,
                 targetPath,
                 (p) => ipc.invoke('file:readDir', { path: p }),
-                (message, buttons) => appDialog.choice({
-                  title: '同名冲突',
-                  message,
-                  buttons,
-                  defaultId: 'rename',
-                  cancelId: 'cancel',
-                }),
+                (message, buttons) =>
+                  appDialog.choice({
+                    title: '同名冲突',
+                    message,
+                    buttons,
+                    defaultId: 'rename',
+                    cancelId: 'cancel',
+                  }),
               );
               if (!conflictStrategy) return;
               const result = await ipc.invoke('file:move', {
@@ -319,10 +321,12 @@ export function MenuBar() {
       items: [
         {
           label: '快捷键与操作说明',
-          action: () => appDialog.alert({
-            title: '快捷键与操作说明',
-            message: 'Ctrl+O  打开文件夹\nCtrl+T  新建标签\nCtrl+W  关闭当前预览或标签\nCtrl+P  搜索标签\nCtrl+Shift+W  搜索工作区\nCtrl+F  搜索文件或内容\nCtrl+Shift+F  全文搜索\n\nF5 / F6  复制 / 移动到另一侧的文件夹\nF7  新建文件夹\nF8  移到回收站\n\n拖拽默认为复制，按住 Shift 拖拽为移动，Ctrl 拖拽保持复制。',
-          }),
+          action: () =>
+            appDialog.alert({
+              title: '快捷键与操作说明',
+              message:
+                'Ctrl+O  打开文件夹\nCtrl+T  新建标签\nCtrl+W  关闭当前预览或标签\nCtrl+P  搜索标签\nCtrl+Shift+W  搜索工作区\nCtrl+F  搜索文件或内容\nCtrl+Shift+F  全文搜索\n\nF5 / F6  复制 / 移动到另一侧的文件夹\nF7  新建文件夹\nF8  移到回收站\n\n拖拽默认为复制，按住 Shift 拖拽为移动，Ctrl 拖拽保持复制。',
+            }),
         },
         { separator: true },
         {
@@ -349,76 +353,111 @@ export function MenuBar() {
 
   return (
     <>
-    <div ref={menuRef} className="flex items-center h-7 bg-surface-light border-b border-border px-1 flex-shrink-0 select-none">
-      {menus.map((menu) => (
-        <div key={menu.label} className="relative">
-          <button
-            className={`px-2 py-0.5 text-xs rounded transition-colors ${
-              openMenu === menu.label
-                ? 'bg-accent/20 text-accent'
-                : 'text-text-secondary hover:text-text-primary hover:bg-surface-lighter'
-            }`}
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpenMenu(openMenu === menu.label ? null : menu.label);
-            }}
+      <div
+        ref={menuRef}
+        className="flex items-center h-7 bg-surface-light border-b border-border px-1 flex-shrink-0 select-none"
+      >
+        {menus.map((menu) => (
+          <div key={menu.label} className="relative">
+            <button
+              className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                openMenu === menu.label
+                  ? 'bg-accent/20 text-accent'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-surface-lighter'
+              }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpenMenu(openMenu === menu.label ? null : menu.label);
+              }}
+            >
+              {menu.label}
+            </button>
+            {openMenu === menu.label && (
+              <div className="absolute left-0 top-full mt-0.5 z-50 bg-surface-light border border-border rounded shadow-lg py-1 min-w-[200px] text-xs">
+                {menu.items.map((item, i) =>
+                  item.separator ? (
+                    <div key={`sep-${i}`} className="border-t border-border/50 my-0.5" />
+                  ) : (
+                    <button
+                      key={item.label}
+                      className="w-full text-left px-3 py-1 flex items-center justify-between hover:bg-accent/20 text-text-secondary hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-text-secondary"
+                      disabled={item.disabled}
+                      title={item.title}
+                      onClick={() => {
+                        item.action?.();
+                        setOpenMenu(null);
+                      }}
+                    >
+                      <span>{item.label}</span>
+                      {item.shortcut && (
+                        <span className="text-text-secondary text-xs ml-4">{item.shortcut}</span>
+                      )}
+                    </button>
+                  ),
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+        <span className="flex-1" />
+        <ThemeDropdown />
+        <span className="w-1" />
+        <FontScaleDropdown />
+        <LayoutModeToggle />
+      </div>
+      {inlinePrompt && (
+        <div
+          className="fixed inset-0 z-[400] flex items-center justify-center bg-black/50"
+          onClick={() => {
+            inlinePrompt.resolve(null);
+            setInlinePrompt(null);
+          }}
+        >
+          <div
+            className="bg-surface-light border border-border rounded-lg shadow-2xl p-4 min-w-[320px]"
+            onClick={(e) => e.stopPropagation()}
           >
-            {menu.label}
-          </button>
-          {openMenu === menu.label && (
-            <div className="absolute left-0 top-full mt-0.5 z-50 bg-surface-light border border-border rounded shadow-lg py-1 min-w-[200px] text-xs">
-              {menu.items.map((item, i) =>
-                item.separator ? (
-                  <div key={`sep-${i}`} className="border-t border-border/50 my-0.5" />
-                ) : (
-                  <button
-                    key={item.label}
-                    className="w-full text-left px-3 py-1 flex items-center justify-between hover:bg-accent/20 text-text-secondary hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-text-secondary"
-                    disabled={item.disabled}
-                    title={item.title}
-                    onClick={() => {
-                      item.action?.();
-                      setOpenMenu(null);
-                    }}
-                  >
-                    <span>{item.label}</span>
-                    {item.shortcut && (
-                      <span className="text-text-secondary text-xs ml-4">{item.shortcut}</span>
-                    )}
-                  </button>
-                ),
-              )}
+            <div className="text-sm text-text-primary mb-3">{inlinePrompt.message}</div>
+            <input
+              autoFocus
+              id="menu-inline-prompt-input"
+              className="w-full bg-surface-lighter border border-border rounded px-3 py-1.5 text-sm text-text-primary outline-none focus:border-accent"
+              defaultValue={inlinePrompt.defaultValue}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  inlinePrompt.resolve((e.target as HTMLInputElement).value);
+                  setInlinePrompt(null);
+                }
+                if (e.key === 'Escape') {
+                  inlinePrompt.resolve(null);
+                  setInlinePrompt(null);
+                }
+              }}
+            />
+            <div className="flex justify-end gap-2 mt-3">
+              <button
+                className="px-3 py-1 text-xs text-text-muted hover:text-text-primary"
+                onClick={() => {
+                  inlinePrompt.resolve(null);
+                  setInlinePrompt(null);
+                }}
+              >
+                取消
+              </button>
+              <button
+                className="px-3 py-1 text-xs bg-accent text-white rounded"
+                onClick={() => {
+                  const el = document.getElementById('menu-inline-prompt-input') as HTMLInputElement;
+                  inlinePrompt.resolve(el?.value || '');
+                  setInlinePrompt(null);
+                }}
+              >
+                确定
+              </button>
             </div>
-          )}
-        </div>
-      ))}
-      <span className="flex-1" />
-      <ThemeDropdown />
-      <span className="w-1" />
-      <FontScaleDropdown />
-      <LayoutModeToggle />
-    </div>
-    {inlinePrompt && (
-      <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/50" onClick={() => { inlinePrompt.resolve(null); setInlinePrompt(null); }}>
-        <div className="bg-surface-light border border-border rounded-lg shadow-2xl p-4 min-w-[320px]" onClick={(e) => e.stopPropagation()}>
-          <div className="text-sm text-text-primary mb-3">{inlinePrompt.message}</div>
-          <input
-            autoFocus
-            id="menu-inline-prompt-input"
-            className="w-full bg-surface-lighter border border-border rounded px-3 py-1.5 text-sm text-text-primary outline-none focus:border-accent"
-            defaultValue={inlinePrompt.defaultValue}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') { inlinePrompt.resolve((e.target as HTMLInputElement).value); setInlinePrompt(null); }
-              if (e.key === 'Escape') { inlinePrompt.resolve(null); setInlinePrompt(null); }
-            }}
-          />
-          <div className="flex justify-end gap-2 mt-3">
-            <button className="px-3 py-1 text-xs text-text-muted hover:text-text-primary" onClick={() => { inlinePrompt.resolve(null); setInlinePrompt(null); }}>取消</button>
-            <button className="px-3 py-1 text-xs bg-accent text-white rounded" onClick={() => { const el = document.getElementById('menu-inline-prompt-input') as HTMLInputElement; inlinePrompt.resolve(el?.value || ''); setInlinePrompt(null); }}>确定</button>
           </div>
         </div>
-      </div>
-    )}
+      )}
     </>
   );
 }

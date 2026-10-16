@@ -19,7 +19,9 @@ async function init() {
 
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
-      <ErrorBoundary name="App"><App /></ErrorBoundary>
+      <ErrorBoundary name="App">
+        <App />
+      </ErrorBoundary>
     </React.StrictMode>,
   );
 }
@@ -33,6 +35,10 @@ void init().catch((error) => {
   retry.onclick = () => window.location.reload();
   const copy = document.createElement('button');
   copy.textContent = '复制诊断信息';
-  copy.onclick = () => { void ipc.invoke('app:copyDiagnostics', { source: 'renderer-startup', message: String(error) }).catch(() => {}); };
+  copy.onclick = () => {
+    void ipc
+      .invoke('app:copyDiagnostics', { source: 'renderer-startup', message: String(error) })
+      .catch(() => {});
+  };
   root.append(retry, copy);
 });

@@ -16,13 +16,21 @@ test('packaged Windows app launches, searches without development tools, and sav
   await writeFile(join(contentDir, '.ignore'), 'ignored.txt\n');
   await writeFile(join(contentDir, 'ignored.txt'), 'literal.* must be ignored');
   await writeFile(join(configDir, 'config.json'), JSON.stringify({ indexPaths: [] }));
-  await writeFile(join(configDir, 'spaces.json'), JSON.stringify([{
-    id: 'package-smoke', name: '安装包验证',
-    left: { tabs: [{ path: contentDir, label: 'fixture' }], activeTabId: null, path: contentDir },
-    right: { tabs: [], activeTabId: null, path: null },
-  }]));
+  await writeFile(
+    join(configDir, 'spaces.json'),
+    JSON.stringify([
+      {
+        id: 'package-smoke',
+        name: '安装包验证',
+        left: { tabs: [{ path: contentDir, label: 'fixture' }], activeTabId: null, path: contentDir },
+        right: { tabs: [], activeTabId: null, path: null },
+      },
+    ]),
+  );
 
-  const env = { ...process.env };
+  const env: Record<string, string> = Object.fromEntries(
+    Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+  );
   delete env.RG_PATH;
   // Keep Windows system tools available, but exclude Node, pnpm and system-installed ripgrep.
   const windowsDir = env.SystemRoot || 'C:\\Windows';
@@ -43,13 +51,26 @@ test('packaged Windows app launches, searches without development tools, and sav
     expect(await application.evaluate(({ app }) => app.getPath('userData'))).toBe(profile);
     await expect(page.getByTestId('workspace-menu-trigger')).toContainText('安装包验证');
     await expect(page.getByText('match.txt', { exact: true })).toBeVisible();
-    const matches = await page.evaluate(async (dir) => window.explore.invoke('search:fulltext', {
-      dir, query: 'literal.*', searchId: 'packaged-smoke', maxResults: 2,
-    }), contentDir);
+    const matches = await page.evaluate(
+      async (dir) =>
+        window.explore.requests['search:fulltext']({
+          dir,
+          query: 'literal.*',
+          searchId: 'packaged-smoke',
+          maxResults: 2,
+        }),
+      contentDir,
+    );
     // Native ripgrep honors .ignore; the JS fallback would also return ignored.txt.
-    expect(matches).toMatchObject([{
-      fileName: 'match.txt', matchText: 'literal.*', lineNumber: 1, columnStart: 4, columnEnd: 13,
-    }]);
+    expect(matches).toMatchObject([
+      {
+        fileName: 'match.txt',
+        matchText: 'literal.*',
+        lineNumber: 1,
+        columnStart: 4,
+        columnEnd: 13,
+      },
+    ]);
     await page.keyboard.press('Control+f');
     await page.getByRole('textbox', { name: '搜索文件和文件夹', exact: true }).fill('match');
     await expect(page.getByTestId('scan-status')).toContainText('已索引 2 项');

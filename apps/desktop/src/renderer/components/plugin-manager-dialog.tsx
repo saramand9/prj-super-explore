@@ -20,7 +20,10 @@ export function PluginManagerDialog() {
     setMsg(null);
     try {
       const result = await ipc.invoke('dialog:openFolder', {});
-      if (!result) { setInstalling(false); return; }
+      if (!result) {
+        setInstalling(false);
+        return;
+      }
 
       const installResult = await ipc.invoke('plugin:install', { sourcePath: result });
       if (!installResult.success) {
@@ -74,9 +77,11 @@ export function PluginManagerDialog() {
 
         {/* Messages */}
         {msg && (
-          <div className={`px-4 py-2 text-xs ${
-            msg.type === 'error' ? 'text-red-400 bg-red-400/10' : 'text-green-400 bg-green-400/10'
-          }`}>
+          <div
+            className={`px-4 py-2 text-xs ${
+              msg.type === 'error' ? 'text-red-400 bg-red-400/10' : 'text-green-400 bg-green-400/10'
+            }`}
+          >
             {msg.text}
           </div>
         )}
@@ -91,9 +96,7 @@ export function PluginManagerDialog() {
                 key={reg.manifest.id}
                 className="px-4 py-2.5 flex items-center gap-3 hover:bg-surface-lighter/50"
               >
-                <span className="text-sm">
-                  {reg.activated ? '🟢' : '⭕'}
-                </span>
+                <span className="text-sm">{reg.activated ? '🟢' : '⭕'}</span>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs text-text-primary truncate">{reg.manifest.name}</div>
                   <div className="text-[10px] text-text-muted">

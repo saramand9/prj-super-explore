@@ -53,9 +53,7 @@ export class FileSearchIndex {
 
       // 拼音扩展
       if (/[一-鿿]/.test(name)) {
-        const fullPinyin = pinyin(name, { toneType: 'none', type: 'array', v: true })
-          .join('')
-          .toLowerCase();
+        const fullPinyin = pinyin(name, { toneType: 'none', type: 'array', v: true }).join('').toLowerCase();
         const initials = pinyin(name, { pattern: 'first', toneType: 'none', type: 'array' })
           .join('')
           .toLowerCase();

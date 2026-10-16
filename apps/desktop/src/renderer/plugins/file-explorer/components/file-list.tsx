@@ -6,7 +6,25 @@ import { FileRow } from './file-row';
 import { ipc } from '../../../framework/bridge/ipc-client';
 import { useLayoutStore } from '../../../framework/store/layout-store';
 import { pluginManager, showNotification } from '../../../framework/plugin-system';
-import { AlertTriangle, ArrowUp, ArrowUpRight, FolderOpen, FolderPlus, RefreshCw, Trash2, Copy, ArrowRightLeft, Pencil, File, FilePlus, Folder, Clipboard, ClipboardCheck, ExternalLink, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowUp,
+  ArrowUpRight,
+  FolderOpen,
+  FolderPlus,
+  RefreshCw,
+  Trash2,
+  Copy,
+  ArrowRightLeft,
+  Pencil,
+  File,
+  FilePlus,
+  Folder,
+  Clipboard,
+  ClipboardCheck,
+  ExternalLink,
+  X,
+} from 'lucide-react';
 import {
   getFileOpToastType,
   resolveCopyConflictStrategy,
@@ -27,7 +45,10 @@ const FILE_ROW_HEIGHT = 30;
 const SELECTION_ACTION_BAR_DELAY_MS = 280;
 
 function normalizePathForCompare(path: string): string {
-  return path.replace(/[\\/]+$/, '').replace(/\//g, '\\').toLowerCase();
+  return path
+    .replace(/[\\/]+$/, '')
+    .replace(/\//g, '\\')
+    .toLowerCase();
 }
 
 function isSameDirectory(a: string, b: string): boolean {
@@ -112,7 +133,8 @@ export function FileList({ side }: FileListProps) {
   const selectionActionsTimerRef = useRef<number | null>(null);
   const [selectionActionsVisible, setSelectionActionsVisible] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
-    x: number; y: number;
+    x: number;
+    y: number;
     single?: FileEntry;
     count: number;
   } | null>(null);
@@ -233,22 +255,29 @@ export function FileList({ side }: FileListProps) {
     if (!contextMenu) return;
     const h = () => closeMenu();
     window.addEventListener('click', h);
-    window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
-    return () => { window.removeEventListener('click', h); };
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeMenu();
+    });
+    return () => {
+      window.removeEventListener('click', h);
+    };
   }, [contextMenu, closeMenu]);
 
   // 文件打开路由：左侧文件在右侧预览；右侧文件在本侧预览，避免覆盖左侧文件列表。
-  const openFile = useCallback((entry: FileEntry) => {
-    const ext = entry.name.slice(entry.name.lastIndexOf('.')).toLowerCase();
-    const handler = pluginManager.getFileHandlerForExtension(ext);
-    if (handler) {
-      const targetSide = side === 'left' ? 'right' : side;
-      useLayoutStore.getState().setPanelPath(targetSide, entry.path);
-      useLayoutStore.getState().setPanelPlugin(targetSide, handler.pluginId, handler.panelId);
-    } else {
-      ipc.invoke('file:open', { path: entry.path });
-    }
-  }, [side]);
+  const openFile = useCallback(
+    (entry: FileEntry) => {
+      const ext = entry.name.slice(entry.name.lastIndexOf('.')).toLowerCase();
+      const handler = pluginManager.getFileHandlerForExtension(ext);
+      if (handler) {
+        const targetSide = side === 'left' ? 'right' : side;
+        useLayoutStore.getState().setPanelPath(targetSide, entry.path);
+        useLayoutStore.getState().setPanelPlugin(targetSide, handler.pluginId, handler.panelId);
+      } else {
+        ipc.invoke('file:open', { path: entry.path });
+      }
+    },
+    [side],
+  );
   const ctxOpen = useCallback(() => {
     if (!contextMenu?.single) return;
     if (contextMenu.single.isDirectory) {
@@ -278,34 +307,38 @@ export function FileList({ side }: FileListProps) {
     }
   }, [contextMenu, closeMenu, showAlert]);
 
-  const deletePaths = useCallback(async (paths: string[], permanent = false) => {
-    if (paths.length === 0) return;
-    if (permanent) {
-      if (!await showConfirm(`确定要永久删除 ${paths.length} 个项目吗？\n这些项目不会进入回收站。`)) return;
-      if (!await showConfirm('再次确认：永久删除无法从回收站恢复。是否继续？')) return;
-    } else if (!await showConfirm(`确定要将 ${paths.length} 个项目移到回收站吗？`)) {
-      return;
-    }
+  const deletePaths = useCallback(
+    async (paths: string[], permanent = false) => {
+      if (paths.length === 0) return;
+      if (permanent) {
+        if (!(await showConfirm(`确定要永久删除 ${paths.length} 个项目吗？\n这些项目不会进入回收站。`)))
+          return;
+        if (!(await showConfirm('再次确认：永久删除无法从回收站恢复。是否继续？'))) return;
+      } else if (!(await showConfirm(`确定要将 ${paths.length} 个项目移到回收站吗？`))) {
+        return;
+      }
 
-    try {
-      const result = await runFileOperation(
-        'file:delete',
-        { paths, permanent },
-        permanent ? '正在永久删除...' : '正在移到回收站...',
-      );
-      await reportFileOperationResult(permanent ? 'PermanentDelete' : 'Delete', result);
-      clearSelection(side);
-      refresh(side);
-    } catch (err: any) {
-      await showAlert(`删除失败：${err.message}`, 'error');
-    }
-  }, [side, clearSelection, refresh, showAlert, runFileOperation, reportFileOperationResult]);
+      try {
+        const result = await runFileOperation(
+          'file:delete',
+          { paths, permanent },
+          permanent ? '正在永久删除...' : '正在移到回收站...',
+        );
+        await reportFileOperationResult(permanent ? 'PermanentDelete' : 'Delete', result);
+        clearSelection(side);
+        refresh(side);
+      } catch (err: any) {
+        await showAlert(`删除失败：${err.message}`, 'error');
+      }
+    },
+    [side, clearSelection, refresh, showAlert, runFileOperation, reportFileOperationResult],
+  );
 
   const ctxDelete = useCallback(async () => {
     if (!contextMenu) return;
     const paths = contextMenu.single
       ? [contextMenu.single.path]
-      : [...(useFileStore.getState()[side].selected)];
+      : [...useFileStore.getState()[side].selected];
     await deletePaths(paths, false);
     closeMenu();
   }, [contextMenu, side, closeMenu, deletePaths]);
@@ -314,7 +347,7 @@ export function FileList({ side }: FileListProps) {
     if (!contextMenu) return;
     const paths = contextMenu.single
       ? [contextMenu.single.path]
-      : [...(useFileStore.getState()[side].selected)];
+      : [...useFileStore.getState()[side].selected];
     await deletePaths(paths, true);
     closeMenu();
   }, [contextMenu, side, closeMenu, deletePaths]);
@@ -322,7 +355,10 @@ export function FileList({ side }: FileListProps) {
   const ctxRename = useCallback(async () => {
     if (!contextMenu?.single) return;
     const newName = await showPrompt('新名称：', contextMenu.single.name);
-    if (!newName || newName === contextMenu.single.name) { closeMenu(); return; }
+    if (!newName || newName === contextMenu.single.name) {
+      closeMenu();
+      return;
+    }
     try {
       const result = await ipc.invoke('file:rename', { path: contextMenu.single.path, newName });
       if (!result.success) throw new Error(result.error || '重命名失败');
@@ -333,49 +369,47 @@ export function FileList({ side }: FileListProps) {
     closeMenu();
   }, [contextMenu, side, refresh, closeMenu, showPrompt, showAlert]);
 
-  const transferToOtherSide = useCallback(async (
-    mode: 'copy' | 'move',
-    paths: string[],
-  ) => {
-    if (paths.length === 0) return;
-    if (useLayoutStore.getState().layout.mode !== 'dual') {
-      await showAlert('请先启用双栏，并在另一侧打开目标文件夹。');
-      return;
-    }
-    const other = side === 'left' ? 'right' : 'left';
-    const dest = useFileStore.getState()[other].path;
-    if (!dest) {
-      await showAlert(`请先在${other === 'left' ? '左' : '右'}侧打开目标文件夹。`);
-      return;
-    }
-    try {
-      const conflictStrategy = await chooseConflictStrategy(paths, dest);
-      if (!conflictStrategy) return;
-      const isCopy = mode === 'copy';
-      const result = await runFileOperation(
-        isCopy ? 'file:copy' : 'file:move',
-        { sources: paths, destDir: dest, conflictStrategy },
-        isCopy ? '正在复制...' : '正在移动...',
-      );
-      await reportFileOperationResult(isCopy ? 'Copy' : 'Move', result);
-      refresh(side);
-      useFileStore.getState().refresh(other);
-      return result;
-    } catch (err: any) {
-      await showAlert(`${mode === 'copy' ? '复制' : '移动'}失败：${err.message}`, 'error');
-    }
-  }, [side, refresh, chooseConflictStrategy, showAlert, runFileOperation, reportFileOperationResult]);
+  const transferToOtherSide = useCallback(
+    async (mode: 'copy' | 'move', paths: string[]) => {
+      if (paths.length === 0) return;
+      if (useLayoutStore.getState().layout.mode !== 'dual') {
+        await showAlert('请先启用双栏，并在另一侧打开目标文件夹。');
+        return;
+      }
+      const other = side === 'left' ? 'right' : 'left';
+      const dest = useFileStore.getState()[other].path;
+      if (!dest) {
+        await showAlert(`请先在${other === 'left' ? '左' : '右'}侧打开目标文件夹。`);
+        return;
+      }
+      try {
+        const conflictStrategy = await chooseConflictStrategy(paths, dest);
+        if (!conflictStrategy) return;
+        const isCopy = mode === 'copy';
+        const result = await runFileOperation(
+          isCopy ? 'file:copy' : 'file:move',
+          { sources: paths, destDir: dest, conflictStrategy },
+          isCopy ? '正在复制...' : '正在移动...',
+        );
+        await reportFileOperationResult(isCopy ? 'Copy' : 'Move', result);
+        refresh(side);
+        useFileStore.getState().refresh(other);
+        return result;
+      } catch (err: any) {
+        await showAlert(`${mode === 'copy' ? '复制' : '移动'}失败：${err.message}`, 'error');
+      }
+    },
+    [side, refresh, chooseConflictStrategy, showAlert, runFileOperation, reportFileOperationResult],
+  );
 
   const getContextPaths = useCallback(() => {
     if (!contextMenu) return [];
-    return contextMenu.single
-      ? [contextMenu.single.path]
-      : [...(useFileStore.getState()[side].selected)];
+    return contextMenu.single ? [contextMenu.single.path] : [...useFileStore.getState()[side].selected];
   }, [contextMenu, side]);
 
   const transferSelection = useCallback(
     async (mode: 'copy' | 'move') => {
-      const paths = [...(useFileStore.getState()[side].selected)];
+      const paths = [...useFileStore.getState()[side].selected];
       await transferToOtherSide(mode, paths);
     },
     [side, transferToOtherSide],
@@ -397,7 +431,7 @@ export function FileList({ side }: FileListProps) {
     if (!contextMenu) return;
     const names = contextMenu.single
       ? [contextMenu.single.name]
-      : [...(useFileStore.getState()[side].selected)].map((p) => p.split(/[/\\]/).pop()!);
+      : [...useFileStore.getState()[side].selected].map((p) => p.split(/[/\\]/).pop()!);
     navigator.clipboard.writeText(names.join('\n'));
     closeMenu();
   }, [contextMenu, side, closeMenu]);
@@ -406,18 +440,28 @@ export function FileList({ side }: FileListProps) {
     if (!contextMenu) return;
     const paths = contextMenu.single
       ? [contextMenu.single.path]
-      : [...(useFileStore.getState()[side].selected)];
+      : [...useFileStore.getState()[side].selected];
     navigator.clipboard.writeText(paths.join('\n'));
     closeMenu();
   }, [contextMenu, side, closeMenu]);
 
   const ctxNewFolder = useCallback(async () => {
     const dir = useFileStore.getState()[side].path;
-    if (!dir) { closeMenu(); return; }
+    if (!dir) {
+      closeMenu();
+      return;
+    }
     const name = await showPrompt('文件夹名称：', '新建文件夹');
-    if (!name) { closeMenu(); return; }
+    if (!name) {
+      closeMenu();
+      return;
+    }
     const result = await ipc.invoke('file:mkdir', { parentPath: dir, name });
-    if (!result.success) { await showAlert(`操作失败：${result.error}`, 'error'); closeMenu(); return; }
+    if (!result.success) {
+      await showAlert(`操作失败：${result.error}`, 'error');
+      closeMenu();
+      return;
+    }
     refresh(side);
     refreshPeerIfSameDirectory(dir);
     closeMenu();
@@ -425,11 +469,21 @@ export function FileList({ side }: FileListProps) {
 
   const ctxNewFile = useCallback(async () => {
     const dir = useFileStore.getState()[side].path;
-    if (!dir) { closeMenu(); return; }
+    if (!dir) {
+      closeMenu();
+      return;
+    }
     const name = await showPrompt('文件名称：', '新建文件.txt');
-    if (!name) { closeMenu(); return; }
+    if (!name) {
+      closeMenu();
+      return;
+    }
     const result = await ipc.invoke('file:create', { parentPath: dir, name });
-    if (!result.success) { await showAlert(`创建文件失败：${result.error}`, 'error'); closeMenu(); return; }
+    if (!result.success) {
+      await showAlert(`创建文件失败：${result.error}`, 'error');
+      closeMenu();
+      return;
+    }
     refresh(side);
     refreshPeerIfSameDirectory(dir);
     closeMenu();
@@ -442,7 +496,10 @@ export function FileList({ side }: FileListProps) {
 
   const ctxEmptyFolder = useCallback(async () => {
     const allPaths = useFileStore.getState()[side].entries.map((e) => e.path);
-    if (allPaths.length === 0) { closeMenu(); return; }
+    if (allPaths.length === 0) {
+      closeMenu();
+      return;
+    }
     await deletePaths(allPaths, false);
     closeMenu();
   }, [side, closeMenu, deletePaths]);
@@ -510,14 +567,18 @@ export function FileList({ side }: FileListProps) {
   const virtualItems = virtualizer.getVirtualItems();
   const isScrolling = virtualizer.isScrolling;
   const firstVisibleIndex = virtualItems[0]?.index ?? 0;
-  const lastVisibleIndex = virtualItems[virtualItems.length - 1]?.index ?? Math.min(entries.length - 1, DIR_SIZE_INITIAL_ROWS - 1);
+  const lastVisibleIndex =
+    virtualItems[virtualItems.length - 1]?.index ?? Math.min(entries.length - 1, DIR_SIZE_INITIAL_ROWS - 1);
   const dirSizeStartIndex = Math.max(0, firstVisibleIndex - DIR_SIZE_VISIBLE_OVERSCAN);
   const dirSizeEndIndex = Math.min(entries.length - 1, lastVisibleIndex + DIR_SIZE_VISIBLE_OVERSCAN);
   const visibleDirSizePaths = useMemo(() => {
     if (entries.length === 0) return [];
     return entries
       .slice(dirSizeStartIndex, dirSizeEndIndex + 1)
-      .filter((entry) => entry.isDirectory && !dirSizeMap[entry.path] && !dirSizeRequestedRef.current.has(entry.path))
+      .filter(
+        (entry) =>
+          entry.isDirectory && !dirSizeMap[entry.path] && !dirSizeRequestedRef.current.has(entry.path),
+      )
       .map((entry) => entry.path);
   }, [entries, dirSizeMap, dirSizeStartIndex, dirSizeEndIndex]);
 
@@ -535,13 +596,16 @@ export function FileList({ side }: FileListProps) {
     let started = false;
     const timer = window.setTimeout(() => {
       started = true;
-      ipc.invoke('file:dirSizes', { paths: visibleDirSizePaths }).then((sizes) => {
-        setDirSizes(sizes);
-      }).catch(() => {
-        for (const dirPath of visibleDirSizePaths) {
-          dirSizeRequestedRef.current.delete(dirPath);
-        }
-      });
+      ipc
+        .invoke('file:dirSizes', { paths: visibleDirSizePaths })
+        .then((sizes) => {
+          setDirSizes(sizes);
+        })
+        .catch(() => {
+          for (const dirPath of visibleDirSizePaths) {
+            dirSizeRequestedRef.current.delete(dirPath);
+          }
+        });
     }, DIR_SIZE_IDLE_DELAY);
 
     return () => {
@@ -584,9 +648,10 @@ export function FileList({ side }: FileListProps) {
   const handleOpenFolder = useCallback(async () => {
     const state = useFileStore.getState()[side];
     const currentPath = state.path;
-    const defaultPath = state.errorInfo?.code === 'FILE_NOT_FOUND' && currentPath
-      ? parentPathOf(state.errorInfo.path ?? currentPath) ?? currentPath
-      : currentPath;
+    const defaultPath =
+      state.errorInfo?.code === 'FILE_NOT_FOUND' && currentPath
+        ? (parentPathOf(state.errorInfo.path ?? currentPath) ?? currentPath)
+        : currentPath;
     const result = await ipc.invoke('dialog:openFolder', {
       defaultPath: defaultPath ?? undefined,
     });
@@ -641,7 +706,12 @@ export function FileList({ side }: FileListProps) {
       if (!entry) return;
       const anchor = getRangeAnchor() ?? entry.path;
       suppressSelectionScrollRef.current = true;
-      selectRange(side, anchor, entry.path, entries.map((item) => item.path));
+      selectRange(
+        side,
+        anchor,
+        entry.path,
+        entries.map((item) => item.path),
+      );
       setFocusIdx(idx);
       focusIdxRef.current = idx;
       lastSelectedRef.current = anchor;
@@ -700,7 +770,8 @@ export function FileList({ side }: FileListProps) {
       focusIdxRef.current = idx;
       lastSelectedRef.current = entry.path;
       setContextMenu({
-        x: e.clientX, y: e.clientY,
+        x: e.clientX,
+        y: e.clientY,
         single: nextSelectedCount <= 1 ? entry : undefined,
         count: nextSelectedCount,
       });
@@ -711,9 +782,7 @@ export function FileList({ side }: FileListProps) {
   const handleRowDragStart = useCallback(
     (entry: FileEntry, _idx: number, e: React.DragEvent) => {
       const currentSelected = useFileStore.getState()[side].selected;
-      const paths = currentSelected.has(entry.path)
-        ? [...currentSelected]
-        : [entry.path];
+      const paths = currentSelected.has(entry.path) ? [...currentSelected] : [entry.path];
       e.dataTransfer.setData('application/x-explore-files', JSON.stringify(paths));
     },
     [side],
@@ -736,10 +805,13 @@ export function FileList({ side }: FileListProps) {
       if (sources.length === 0) return;
 
       // 同目录忽略
-      if (sources.every((s) => {
-        const parent = s.replace(/[/\\][^/\\]*$/, '');
-        return parent === entry.path;
-      })) return;
+      if (
+        sources.every((s) => {
+          const parent = s.replace(/[/\\][^/\\]*$/, '');
+          return parent === entry.path;
+        })
+      )
+        return;
 
       // 拖到自己子目录 -> 阻止
       if (sources.some((s) => entry.path.startsWith(s + '\\') || entry.path.startsWith(s + '/'))) return;
@@ -910,10 +982,7 @@ export function FileList({ side }: FileListProps) {
           e.preventDefault();
           {
             if (entries.length === 0) break;
-            const visibleRows = Math.max(
-              1,
-              Math.floor((containerRef.current?.clientHeight ?? 300) / 30) - 1,
-            );
+            const visibleRows = Math.max(1, Math.floor((containerRef.current?.clientHeight ?? 300) / 30) - 1);
             const delta = e.key === 'PageDown' ? visibleRows : -visibleRows;
             const next = Math.max(0, Math.min(focusIdxRef.current + delta, entries.length - 1));
             if (e.shiftKey) {
@@ -1037,7 +1106,28 @@ export function FileList({ side }: FileListProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [side, filterText, path, entries, setFilter, clearSelection, selectAll, selectSingle, selectSingleAtIndex, selectRangeToIndex, navigateToPath, navigateTo, refresh, handleOpenFolder, showAlert, deletePaths, transferToOtherSide, pinTab, unpinTab, repinTab]);
+  }, [
+    side,
+    filterText,
+    path,
+    entries,
+    setFilter,
+    clearSelection,
+    selectAll,
+    selectSingle,
+    selectSingleAtIndex,
+    selectRangeToIndex,
+    navigateToPath,
+    navigateTo,
+    refresh,
+    handleOpenFolder,
+    showAlert,
+    deletePaths,
+    transferToOtherSide,
+    pinTab,
+    unpinTab,
+    repinTab,
+  ]);
 
   // 键盘操作后禁 hover，鼠标移动恢复
   useEffect(() => {
@@ -1078,11 +1168,7 @@ export function FileList({ side }: FileListProps) {
 
   // Refreshing or sorting keeps the table mounted, preserving keyboard focus.
   if (loading && entries.length === 0) {
-    return (
-      <div className="h-full flex items-center justify-center text-text-muted">
-        正在加载...
-      </div>
-    );
+    return <div className="h-full flex items-center justify-center text-text-muted">正在加载...</div>;
   }
 
   if (error) {
@@ -1172,294 +1258,448 @@ export function FileList({ side }: FileListProps) {
     );
   }
 
-  return (<>
-    <div className="relative h-full">
-      <div ref={containerRef} className={`file-table h-full overflow-auto ${selected.size > 0 && selectionActionsVisible ? 'pb-10' : ''}`} onContextMenu={(e) => {
-        if (e.target === containerRef.current || (e.target as HTMLElement).classList.contains('relative')) {
-          e.preventDefault();
-          setContextMenu({ x: e.clientX, y: e.clientY, count: 0 });
-        }
-      }}>
-        <SortHeader side={side} />
-        {filterText && (
-          <div className="sticky top-7 z-10 px-2 py-0.5 bg-accent/80 text-white text-xs">
-            筛选：“{filterText}”（{entries.length} 项）
+  return (
+    <>
+      <div className="relative h-full">
+        <div
+          ref={containerRef}
+          className={`file-table h-full overflow-auto ${selected.size > 0 && selectionActionsVisible ? 'pb-10' : ''}`}
+          onContextMenu={(e) => {
+            if (
+              e.target === containerRef.current ||
+              (e.target as HTMLElement).classList.contains('relative')
+            ) {
+              e.preventDefault();
+              setContextMenu({ x: e.clientX, y: e.clientY, count: 0 });
+            }
+          }}
+        >
+          <SortHeader side={side} />
+          {filterText && (
+            <div className="sticky top-7 z-10 px-2 py-0.5 bg-accent/80 text-white text-xs">
+              筛选：“{filterText}”（{entries.length} 项）
+            </div>
+          )}
+
+          <div className="relative" style={{ height: `${virtualizer.getTotalSize()}px` }}>
+            {virtualItems.map((virtualItem) => {
+              const idx = virtualItem.index;
+              const entry = entries[idx];
+              return (
+                <div
+                  key={entry.path}
+                  data-index={idx}
+                  className="absolute top-0 left-0 w-full"
+                  style={{
+                    height: `${FILE_ROW_HEIGHT}px`,
+                    transform: `translate3d(0, ${virtualItem.start}px, 0)`,
+                    willChange: 'transform',
+                  }}
+                >
+                  <FileRow
+                    entry={entry}
+                    index={idx}
+                    isSelected={selected.has(entry.path)}
+                    isActive={idx === focusIdx}
+                    disableHover={disableHover}
+                    highlight={filterText}
+                    dirSize={dirSizeMap[entry.path]}
+                    onClick={handleRowClick}
+                    onDoubleClick={handleRowDoubleClick}
+                    onContextMenu={handleRowContextMenu}
+                    onDragStart={handleRowDragStart}
+                    dragOver={dragOverPath === entry.path}
+                    dropFlash={dropFlashPath === entry.path}
+                    onDragEnterRow={handleRowDragEnter}
+                    onDragLeaveRow={handleRowDragLeave}
+                    onDrop={handleRowDrop}
+                  />
+                </div>
+              );
+            })}
+          </div>
+
+          {entries.length === 0 && !loading && (
+            <div className="mx-auto mt-8 max-w-[24rem] px-6 text-center text-sm">
+              <div className="text-text-primary">{filterText ? '未找到匹配' : '空文件夹'}</div>
+              <div className="mt-2 text-xs leading-relaxed text-text-secondary">
+                {filterText
+                  ? '试试更短的名称，或清除筛选查看全部文件。'
+                  : '从另一侧拖入可复制文件，按住 Shift 拖动可移动。'}
+              </div>
+              {filterText && (
+                <button
+                  className="mt-3 rounded px-3 py-1.5 text-xs text-accent hover:bg-accent/10"
+                  onClick={() => setFilter(side, '')}
+                >
+                  清除筛选
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {selected.size > 0 && selectionActionsVisible && (
+          <div
+            data-testid="selection-action-bar"
+            className="selection-action-bar absolute bottom-2 left-2 right-2 z-20 flex h-8 items-center gap-2 rounded border border-border-strong px-2 text-xs shadow-lg"
+          >
+            <span className="whitespace-nowrap text-text-primary font-medium">{selected.size} 项已选中</span>
+            <span className="flex-1" />
+            <button
+              className="inline-flex items-center gap-1 rounded px-2 py-1 text-text-secondary hover:bg-accent/15 hover:text-text-primary transition-colors"
+              onClick={() => transferSelection('copy')}
+            >
+              <Copy className="h-3.5 w-3.5" />
+              复制到另一侧
+            </button>
+            <button
+              className="inline-flex items-center gap-1 rounded px-2 py-1 text-text-secondary hover:bg-accent/15 hover:text-text-primary transition-colors"
+              onClick={() => transferSelection('move')}
+            >
+              <ArrowRightLeft className="h-3.5 w-3.5" />
+              移动到另一侧
+            </button>
+            <button
+              className="inline-flex items-center rounded p-1 text-text-muted hover:bg-white/5 hover:text-text-primary transition-colors"
+              onClick={() => clearSelection(side)}
+              title="清除选择"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
           </div>
         )}
+      </div>
 
+      {/* 内联输入框（代替 prompt()） */}
+      {inlinePrompt && (
         <div
-          className="relative"
-          style={{ height: `${virtualizer.getTotalSize()}px` }}
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50"
+          onClick={() => {
+            inlinePrompt.resolve(null);
+            setInlinePrompt(null);
+          }}
         >
-          {virtualItems.map((virtualItem) => {
-            const idx = virtualItem.index;
-            const entry = entries[idx];
-            return (
-              <div
-                key={entry.path}
-                data-index={idx}
-                className="absolute top-0 left-0 w-full"
-                style={{
-                  height: `${FILE_ROW_HEIGHT}px`,
-                  transform: `translate3d(0, ${virtualItem.start}px, 0)`,
-                  willChange: 'transform',
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={inlinePrompt.message}
+            className="bg-surface-light border border-border rounded-lg shadow-2xl p-4 min-w-[320px]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-sm text-text-primary mb-3">{inlinePrompt.message}</div>
+            <input
+              autoFocus
+              id="inline-prompt-input"
+              className="w-full bg-surface-lighter border border-border rounded px-3 py-1.5 text-sm text-text-primary outline-none focus:border-accent"
+              defaultValue={inlinePrompt.defaultValue}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  inlinePrompt.resolve((e.target as HTMLInputElement).value);
+                  setInlinePrompt(null);
+                }
+                if (e.key === 'Escape') {
+                  inlinePrompt.resolve(null);
+                  setInlinePrompt(null);
+                }
+              }}
+            />
+            <div className="flex justify-end gap-2 mt-3">
+              <button
+                className="px-3 py-1 text-xs text-text-muted hover:text-text-primary"
+                onClick={() => {
+                  inlinePrompt.resolve(null);
+                  setInlinePrompt(null);
                 }}
               >
-                <FileRow
-                  entry={entry}
-                  index={idx}
-                  isSelected={selected.has(entry.path)}
-                  isActive={idx === focusIdx}
-                  disableHover={disableHover}
-                  highlight={filterText}
-                  dirSize={dirSizeMap[entry.path]}
-                  onClick={handleRowClick}
-                  onDoubleClick={handleRowDoubleClick}
-                  onContextMenu={handleRowContextMenu}
-                  onDragStart={handleRowDragStart}
-                  dragOver={dragOverPath === entry.path}
-                  dropFlash={dropFlashPath === entry.path}
-                  onDragEnterRow={handleRowDragEnter}
-                  onDragLeaveRow={handleRowDragLeave}
-                  onDrop={handleRowDrop}
-                />
-              </div>
-            );
-          })}
-        </div>
-
-        {entries.length === 0 && !loading && (
-          <div className="mx-auto mt-8 max-w-[24rem] px-6 text-center text-sm">
-            <div className="text-text-primary">{filterText ? '未找到匹配' : '空文件夹'}</div>
-            <div className="mt-2 text-xs leading-relaxed text-text-secondary">
-              {filterText ? '试试更短的名称，或清除筛选查看全部文件。' : '从另一侧拖入可复制文件，按住 Shift 拖动可移动。'}
-            </div>
-            {filterText && (
-              <button className="mt-3 rounded px-3 py-1.5 text-xs text-accent hover:bg-accent/10" onClick={() => setFilter(side, '')}>
-                清除筛选
+                取消
               </button>
-            )}
+              <button
+                className="px-3 py-1 text-xs bg-accent text-white rounded"
+                onClick={() => {
+                  const el = document.getElementById('inline-prompt-input') as HTMLInputElement;
+                  inlinePrompt.resolve(el?.value || '');
+                  setInlinePrompt(null);
+                }}
+              >
+                确定
+              </button>
+            </div>
           </div>
-        )}
-      </div>
-
-      {selected.size > 0 && selectionActionsVisible && (
-        <div
-          data-testid="selection-action-bar"
-          className="selection-action-bar absolute bottom-2 left-2 right-2 z-20 flex h-8 items-center gap-2 rounded border border-border-strong px-2 text-xs shadow-lg"
-        >
-          <span className="whitespace-nowrap text-text-primary font-medium">{selected.size} 项已选中</span>
-          <span className="flex-1" />
-          <button
-            className="inline-flex items-center gap-1 rounded px-2 py-1 text-text-secondary hover:bg-accent/15 hover:text-text-primary transition-colors"
-            onClick={() => transferSelection('copy')}
-          >
-            <Copy className="h-3.5 w-3.5" />
-            复制到另一侧
-          </button>
-          <button
-            className="inline-flex items-center gap-1 rounded px-2 py-1 text-text-secondary hover:bg-accent/15 hover:text-text-primary transition-colors"
-            onClick={() => transferSelection('move')}
-          >
-            <ArrowRightLeft className="h-3.5 w-3.5" />
-            移动到另一侧
-          </button>
-          <button
-            className="inline-flex items-center rounded p-1 text-text-muted hover:bg-white/5 hover:text-text-primary transition-colors"
-            onClick={() => clearSelection(side)}
-            title="清除选择"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
         </div>
       )}
-    </div>
 
-    {/* 内联输入框（代替 prompt()） */}
-    {inlinePrompt && (
-      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50" onClick={() => { inlinePrompt.resolve(null); setInlinePrompt(null); }}>
-        <div role="dialog" aria-modal="true" aria-label={inlinePrompt.message} className="bg-surface-light border border-border rounded-lg shadow-2xl p-4 min-w-[320px]" onClick={(e) => e.stopPropagation()}>
-          <div className="text-sm text-text-primary mb-3">{inlinePrompt.message}</div>
-          <input
-            autoFocus
-            id="inline-prompt-input"
-            className="w-full bg-surface-lighter border border-border rounded px-3 py-1.5 text-sm text-text-primary outline-none focus:border-accent"
-            defaultValue={inlinePrompt.defaultValue}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') { inlinePrompt.resolve((e.target as HTMLInputElement).value); setInlinePrompt(null); }
-              if (e.key === 'Escape') { inlinePrompt.resolve(null); setInlinePrompt(null); }
-            }}
-          />
-          <div className="flex justify-end gap-2 mt-3">
-            <button className="px-3 py-1 text-xs text-text-muted hover:text-text-primary" onClick={() => { inlinePrompt.resolve(null); setInlinePrompt(null); }}>取消</button>
-            <button className="px-3 py-1 text-xs bg-accent text-white rounded" onClick={() => { const el = document.getElementById('inline-prompt-input') as HTMLInputElement; inlinePrompt.resolve(el?.value || ''); setInlinePrompt(null); }}>确定</button>
+      {/* 内联确认框（代替 confirm） */}
+      {inlineConfirm && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50"
+          onClick={() => {
+            inlineConfirm.resolve(false);
+            setInlineConfirm(null);
+          }}
+        >
+          <div
+            className="bg-surface-light border border-border rounded-lg shadow-2xl p-4 min-w-[300px]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-sm text-text-primary mb-4 whitespace-pre-wrap">{inlineConfirm.message}</div>
+            <div className="flex justify-end gap-2">
+              <button
+                className="px-4 py-1 text-xs text-text-muted hover:text-text-primary border border-border rounded"
+                onClick={() => {
+                  inlineConfirm.resolve(false);
+                  setInlineConfirm(null);
+                }}
+              >
+                取消
+              </button>
+              <button
+                className="px-4 py-1 text-xs bg-accent text-white rounded"
+                onClick={() => {
+                  inlineConfirm.resolve(true);
+                  setInlineConfirm(null);
+                }}
+              >
+                确定
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    )}
+      )}
 
-    {/* 内联确认框（代替 confirm） */}
-    {inlineConfirm && (
-      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50" onClick={() => { inlineConfirm.resolve(false); setInlineConfirm(null); }}>
-        <div className="bg-surface-light border border-border rounded-lg shadow-2xl p-4 min-w-[300px]" onClick={(e) => e.stopPropagation()}>
-          <div className="text-sm text-text-primary mb-4 whitespace-pre-wrap">{inlineConfirm.message}</div>
-          <div className="flex justify-end gap-2">
-            <button className="px-4 py-1 text-xs text-text-muted hover:text-text-primary border border-border rounded" onClick={() => { inlineConfirm.resolve(false); setInlineConfirm(null); }}>取消</button>
-            <button className="px-4 py-1 text-xs bg-accent text-white rounded" onClick={() => { inlineConfirm.resolve(true); setInlineConfirm(null); }}>确定</button>
+      {inlineAlert && (
+        <div
+          className="fixed inset-0 z-[220] flex items-center justify-center bg-black/50"
+          onClick={() => {
+            inlineAlert.resolve();
+            setInlineAlert(null);
+          }}
+        >
+          <div
+            className="bg-surface-light border border-border rounded-lg shadow-2xl p-4 min-w-[360px] max-w-[min(680px,90vw)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-sm font-medium text-text-primary mb-3">
+              {inlineAlert.type === 'error'
+                ? '操作失败'
+                : inlineAlert.type === 'warning'
+                  ? '操作结果'
+                  : '提示'}
+            </div>
+            <div className="text-xs leading-relaxed text-text-secondary whitespace-pre-wrap max-h-[60vh] overflow-auto pr-1">
+              {inlineAlert.message}
+            </div>
+            <div className="flex justify-end mt-4">
+              <button
+                className="px-4 py-1 text-xs bg-accent text-white rounded"
+                onClick={() => {
+                  inlineAlert.resolve();
+                  setInlineAlert(null);
+                }}
+              >
+                确定
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    )}
+      )}
 
-    {inlineAlert && (
-      <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/50" onClick={() => { inlineAlert.resolve(); setInlineAlert(null); }}>
-        <div className="bg-surface-light border border-border rounded-lg shadow-2xl p-4 min-w-[360px] max-w-[min(680px,90vw)]" onClick={(e) => e.stopPropagation()}>
-          <div className="text-sm font-medium text-text-primary mb-3">
-            {inlineAlert.type === 'error' ? '操作失败' : inlineAlert.type === 'warning' ? '操作结果' : '提示'}
-          </div>
-          <div className="text-xs leading-relaxed text-text-secondary whitespace-pre-wrap max-h-[60vh] overflow-auto pr-1">
-            {inlineAlert.message}
-          </div>
-          <div className="flex justify-end mt-4">
-            <button
-              className="px-4 py-1 text-xs bg-accent text-white rounded"
-              onClick={() => { inlineAlert.resolve(); setInlineAlert(null); }}
-            >
-              确定
-            </button>
+      {copyConflictChoice && (
+        <div
+          className="fixed inset-0 z-[210] flex items-center justify-center bg-black/50"
+          onClick={() => {
+            copyConflictChoice.resolve(null);
+            setConflictHover(null);
+            setCopyConflictChoice(null);
+          }}
+        >
+          <div
+            className="bg-surface-light border border-border rounded-lg shadow-2xl p-4 min-w-[560px] max-w-[min(720px,90vw)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-sm text-text-primary mb-4 whitespace-pre-wrap">
+              {copyConflictChoice.message}
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              <button
+                className={getConflictChoiceButtonClass('skip', conflictHover)}
+                onMouseEnter={() => setConflictHover('skip')}
+                onMouseLeave={() => setConflictHover(null)}
+                onFocus={() => setConflictHover('skip')}
+                onBlur={() => setConflictHover(null)}
+                onClick={() => {
+                  copyConflictChoice.resolve('skip');
+                  setConflictHover(null);
+                  setCopyConflictChoice(null);
+                }}
+              >
+                跳过全部同名
+              </button>
+              <button
+                className={getConflictChoiceButtonClass('rename', conflictHover)}
+                onMouseEnter={() => setConflictHover('rename')}
+                onMouseLeave={() => setConflictHover(null)}
+                onFocus={() => setConflictHover('rename')}
+                onBlur={() => setConflictHover(null)}
+                onClick={() => {
+                  copyConflictChoice.resolve('rename');
+                  setConflictHover(null);
+                  setCopyConflictChoice(null);
+                }}
+              >
+                自动重命名全部
+              </button>
+              <button
+                className={getConflictChoiceButtonClass('overwrite', conflictHover)}
+                onMouseEnter={() => setConflictHover('overwrite')}
+                onMouseLeave={() => setConflictHover(null)}
+                onFocus={() => setConflictHover('overwrite')}
+                onBlur={() => setConflictHover(null)}
+                onClick={() => {
+                  copyConflictChoice.resolve('overwrite');
+                  setConflictHover(null);
+                  setCopyConflictChoice(null);
+                }}
+              >
+                覆盖全部
+              </button>
+              <button
+                className={getConflictChoiceButtonClass('cancel', conflictHover)}
+                onMouseEnter={() => setConflictHover('cancel')}
+                onMouseLeave={() => setConflictHover(null)}
+                onFocus={() => setConflictHover('cancel')}
+                onBlur={() => setConflictHover(null)}
+                onClick={() => {
+                  copyConflictChoice.resolve(null);
+                  setConflictHover(null);
+                  setCopyConflictChoice(null);
+                }}
+              >
+                取消
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    )}
+      )}
 
-    {copyConflictChoice && (
-      <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/50" onClick={() => { copyConflictChoice.resolve(null); setConflictHover(null); setCopyConflictChoice(null); }}>
-        <div className="bg-surface-light border border-border rounded-lg shadow-2xl p-4 min-w-[560px] max-w-[min(720px,90vw)]" onClick={(e) => e.stopPropagation()}>
-          <div className="text-sm text-text-primary mb-4 whitespace-pre-wrap">{copyConflictChoice.message}</div>
-          <div className="grid grid-cols-4 gap-2">
-            <button
-              className={getConflictChoiceButtonClass('skip', conflictHover)}
-              onMouseEnter={() => setConflictHover('skip')}
-              onMouseLeave={() => setConflictHover(null)}
-              onFocus={() => setConflictHover('skip')}
-              onBlur={() => setConflictHover(null)}
-              onClick={() => { copyConflictChoice.resolve('skip'); setConflictHover(null); setCopyConflictChoice(null); }}
-            >
-              跳过全部同名
-            </button>
-            <button
-              className={getConflictChoiceButtonClass('rename', conflictHover)}
-              onMouseEnter={() => setConflictHover('rename')}
-              onMouseLeave={() => setConflictHover(null)}
-              onFocus={() => setConflictHover('rename')}
-              onBlur={() => setConflictHover(null)}
-              onClick={() => { copyConflictChoice.resolve('rename'); setConflictHover(null); setCopyConflictChoice(null); }}
-            >
-              自动重命名全部
-            </button>
-            <button
-              className={getConflictChoiceButtonClass('overwrite', conflictHover)}
-              onMouseEnter={() => setConflictHover('overwrite')}
-              onMouseLeave={() => setConflictHover(null)}
-              onFocus={() => setConflictHover('overwrite')}
-              onBlur={() => setConflictHover(null)}
-              onClick={() => { copyConflictChoice.resolve('overwrite'); setConflictHover(null); setCopyConflictChoice(null); }}
-            >
-              覆盖全部
-            </button>
-            <button
-              className={getConflictChoiceButtonClass('cancel', conflictHover)}
-              onMouseEnter={() => setConflictHover('cancel')}
-              onMouseLeave={() => setConflictHover(null)}
-              onFocus={() => setConflictHover('cancel')}
-              onBlur={() => setConflictHover(null)}
-              onClick={() => { copyConflictChoice.resolve(null); setConflictHover(null); setCopyConflictChoice(null); }}
-            >
-              取消
-            </button>
+      {pendingOperation && (
+        <div className="fixed inset-0 z-[205] flex items-center justify-center bg-black/40">
+          <div className="bg-surface-light border border-border rounded-lg shadow-2xl p-4 min-w-[320px]">
+            <div className="text-sm text-text-primary mb-1">{pendingOperation.label}</div>
+            <div className="text-xs text-text-muted mb-4">长任务可取消；已完成的项目会在结果报告中列出。</div>
+            <div className="flex justify-end">
+              <button
+                className="px-4 py-1 text-xs text-text-secondary hover:text-text-primary border border-border rounded disabled:opacity-60"
+                disabled={pendingOperation.cancelling}
+                onClick={cancelPendingOperation}
+              >
+                {pendingOperation.cancelling ? '正在取消...' : '取消任务'}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    )}
+      )}
 
-    {pendingOperation && (
-      <div className="fixed inset-0 z-[205] flex items-center justify-center bg-black/40">
-        <div className="bg-surface-light border border-border rounded-lg shadow-2xl p-4 min-w-[320px]">
-          <div className="text-sm text-text-primary mb-1">{pendingOperation.label}</div>
-          <div className="text-xs text-text-muted mb-4">
-            长任务可取消；已完成的项目会在结果报告中列出。
-          </div>
-          <div className="flex justify-end">
-            <button
-              className="px-4 py-1 text-xs text-text-secondary hover:text-text-primary border border-border rounded disabled:opacity-60"
-              disabled={pendingOperation.cancelling}
-              onClick={cancelPendingOperation}
-            >
-              {pendingOperation.cancelling ? '正在取消...' : '取消任务'}
-            </button>
+      {/* 右键菜单 */}
+      {contextMenu && (
+        <div className="fixed z-[150]" style={{ left: contextMenu.x, top: contextMenu.y }}>
+          <div className="bg-surface-light border border-border rounded-lg shadow-xl py-1 min-w-[180px] text-xs">
+            {/* 空白区域 */}
+            {contextMenu.count === 0 && (
+              <>
+                <MenuBtn onClick={ctxNewFolder}>
+                  <FolderPlus className="w-3.5 h-3.5" /> 新建文件夹
+                </MenuBtn>
+                <MenuBtn onClick={ctxNewFile}>
+                  <FilePlus className="w-3.5 h-3.5" /> 新建文件
+                </MenuBtn>
+                <MenuSep />
+                <MenuBtn onClick={ctxRefresh}>
+                  <RefreshCw className="w-3.5 h-3.5" /> 刷新
+                </MenuBtn>
+                <MenuBtn onClick={handleOpenFolder}>
+                  <FolderOpen className="w-3.5 h-3.5" /> 打开文件夹...
+                </MenuBtn>
+                <MenuSep />
+                <MenuBtn onClick={ctxEmptyFolder}>
+                  <Trash2 className="w-3.5 h-3.5" /> 清空文件夹
+                </MenuBtn>
+              </>
+            )}
+            {/* 单个文件或文件夹 */}
+            {contextMenu.single && (
+              <>
+                <MenuBtn onClick={ctxOpen}>
+                  {contextMenu.single.isDirectory ? (
+                    <Folder className="w-3.5 h-3.5" />
+                  ) : (
+                    <File className="w-3.5 h-3.5" />
+                  )}{' '}
+                  {contextMenu.single.isDirectory ? '打开' : '打开文件'}
+                </MenuBtn>
+                {contextMenu.single.isDirectory && (
+                  <MenuBtn onClick={ctxOpenOther}>
+                    <ArrowUpRight className="w-3.5 h-3.5" /> 在另一侧打开
+                  </MenuBtn>
+                )}
+                <MenuSep />
+                <MenuBtn onClick={ctxCopy}>
+                  <Copy className="w-3.5 h-3.5" /> 复制到另一侧
+                </MenuBtn>
+                <MenuBtn onClick={ctxMove}>
+                  <ArrowRightLeft className="w-3.5 h-3.5" /> 移动到另一侧
+                </MenuBtn>
+                <MenuSep />
+                <MenuBtn onClick={ctxRename}>
+                  <Pencil className="w-3.5 h-3.5" /> 重命名
+                </MenuBtn>
+                <MenuBtn onClick={ctxDelete}>
+                  <Trash2 className="w-3.5 h-3.5" /> 删除
+                </MenuBtn>
+                <MenuBtn onClick={ctxPermanentDelete}>
+                  <Trash2 className="w-3.5 h-3.5" /> 永久删除
+                </MenuBtn>
+                <MenuSep />
+                <MenuBtn onClick={ctxShowItemInFolder}>
+                  <ExternalLink className="w-3.5 h-3.5" /> 打开所在文件夹
+                </MenuBtn>
+                <MenuBtn onClick={ctxCopyName}>
+                  <Clipboard className="w-3.5 h-3.5" /> 复制文件名
+                </MenuBtn>
+                <MenuBtn onClick={ctxCopyPath}>
+                  <ClipboardCheck className="w-3.5 h-3.5" /> 复制路径
+                </MenuBtn>
+              </>
+            )}
+            {/* 多个选中 */}
+            {contextMenu.count > 1 && !contextMenu.single && (
+              <>
+                <MenuBtn onClick={ctxCopy}>
+                  <Copy className="w-3.5 h-3.5" /> 复制 {contextMenu.count} 项到另一侧
+                </MenuBtn>
+                <MenuBtn onClick={ctxMove}>
+                  <ArrowRightLeft className="w-3.5 h-3.5" /> 移动 {contextMenu.count} 项到另一侧
+                </MenuBtn>
+                <MenuSep />
+                <MenuBtn onClick={ctxDelete}>
+                  <Trash2 className="w-3.5 h-3.5" /> 删除 {contextMenu.count} 项
+                </MenuBtn>
+                <MenuBtn onClick={ctxPermanentDelete}>
+                  <Trash2 className="w-3.5 h-3.5" /> 永久删除 {contextMenu.count} 项
+                </MenuBtn>
+                <MenuSep />
+                <MenuBtn onClick={ctxCopyName}>
+                  <Clipboard className="w-3.5 h-3.5" /> 复制文件名
+                </MenuBtn>
+                <MenuBtn onClick={ctxCopyPath}>
+                  <ClipboardCheck className="w-3.5 h-3.5" /> 复制路径
+                </MenuBtn>
+              </>
+            )}
           </div>
         </div>
-      </div>
-    )}
-
-    {/* 右键菜单 */}
-    {contextMenu && (
-      <div className="fixed z-[150]" style={{ left: contextMenu.x, top: contextMenu.y }}>
-        <div className="bg-surface-light border border-border rounded-lg shadow-xl py-1 min-w-[180px] text-xs">
-          {/* 空白区域 */}
-          {contextMenu.count === 0 && (
-            <>
-              <MenuBtn onClick={ctxNewFolder}><FolderPlus className="w-3.5 h-3.5" /> 新建文件夹</MenuBtn>
-              <MenuBtn onClick={ctxNewFile}><FilePlus className="w-3.5 h-3.5" /> 新建文件</MenuBtn>
-              <MenuSep />
-              <MenuBtn onClick={ctxRefresh}><RefreshCw className="w-3.5 h-3.5" /> 刷新</MenuBtn>
-              <MenuBtn onClick={handleOpenFolder}><FolderOpen className="w-3.5 h-3.5" /> 打开文件夹...</MenuBtn>
-              <MenuSep />
-              <MenuBtn onClick={ctxEmptyFolder}><Trash2 className="w-3.5 h-3.5" /> 清空文件夹</MenuBtn>
-            </>
-          )}
-          {/* 单个文件或文件夹 */}
-          {contextMenu.single && (
-            <>
-              <MenuBtn onClick={ctxOpen}>
-                {contextMenu.single.isDirectory ? <Folder className="w-3.5 h-3.5" /> : <File className="w-3.5 h-3.5" />}
-                {' '}{contextMenu.single.isDirectory ? '打开' : '打开文件'}
-              </MenuBtn>
-              {contextMenu.single.isDirectory && (
-                <MenuBtn onClick={ctxOpenOther}><ArrowUpRight className="w-3.5 h-3.5" /> 在另一侧打开</MenuBtn>
-              )}
-              <MenuSep />
-              <MenuBtn onClick={ctxCopy}><Copy className="w-3.5 h-3.5" /> 复制到另一侧</MenuBtn>
-              <MenuBtn onClick={ctxMove}><ArrowRightLeft className="w-3.5 h-3.5" /> 移动到另一侧</MenuBtn>
-              <MenuSep />
-              <MenuBtn onClick={ctxRename}><Pencil className="w-3.5 h-3.5" /> 重命名</MenuBtn>
-              <MenuBtn onClick={ctxDelete}><Trash2 className="w-3.5 h-3.5" /> 删除</MenuBtn>
-              <MenuBtn onClick={ctxPermanentDelete}><Trash2 className="w-3.5 h-3.5" /> 永久删除</MenuBtn>
-              <MenuSep />
-              <MenuBtn onClick={ctxShowItemInFolder}>
-                <ExternalLink className="w-3.5 h-3.5" /> 打开所在文件夹
-              </MenuBtn>
-              <MenuBtn onClick={ctxCopyName}><Clipboard className="w-3.5 h-3.5" /> 复制文件名</MenuBtn>
-              <MenuBtn onClick={ctxCopyPath}><ClipboardCheck className="w-3.5 h-3.5" /> 复制路径</MenuBtn>
-            </>
-          )}
-          {/* 多个选中 */}
-          {contextMenu.count > 1 && !contextMenu.single && (
-            <>
-              <MenuBtn onClick={ctxCopy}><Copy className="w-3.5 h-3.5" /> 复制 {contextMenu.count} 项到另一侧</MenuBtn>
-              <MenuBtn onClick={ctxMove}><ArrowRightLeft className="w-3.5 h-3.5" /> 移动 {contextMenu.count} 项到另一侧</MenuBtn>
-              <MenuSep />
-              <MenuBtn onClick={ctxDelete}><Trash2 className="w-3.5 h-3.5" /> 删除 {contextMenu.count} 项</MenuBtn>
-              <MenuBtn onClick={ctxPermanentDelete}><Trash2 className="w-3.5 h-3.5" /> 永久删除 {contextMenu.count} 项</MenuBtn>
-              <MenuSep />
-              <MenuBtn onClick={ctxCopyName}><Clipboard className="w-3.5 h-3.5" /> 复制文件名</MenuBtn>
-              <MenuBtn onClick={ctxCopyPath}><ClipboardCheck className="w-3.5 h-3.5" /> 复制路径</MenuBtn>
-            </>
-          )}
-        </div>
-      </div>
-    )}
-  </>
+      )}
+    </>
   );
 }
 
@@ -1527,9 +1767,7 @@ function SortHeader({ side }: { side: 'left' | 'right' }) {
             }}
           >
             {col.label}
-            {active && (
-              <span className="ml-0.5">{sort.direction === 'asc' ? '▲' : '▼'}</span>
-            )}
+            {active && <span className="ml-0.5">{sort.direction === 'asc' ? '▲' : '▼'}</span>}
           </button>
         );
       })}

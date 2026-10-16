@@ -47,9 +47,7 @@ interface BenchResult {
 async function main() {
   let files: string[];
   try {
-    files = (await readdir(DATA_DIR))
-      .filter((f) => f.endsWith('.log'))
-      .sort();
+    files = (await readdir(DATA_DIR)).filter((f) => f.endsWith('.log')).sort();
   } catch {
     console.error('No test data found. Run generate-data.ts first:');
     console.error('  npx tsx scripts/benchmark/generate-data.ts');
@@ -86,7 +84,11 @@ async function main() {
       await benchmarkBmh(filePath, QUERY);
       await benchmarkBmhBuffer(filePath, QUERY);
       await sleep(50);
-      try { await benchmarkRg(filePath, QUERY); } catch { /* */ }
+      try {
+        await benchmarkRg(filePath, QUERY);
+      } catch {
+        /* */
+      }
       await sleep(100);
     }
 

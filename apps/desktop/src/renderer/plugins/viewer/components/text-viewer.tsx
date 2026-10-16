@@ -11,26 +11,45 @@ import '../styles/hljs.css';
 function extToLang(filePath: string): string | undefined {
   const ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase();
   const map: Record<string, string> = {
-    '.js': 'javascript', '.jsx': 'javascript', '.mjs': 'javascript',
-    '.ts': 'typescript', '.tsx': 'typescript',
-    '.json': 'json', '.jsonc': 'json',
-    '.html': 'xml', '.htm': 'xml', '.xml': 'xml', '.svg': 'xml',
-    '.css': 'css', '.scss': 'scss', '.less': 'less',
+    '.js': 'javascript',
+    '.jsx': 'javascript',
+    '.mjs': 'javascript',
+    '.ts': 'typescript',
+    '.tsx': 'typescript',
+    '.json': 'json',
+    '.jsonc': 'json',
+    '.html': 'xml',
+    '.htm': 'xml',
+    '.xml': 'xml',
+    '.svg': 'xml',
+    '.css': 'css',
+    '.scss': 'scss',
+    '.less': 'less',
     '.py': 'python',
     '.rs': 'rust',
     '.go': 'golang',
     '.java': 'java',
     '.rb': 'ruby',
     '.php': 'php',
-    '.sh': 'bash', '.bash': 'bash', '.zsh': 'bash',
+    '.sh': 'bash',
+    '.bash': 'bash',
+    '.zsh': 'bash',
     '.md': 'markdown',
-    '.yaml': 'yaml', '.yml': 'yaml',
+    '.yaml': 'yaml',
+    '.yml': 'yaml',
     '.toml': 'ini',
-    '.ini': 'ini', '.cfg': 'ini', '.conf': 'ini',
-    '.c': 'c', '.h': 'c',
-    '.cpp': 'cpp', '.cc': 'cpp', '.cxx': 'cpp', '.hpp': 'cpp',
+    '.ini': 'ini',
+    '.cfg': 'ini',
+    '.conf': 'ini',
+    '.c': 'c',
+    '.h': 'c',
+    '.cpp': 'cpp',
+    '.cc': 'cpp',
+    '.cxx': 'cpp',
+    '.hpp': 'cpp',
     '.sql': 'sql',
-    '.diff': 'diff', '.patch': 'diff',
+    '.diff': 'diff',
+    '.patch': 'diff',
   };
   return map[ext];
 }
@@ -159,9 +178,7 @@ export function TextViewer({ side }: { side: 'left' | 'right' }) {
   });
 
   const isSearchHighlightForFile =
-    !!filePath &&
-    !!searchHighlight &&
-    normalizePath(searchHighlight.filePath) === normalizePath(filePath);
+    !!filePath && !!searchHighlight && normalizePath(searchHighlight.filePath) === normalizePath(filePath);
 
   useEffect(() => {
     if (!isSearchHighlightForFile || !searchHighlight || sourceLines.length === 0) return;
@@ -227,9 +244,7 @@ export function TextViewer({ side }: { side: 'left' | 'right' }) {
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center text-text-muted text-sm">
-        正在加载文件…
-      </div>
+      <div className="h-full flex items-center justify-center text-text-muted text-sm">正在加载文件…</div>
     );
   }
 
@@ -250,7 +265,9 @@ export function TextViewer({ side }: { side: 'left' | 'right' }) {
         <div className="flex-shrink-0 flex items-center justify-between gap-3 border-b border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
           <span className="min-w-0 truncate">
             文件较大，仅加载前 {formatBytes(readInfo.bytesRead)} / {formatBytes(readInfo.size)}。
-            {isSearchHighlightForFile && searchHighlight && searchHighlight.lineNumber > sourceLines.length &&
+            {isSearchHighlightForFile &&
+              searchHighlight &&
+              searchHighlight.lineNumber > sourceLines.length &&
               ` 搜索匹配位于第 ${searchHighlight.lineNumber} 行，请继续加载。`}
           </span>
           {readInfo.canContinue && (
@@ -304,19 +321,19 @@ export function TextViewer({ side }: { side: 'left' | 'right' }) {
               title={showPreview ? '查看 Markdown 源码' : '查看 Markdown 排版预览'}
             >
               {showPreview ? (
-                <><Code2 className="w-3.5 h-3.5" /> 源码</>
+                <>
+                  <Code2 className="w-3.5 h-3.5" /> 源码
+                </>
               ) : (
-                <><Eye className="w-3.5 h-3.5" /> 排版预览</>
+                <>
+                  <Eye className="w-3.5 h-3.5" /> 排版预览
+                </>
               )}
             </button>
           )}
         </div>
       </div>
-      <div
-        ref={containerRef}
-        className="flex-1 overflow-auto relative"
-        onScroll={handleScroll}
-      >
+      <div ref={containerRef} className="flex-1 overflow-auto relative" onScroll={handleScroll}>
         {showPreview ? (
           <div
             className="p-6 text-sm text-text-primary select-text leading-relaxed markdown-body"
@@ -325,8 +342,10 @@ export function TextViewer({ side }: { side: 'left' | 'right' }) {
         ) : isCsvFile && csvRows && csvRows.length > 0 && !showSearchSource ? (
           <CsvTable rows={csvRows} />
         ) : (
-          <div className="relative font-mono text-sm leading-relaxed py-4"
-            style={{ height: `${virtualizer.getTotalSize()}px` }}>
+          <div
+            className="relative font-mono text-sm leading-relaxed py-4"
+            style={{ height: `${virtualizer.getTotalSize()}px` }}
+          >
             {virtualizer.getVirtualItems().map((vItem) => {
               const i = vItem.index;
               const lineHtml = sourceLines[i];
@@ -413,9 +432,7 @@ function CsvTable({ rows }: { rows: string[][] }) {
         </tbody>
       </table>
       {data.length === 0 && (
-        <div className="p-6 text-center text-text-muted text-sm">
-          CSV 仅有表头，暂无数据
-        </div>
+        <div className="p-6 text-center text-text-muted text-sm">CSV 仅有表头，暂无数据</div>
       )}
     </div>
   );
@@ -443,9 +460,7 @@ function formatBytes(bytes: number): string {
 
 function highlightRawLineFirst(line: string, highlight: SearchHighlight): string {
   const rangeStart =
-    typeof highlight.columnStart === 'number' && highlight.columnStart > 0
-      ? highlight.columnStart - 1
-      : -1;
+    typeof highlight.columnStart === 'number' && highlight.columnStart > 0 ? highlight.columnStart - 1 : -1;
   const rangeEnd =
     typeof highlight.columnEnd === 'number' && highlight.columnEnd > rangeStart
       ? highlight.columnEnd - 1
@@ -456,9 +471,7 @@ function highlightRawLineFirst(line: string, highlight: SearchHighlight): string
 
   const rangeText = start >= 0 && end > start ? line.slice(start, Math.min(end, line.length)) : '';
   const expected = highlight.text.trim();
-  const rangeMatches =
-    !expected ||
-    rangeText.toLowerCase() === expected.toLowerCase();
+  const rangeMatches = !expected || rangeText.toLowerCase() === expected.toLowerCase();
 
   if (start < 0 || end <= start || start >= line.length || !rangeMatches) {
     const needle = highlight.text.trim();

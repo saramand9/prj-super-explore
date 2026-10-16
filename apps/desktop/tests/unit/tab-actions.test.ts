@@ -29,7 +29,12 @@ describe('shared tab closing', () => {
     const tab = await open('D:/documents');
     useFileStore.getState().selectSingle('left', 'D:/documents/test.txt');
     await closeExplorerTab('left', tab);
-    expect(useFileStore.getState().left).toMatchObject({ path: null, tabs: [], entries: [], activeTabId: null });
+    expect(useFileStore.getState().left).toMatchObject({
+      path: null,
+      tabs: [],
+      entries: [],
+      activeTabId: null,
+    });
     expect(useFileStore.getState().left.selected.size).toBe(0);
     expect(useLayoutStore.getState().layout.left.path).toBeNull();
   });

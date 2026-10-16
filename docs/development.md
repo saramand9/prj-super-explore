@@ -9,6 +9,8 @@ or regenerate a second lockfile.
 ```powershell
 pnpm dev
 pnpm typecheck
+pnpm lint
+pnpm format:check
 pnpm test:unit
 pnpm test:e2e
 pnpm test:commit-policy
@@ -20,9 +22,11 @@ file fixtures. They cover navigation, workspace switching, search, preview,
 rename conflicts, close/save races, recovery from damaged settings, save
 timeouts, scan cancellation, panel recovery and duplicate instances.
 
-The legacy `lint` and `format` commands need Biome installation/configuration;
-they are not currently usable. This remains an explicit readiness finding, not
-a silently skipped or replaced lint check.
+Biome supplies formatting and an explicit correctness/security lint baseline.
+Run `pnpm format` to apply formatting, and `pnpm format:check` to verify it.
+Type checking includes main, preload, renderer, tests and TypeScript tool configs.
+The tests additionally cover IPC schema rejection, trusted main-frame senders,
+sandbox/isolation flags, navigation and popup denial, and production CSP.
 
 ## Packaging
 
@@ -51,6 +55,8 @@ pnpm verify:search
 ```
 
 The Windows checks workflow builds and tests but does not publish installers.
+The separate [release workflow](releasing.md) builds a draft on a version tag;
+it never publishes automatically.
 Production distribution still needs clean-machine installation, upgrade,
 uninstallation, search without development tools, read-only directories,
 disconnected shares and large-directory checks. Current packaging does not
@@ -71,7 +77,8 @@ run intentionally. See [the measurement method and recorded results](scan-benchm
 ## Layout
 
 - `apps/desktop/src/main/`: operating-system services and IPC handlers.
-- `apps/desktop/src/preload/`: renderer bridge and TypeScript declarations.
+- `apps/desktop/src/preload/`: bundled CommonJS sandbox bridge; shared API types
+  live in `packages/shared/src/bridge.ts` and are used by the renderer declaration.
 - `apps/desktop/src/renderer/`: React UI, plugins, workers and stores.
 - `apps/desktop/tests/`: unit, Electron end-to-end, packaging and benchmark tests.
 - `packages/shared/`: shared configuration, IPC and plugin types.
@@ -83,6 +90,13 @@ The loader reads a trusted local plugin's `main.js`, which exports a named
 `createPlugin()` factory. It is not a package marketplace or a sandbox. Plugins
 can use the application's file capabilities. Inspect unfamiliar plugins before
 loading them, and do not claim process or permission isolation.
+Production CSP explicitly permits Blob modules for these trusted plugins, not
+arbitrary remote scripts. New installation requires native confirmation. Plugin
+IDs and file paths are validated, including canonical-path containment checks.
+Plugins that directly used the old generic `window.explore.invoke/on/once`
+bridge must migrate to the fixed `window.explore.requests[channel](payload)` and
+`window.explore.events[channel](callback)` functions. The framework's typed
+`PluginContext` filesystem/search APIs continue to use the internal IPC client.
 
 The optional launcher has a configurable shortcut, normally `Alt+Space`.
 Filename search and literal full-text search are different features; do not

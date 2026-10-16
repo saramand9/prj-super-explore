@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useFileStore } from '../../src/renderer/plugins/file-explorer/store';
 import { ipc } from '../../src/renderer/framework/bridge/ipc-client';
+import { fixtureFile } from '../helpers/file-entry';
 
 vi.mock('../../src/renderer/framework/bridge/ipc-client', () => ({
   ipc: { invoke: vi.fn() },
@@ -11,7 +12,10 @@ vi.mock('../../src/renderer/framework/bridge/ipc-client', () => ({
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (error: Error) => void;
-  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
   return { promise, resolve, reject };
 }
 
@@ -23,7 +27,9 @@ describe('directory navigation', () => {
 
   it.each(['success', 'error'])('ignores a stale directory %s after newer navigation', async (outcome) => {
     const older = deferred<any[]>();
-    vi.mocked(ipc.invoke).mockReturnValueOnce(older.promise).mockResolvedValueOnce([{ name: 'new.txt' }]);
+    vi.mocked(ipc.invoke)
+      .mockReturnValueOnce(older.promise)
+      .mockResolvedValueOnce([fixtureFile('new.txt')]);
     const pending = useFileStore.getState().navigateTo('left', 'D:/old');
     await useFileStore.getState().navigateTo('left', 'D:/new');
     if (outcome === 'success') older.resolve([{ name: 'old.txt' }]);
@@ -31,13 +37,19 @@ describe('directory navigation', () => {
     await pending;
 
     expect(useFileStore.getState().left).toMatchObject({
-      path: 'D:/new', entries: [{ name: 'new.txt' }], loading: false, error: null,
+      path: 'D:/new',
+      entries: [{ name: 'new.txt' }],
+      loading: false,
+      error: null,
     });
   });
 
   it('ignores a refresh after navigating away', async () => {
     const older = deferred<any[]>();
-    vi.mocked(ipc.invoke).mockResolvedValueOnce([]).mockReturnValueOnce(older.promise).mockResolvedValueOnce([]);
+    vi.mocked(ipc.invoke)
+      .mockResolvedValueOnce([])
+      .mockReturnValueOnce(older.promise)
+      .mockResolvedValueOnce([]);
     await useFileStore.getState().navigateTo('left', 'D:/old');
     const pending = useFileStore.getState().refresh('left');
     await useFileStore.getState().navigateTo('left', 'D:/new');
@@ -57,7 +69,9 @@ describe('directory navigation', () => {
   });
 
   it('loads both sides independently', async () => {
-    vi.mocked(ipc.invoke).mockResolvedValueOnce([{ name: 'left.txt' }]).mockResolvedValueOnce([{ name: 'right.txt' }]);
+    vi.mocked(ipc.invoke)
+      .mockResolvedValueOnce([fixtureFile('left.txt')])
+      .mockResolvedValueOnce([fixtureFile('right.txt')]);
     await Promise.all([
       useFileStore.getState().navigateTo('left', 'D:/left'),
       useFileStore.getState().navigateTo('right', 'D:/right'),

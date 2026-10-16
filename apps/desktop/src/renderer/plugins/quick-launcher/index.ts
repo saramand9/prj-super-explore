@@ -12,9 +12,7 @@ const manifest = {
       { id: 'quick-launcher.toggle', title: 'Toggle Launcher', category: 'Window' },
       { id: 'quick-launcher.search', title: 'Quick Search', category: 'Search' },
     ],
-    keybindings: [
-      { command: 'quick-launcher.toggle', key: 'Alt+Space' },
-    ],
+    keybindings: [{ command: 'quick-launcher.toggle', key: 'Alt+Space' }],
   },
 };
 

@@ -8,7 +8,10 @@ const listeners = vi.hoisted(() => new Map<string, (value: any) => void>());
 vi.mock('../../src/renderer/framework/bridge/ipc-client', () => ({
   ipc: {
     invoke: vi.fn(),
-    on: vi.fn((channel, callback) => { listeners.set(channel, callback); return () => listeners.delete(channel); }),
+    on: vi.fn((channel, callback) => {
+      listeners.set(channel, callback);
+      return () => listeners.delete(channel);
+    }),
   },
   getIpcErrorMessage: (error: Error) => error.message,
 }));
@@ -16,7 +19,10 @@ vi.mock('../../src/renderer/framework/bridge/ipc-client', () => ({
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (error: Error) => void;
-  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
   return { promise, resolve, reject };
 }
 
@@ -25,8 +31,9 @@ function result(content: string, partial = false): FileReadResult {
 }
 
 function mockReads(read: (payload: any) => Promise<FileReadResult>) {
-  vi.mocked(ipc.invoke).mockImplementation((channel, payload) =>
-    (channel === 'file:read' ? read(payload) : Promise.resolve(undefined)) as any);
+  vi.mocked(ipc.invoke).mockImplementation(
+    (channel, payload) => (channel === 'file:read' ? read(payload) : Promise.resolve(undefined)) as any,
+  );
 }
 
 describe('viewer request lifecycle', () => {
@@ -40,7 +47,7 @@ describe('viewer request lifecycle', () => {
 
   it.each(['success', 'error'])('does not show a stale %s from A under the path of B', async (outcome) => {
     const older = deferred<FileReadResult>();
-    mockReads(({ path }) => path === 'D:/A.txt' ? older.promise : Promise.resolve(result('B content')));
+    mockReads(({ path }) => (path === 'D:/A.txt' ? older.promise : Promise.resolve(result('B content'))));
     const pending = useViewerStore.getState().loadFile('left', 'D:/A.txt');
     await useViewerStore.getState().loadFile('left', 'D:/B.txt');
     if (outcome === 'success') older.resolve(result('A content'));
@@ -48,7 +55,10 @@ describe('viewer request lifecycle', () => {
     await pending;
 
     expect(useViewerStore.getState().left).toMatchObject({
-      filePath: 'D:/B.txt', content: 'B content', loading: false, error: null,
+      filePath: 'D:/B.txt',
+      content: 'B content',
+      loading: false,
+      error: null,
     });
     expect(ipc.invoke).not.toHaveBeenCalledWith('file:watchFile', { path: 'D:/A.txt' });
   });
@@ -56,7 +66,7 @@ describe('viewer request lifecycle', () => {
   it('discards the older read even when the same path is opened again', async () => {
     const older = deferred<FileReadResult>();
     let reads = 0;
-    mockReads(() => ++reads === 1 ? older.promise : Promise.resolve(result('new version')));
+    mockReads(() => (++reads === 1 ? older.promise : Promise.resolve(result('new version'))));
     const pending = useViewerStore.getState().loadFile('left', 'D:/same.txt');
     await useViewerStore.getState().loadFile('left', 'D:/same.txt');
     older.resolve(result('old version'));
@@ -64,17 +74,24 @@ describe('viewer request lifecycle', () => {
     expect(useViewerStore.getState().left.content).toBe('new version');
   });
 
-  it.each(['loadFullFile', 'reload', 'silentReload'] as const)('ignores %s after changing files', async (action) => {
-    mockReads(() => Promise.resolve(result('A preview', true)));
-    await useViewerStore.getState().loadFile('left', 'D:/A.txt');
-    const older = deferred<FileReadResult>();
-    mockReads(({ path }) => path === 'D:/A.txt' ? older.promise : Promise.resolve(result('B content')));
-    const pending = useViewerStore.getState()[action]('left');
-    await useViewerStore.getState().loadFile('left', 'D:/B.txt');
-    older.resolve(result('A full or refreshed content'));
-    await pending;
-    expect(useViewerStore.getState().left).toMatchObject({ filePath: 'D:/B.txt', content: 'B content', loading: false });
-  });
+  it.each(['loadFullFile', 'reload', 'silentReload'] as const)(
+    'ignores %s after changing files',
+    async (action) => {
+      mockReads(() => Promise.resolve(result('A preview', true)));
+      await useViewerStore.getState().loadFile('left', 'D:/A.txt');
+      const older = deferred<FileReadResult>();
+      mockReads(({ path }) => (path === 'D:/A.txt' ? older.promise : Promise.resolve(result('B content'))));
+      const pending = useViewerStore.getState()[action]('left');
+      await useViewerStore.getState().loadFile('left', 'D:/B.txt');
+      older.resolve(result('A full or refreshed content'));
+      await pending;
+      expect(useViewerStore.getState().left).toMatchObject({
+        filePath: 'D:/B.txt',
+        content: 'B content',
+        loading: false,
+      });
+    },
+  );
 
   it('does not repopulate a cleared preview or start its watcher', async () => {
     const older = deferred<FileReadResult>();
@@ -83,13 +100,18 @@ describe('viewer request lifecycle', () => {
     useViewerStore.getState().clear('left');
     older.resolve(result('A content'));
     await pending;
-    expect(useViewerStore.getState().left).toMatchObject({ filePath: null, content: '', loading: false, error: null });
+    expect(useViewerStore.getState().left).toMatchObject({
+      filePath: null,
+      content: '',
+      loading: false,
+      error: null,
+    });
     expect(ipc.invoke).not.toHaveBeenCalledWith('file:watchFile', { path: 'D:/A.txt' });
   });
 
   it('keeps reads for opposite panels independent', async () => {
     const left = deferred<FileReadResult>();
-    mockReads(({ path }) => path === 'D:/left.txt' ? left.promise : Promise.resolve(result('right')));
+    mockReads(({ path }) => (path === 'D:/left.txt' ? left.promise : Promise.resolve(result('right'))));
     const pending = useViewerStore.getState().loadFile('left', 'D:/left.txt');
     await useViewerStore.getState().loadFile('right', 'D:/right.txt');
     left.resolve(result('left'));
@@ -151,6 +173,11 @@ describe('viewer request lifecycle', () => {
     listeners.get('file:contentChanged')!({ filePath: 'D:/B.txt' });
     pendingRead.resolve(result('B'));
     await pending;
-    expect(useViewerStore.getState().left).toMatchObject({ filePath: 'D:/B.txt', content: 'B', watchError: null, loading: false });
+    expect(useViewerStore.getState().left).toMatchObject({
+      filePath: 'D:/B.txt',
+      content: 'B',
+      watchError: null,
+      loading: false,
+    });
   });
 });

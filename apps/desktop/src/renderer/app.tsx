@@ -90,7 +90,9 @@ function getMouseGestureElement(target: EventTarget | null): Element | null {
 function shouldIgnoreMouseGestureTarget(target: EventTarget | null): boolean {
   const element = getMouseGestureElement(target);
   if (!element) return false;
-  return Boolean(element.closest('button,a,input,textarea,select,summary,[role="button"],[contenteditable="true"]'));
+  return Boolean(
+    element.closest('button,a,input,textarea,select,summary,[role="button"],[contenteditable="true"]'),
+  );
 }
 
 function getPanelSideFromTarget(target: EventTarget | null): PanelSide | null {
@@ -113,9 +115,15 @@ function getMouseGestureTargetLabel(target: EventTarget | null): string {
   const element = getMouseGestureElement(target);
   if (!element) return 'unknown';
   const id = element.id ? `#${element.id}` : '';
-  const className = typeof element.className === 'string'
-    ? element.className.split(/\s+/).filter(Boolean).slice(0, 2).map((name) => `.${name}`).join('')
-    : '';
+  const className =
+    typeof element.className === 'string'
+      ? element.className
+          .split(/\s+/)
+          .filter(Boolean)
+          .slice(0, 2)
+          .map((name) => `.${name}`)
+          .join('')
+      : '';
   return `${element.tagName.toLowerCase()}${id}${className}`;
 }
 
@@ -196,21 +204,22 @@ function MainApp() {
 
   const isMouseGestureAvailable = useCallback((side: PanelSide, action: MouseGestureAction) => {
     const state = useFileStore.getState()[side];
-    return action === 'back'
-      ? state.backStack.length > 0
-      : state.forwardStack.length > 0;
+    return action === 'back' ? state.backStack.length > 0 : state.forwardStack.length > 0;
   }, []);
 
-  const showMouseGestureHint = useCallback((side: PanelSide, action: MouseGestureAction) => {
-    if (gestureHintTimerRef.current !== null) {
-      window.clearTimeout(gestureHintTimerRef.current);
-      gestureHintTimerRef.current = null;
-    }
-    setMouseGestureHint({
-      action,
-      available: isMouseGestureAvailable(side, action),
-    });
-  }, [isMouseGestureAvailable]);
+  const showMouseGestureHint = useCallback(
+    (side: PanelSide, action: MouseGestureAction) => {
+      if (gestureHintTimerRef.current !== null) {
+        window.clearTimeout(gestureHintTimerRef.current);
+        gestureHintTimerRef.current = null;
+      }
+      setMouseGestureHint({
+        action,
+        available: isMouseGestureAvailable(side, action),
+      });
+    },
+    [isMouseGestureAvailable],
+  );
 
   const clearMouseGestureHintSoon = useCallback(() => {
     if (gestureHintTimerRef.current !== null) {
@@ -240,59 +249,60 @@ function MainApp() {
     setMouseGestureTrail(null);
   }, []);
 
-  const showMouseGestureDebugStatus = useCallback((message: string, type: 'info' | 'warn' | 'error' = 'info') => {
-    if (debugStatusTimerRef.current !== null) {
-      window.clearTimeout(debugStatusTimerRef.current);
-    }
-    setMouseGestureDebugStatus({ message, type });
-    debugStatusTimerRef.current = window.setTimeout(() => {
-      setMouseGestureDebugStatus(null);
-      debugStatusTimerRef.current = null;
-    }, 2500);
-  }, []);
+  const showMouseGestureDebugStatus = useCallback(
+    (message: string, type: 'info' | 'warn' | 'error' = 'info') => {
+      if (debugStatusTimerRef.current !== null) {
+        window.clearTimeout(debugStatusTimerRef.current);
+      }
+      setMouseGestureDebugStatus({ message, type });
+      debugStatusTimerRef.current = window.setTimeout(() => {
+        setMouseGestureDebugStatus(null);
+        debugStatusTimerRef.current = null;
+      }, 2500);
+    },
+    [],
+  );
 
-  const runMouseGestureAction = useCallback(async (
-    side: PanelSide,
-    action: MouseGestureAction,
-    source: MouseNavigationSource = 'right-drag',
-  ) => {
-    const panelState = useFileStore.getState()[side];
-    const available = action === 'back'
-      ? panelState.backStack.length > 0
-      : panelState.forwardStack.length > 0;
-    logMouseGesture('run-request', {
-      side,
-      action,
-      source,
-      available,
-      path: panelState.path,
-      backStack: panelState.backStack.length,
-      forwardStack: panelState.forwardStack.length,
-    });
-    const actionText = action === 'back' ? '返回' : '前进';
-    if (!available) {
-      showMouseGestureDebugStatus(`${source} ${side}: ${actionText}失败，没有${actionText}记录`, 'warn');
-      return;
-    }
-    showMouseGestureDebugStatus(`${source} ${side}: 执行${actionText}`);
+  const runMouseGestureAction = useCallback(
+    async (side: PanelSide, action: MouseGestureAction, source: MouseNavigationSource = 'right-drag') => {
+      const panelState = useFileStore.getState()[side];
+      const available =
+        action === 'back' ? panelState.backStack.length > 0 : panelState.forwardStack.length > 0;
+      logMouseGesture('run-request', {
+        side,
+        action,
+        source,
+        available,
+        path: panelState.path,
+        backStack: panelState.backStack.length,
+        forwardStack: panelState.forwardStack.length,
+      });
+      const actionText = action === 'back' ? '返回' : '前进';
+      if (!available) {
+        showMouseGestureDebugStatus(`${source} ${side}: ${actionText}失败，没有${actionText}记录`, 'warn');
+        return;
+      }
+      showMouseGestureDebugStatus(`${source} ${side}: 执行${actionText}`);
 
-    useLayoutStore.getState().setActivePanel(side);
-    const fileStore = useFileStore.getState();
-    if (action === 'back') {
-      await fileStore.goBack(side);
-    } else {
-      await fileStore.goForward(side);
-    }
-    const nextPath = useFileStore.getState()[side].path;
-    if (nextPath) {
-      useLayoutStore.getState().setPanelPath(side, nextPath);
-    }
-    logMouseGesture('run-complete', { side, action, source, nextPath });
-    showMouseGestureDebugStatus(`${source} ${side}: 已${actionText}`);
-  }, [showMouseGestureDebugStatus]);
+      useLayoutStore.getState().setActivePanel(side);
+      const fileStore = useFileStore.getState();
+      if (action === 'back') {
+        await fileStore.goBack(side);
+      } else {
+        await fileStore.goForward(side);
+      }
+      const nextPath = useFileStore.getState()[side].path;
+      if (nextPath) {
+        useLayoutStore.getState().setPanelPath(side, nextPath);
+      }
+      logMouseGesture('run-complete', { side, action, source, nextPath });
+      showMouseGestureDebugStatus(`${source} ${side}: 已${actionText}`);
+    },
+    [showMouseGestureDebugStatus],
+  );
 
   useEffect(() => {
-    return window.explore.on('navigation:command', ({ action, source }) => {
+    return window.explore.events['navigation:command'](({ action, source }) => {
       const side = getActivePanelSide();
       logMouseGesture('app-command', { side, action, source });
       void runMouseGestureAction(side, action, source);
@@ -305,9 +315,10 @@ function MainApp() {
       deferredContextMenuRef.current = null;
       if (!deferred) return;
 
-      const target = deferred.target instanceof Element && document.contains(deferred.target)
-        ? deferred.target
-        : document.elementFromPoint(deferred.clientX, deferred.clientY);
+      const target =
+        deferred.target instanceof Element && document.contains(deferred.target)
+          ? deferred.target
+          : document.elementFromPoint(deferred.clientX, deferred.clientY);
       if (!target) return;
 
       suppressContextMenuRef.current = false;
@@ -318,15 +329,17 @@ function MainApp() {
       });
       replayingContextMenuRef.current = true;
       try {
-        target.dispatchEvent(new MouseEvent('contextmenu', {
-          bubbles: true,
-          cancelable: true,
-          view: window,
-          button: 2,
-          buttons: 0,
-          clientX: deferred.clientX,
-          clientY: deferred.clientY,
-        }));
+        target.dispatchEvent(
+          new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            view: window,
+            button: 2,
+            buttons: 0,
+            clientX: deferred.clientX,
+            clientY: deferred.clientY,
+          }),
+        );
       } finally {
         replayingContextMenuRef.current = false;
       }
@@ -382,8 +395,9 @@ function MainApp() {
         return;
       }
 
-      const side = getPanelSideFromTarget(e.target)
-        ?? (useLayoutStore.getState().layout.id === 'right' ? 'right' : 'left');
+      const side =
+        getPanelSideFromTarget(e.target) ??
+        (useLayoutStore.getState().layout.id === 'right' ? 'right' : 'left');
       mouseGestureRef.current = {
         side,
         startX: e.clientX,
@@ -541,7 +555,9 @@ function MainApp() {
 
       if (!suppressContextMenuRef.current) return;
       suppressContextMenuRef.current = false;
-      logMouseGesture('contextmenu-suppressed-after-action', { target: getMouseGestureTargetLabel(e.target) });
+      logMouseGesture('contextmenu-suppressed-after-action', {
+        target: getMouseGestureTargetLabel(e.target),
+      });
       e.preventDefault();
       e.stopPropagation();
     };
@@ -564,19 +580,29 @@ function MainApp() {
       window.removeEventListener('contextmenu', handleContextMenu, true);
       window.removeEventListener('blur', handleBlur);
     };
-  }, [clearMouseGestureHintSoon, clearMouseGestureTrailNow, clearMouseGestureTrailSoon, isMouseGestureAvailable, runMouseGestureAction, showMouseGestureHint]);
+  }, [
+    clearMouseGestureHintSoon,
+    clearMouseGestureTrailNow,
+    clearMouseGestureTrailSoon,
+    isMouseGestureAvailable,
+    runMouseGestureAction,
+    showMouseGestureHint,
+  ]);
 
-  useEffect(() => () => {
-    if (gestureHintTimerRef.current !== null) {
-      window.clearTimeout(gestureHintTimerRef.current);
-    }
-    if (gestureTrailTimerRef.current !== null) {
-      window.clearTimeout(gestureTrailTimerRef.current);
-    }
-    if (debugStatusTimerRef.current !== null) {
-      window.clearTimeout(debugStatusTimerRef.current);
-    }
-  }, []);
+  useEffect(
+    () => () => {
+      if (gestureHintTimerRef.current !== null) {
+        window.clearTimeout(gestureHintTimerRef.current);
+      }
+      if (gestureTrailTimerRef.current !== null) {
+        window.clearTimeout(gestureTrailTimerRef.current);
+      }
+      if (debugStatusTimerRef.current !== null) {
+        window.clearTimeout(debugStatusTimerRef.current);
+      }
+    },
+    [],
+  );
 
   // Sync font size to CSS variable
   useEffect(() => {
@@ -589,18 +615,16 @@ function MainApp() {
     for (const [key, value] of Object.entries(t.vars)) {
       document.documentElement.style.setProperty(key, value);
     }
-    const prev = Object.values(themes).map((x) => x.className).filter(Boolean);
+    const prev = Object.values(themes)
+      .map((x) => x.className)
+      .filter(Boolean);
     document.body.classList.remove(...prev);
     if (t.className) document.body.classList.add(t.className);
   }, [theme]);
 
   const activePanel = layout.id;
   const activePath =
-    activePanel === 'left'
-      ? layout.left.path
-      : activePanel === 'right'
-        ? layout.right.path
-        : null;
+    activePanel === 'left' ? layout.left.path : activePanel === 'right' ? layout.right.path : null;
   const leftSelectedCount = useFileStore((s) => s.left.selected.size);
   const rightSelectedCount = useFileStore((s) => s.right.selected.size);
   const leftEntryCount = useFileStore((s) => s.left.entries.length);
@@ -608,32 +632,30 @@ function MainApp() {
   const activeSelectedCount = activePanel === 'right' ? rightSelectedCount : leftSelectedCount;
   const activeEntryCount = activePanel === 'right' ? rightEntryCount : leftEntryCount;
   const activePanelLabel = activePanel === 'right' ? '右侧' : '左侧';
-  const handlePanelClick = useCallback(
-    (side: 'left' | 'right') => {
-      useLayoutStore.getState().setActivePanel(side);
-    },
-    [],
-  );
+  const handlePanelClick = useCallback((side: 'left' | 'right') => {
+    useLayoutStore.getState().setActivePanel(side);
+  }, []);
 
-  const handlePluginChange = useCallback(
-    (side: 'left' | 'right', pluginId: string, panelId: string) => {
-      const store = useLayoutStore.getState();
-      const previous = store.layout[side];
-      if (previous.pluginId === 'viewer' && previous.path) {
-        if (pluginId === 'fulltext-search') store.setPanelPath(side, parentDir(previous.path));
-        if (pluginId === 'file-explorer') {
-          store.setPanelPath(side, useFileStore.getState()[side].path ?? parentDir(previous.path));
-        }
+  const handlePluginChange = useCallback((side: 'left' | 'right', pluginId: string, panelId: string) => {
+    const store = useLayoutStore.getState();
+    const previous = store.layout[side];
+    if (previous.pluginId === 'viewer' && previous.path) {
+      if (pluginId === 'fulltext-search') store.setPanelPath(side, parentDir(previous.path));
+      if (pluginId === 'file-explorer') {
+        store.setPanelPath(side, useFileStore.getState()[side].path ?? parentDir(previous.path));
       }
-      store.setPanelPlugin(side, pluginId, panelId);
-    },
-    [],
-  );
+    }
+    store.setPanelPlugin(side, pluginId, panelId);
+  }, []);
 
   // Ctrl+Shift+F: 在当前活跃面板打开全文搜索
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || document.querySelector('[aria-modal="true"], [data-testid="workspace-search"]')) return;
+      if (
+        e.defaultPrevented ||
+        document.querySelector('[aria-modal="true"], [data-testid="workspace-search"]')
+      )
+        return;
       if (e.key.toLowerCase() === 'f' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
         e.preventDefault();
         const activeSide = useLayoutStore.getState().layout.id;
@@ -667,32 +689,32 @@ function MainApp() {
       <div className="flex-1 flex overflow-hidden">
         <ActivityBar onPluginChange={handlePluginChange} />
         <div className="flex-1 flex flex-col overflow-hidden">
-        {layout.mode === 'single' ? (
-          <PanelSlot
-            side="left"
-            pluginId={layout.left.pluginId}
-            onClick={() => handlePanelClick('left')}
-            onPluginChange={(pluginId, panelId) => handlePluginChange('left', pluginId, panelId)}
-            notify={notify}
-          />
-        ) : (
-        <SplitPane defaultSplit={50} minSize={200}>
-          <PanelSlot
-            side="left"
-            pluginId={layout.left.pluginId}
-            onClick={() => handlePanelClick('left')}
-            onPluginChange={(pluginId, panelId) => handlePluginChange('left', pluginId, panelId)}
-            notify={notify}
-          />
-          <PanelSlot
-            side="right"
-            pluginId={layout.right.pluginId}
-            onClick={() => handlePanelClick('right')}
-            onPluginChange={(pluginId, panelId) => handlePluginChange('right', pluginId, panelId)}
-            notify={notify}
-          />
-        </SplitPane>
-        )}
+          {layout.mode === 'single' ? (
+            <PanelSlot
+              side="left"
+              pluginId={layout.left.pluginId}
+              onClick={() => handlePanelClick('left')}
+              onPluginChange={(pluginId, panelId) => handlePluginChange('left', pluginId, panelId)}
+              notify={notify}
+            />
+          ) : (
+            <SplitPane defaultSplit={50} minSize={200}>
+              <PanelSlot
+                side="left"
+                pluginId={layout.left.pluginId}
+                onClick={() => handlePanelClick('left')}
+                onPluginChange={(pluginId, panelId) => handlePluginChange('left', pluginId, panelId)}
+                notify={notify}
+              />
+              <PanelSlot
+                side="right"
+                pluginId={layout.right.pluginId}
+                onClick={() => handlePanelClick('right')}
+                onPluginChange={(pluginId, panelId) => handlePluginChange('right', pluginId, panelId)}
+                notify={notify}
+              />
+            </SplitPane>
+          )}
         </div>
       </div>
 
@@ -713,86 +735,91 @@ function MainApp() {
         <span className="hidden text-text-muted/70 lg:inline">Ctrl+Shift+W 工作区</span>
       </div>
 
-      {mouseGestureTrail && (() => {
-        const dx = mouseGestureTrail.currentX - mouseGestureTrail.startX;
-        const dy = mouseGestureTrail.currentY - mouseGestureTrail.startY;
-        const distance = Math.hypot(dx, dy);
-        const color = mouseGestureTrail.available === false
-          ? 'rgba(245, 158, 11, 0.95)'
-          : mouseGestureTrail.action === 'back'
-            ? 'rgba(96, 165, 250, 0.95)'
-            : mouseGestureTrail.action === 'forward'
-              ? 'rgba(52, 211, 153, 0.95)'
-              : 'rgba(148, 163, 184, 0.7)';
-        const label = mouseGestureTrail.action === 'back'
-          ? (mouseGestureTrail.available === false ? '无返回记录' : '返回')
-          : mouseGestureTrail.action === 'forward'
-            ? (mouseGestureTrail.available === false ? '无前进记录' : '前进')
-            : '滑动';
-        const labelX = mouseGestureTrail.currentX + (dx < 0 ? -58 : 14);
-        const labelY = mouseGestureTrail.currentY - 12;
+      {mouseGestureTrail &&
+        (() => {
+          const dx = mouseGestureTrail.currentX - mouseGestureTrail.startX;
+          const dy = mouseGestureTrail.currentY - mouseGestureTrail.startY;
+          const distance = Math.hypot(dx, dy);
+          const color =
+            mouseGestureTrail.available === false
+              ? 'rgba(245, 158, 11, 0.95)'
+              : mouseGestureTrail.action === 'back'
+                ? 'rgba(96, 165, 250, 0.95)'
+                : mouseGestureTrail.action === 'forward'
+                  ? 'rgba(52, 211, 153, 0.95)'
+                  : 'rgba(148, 163, 184, 0.7)';
+          const label =
+            mouseGestureTrail.action === 'back'
+              ? mouseGestureTrail.available === false
+                ? '无返回记录'
+                : '返回'
+              : mouseGestureTrail.action === 'forward'
+                ? mouseGestureTrail.available === false
+                  ? '无前进记录'
+                  : '前进'
+                : '滑动';
+          const labelX = mouseGestureTrail.currentX + (dx < 0 ? -58 : 14);
+          const labelY = mouseGestureTrail.currentY - 12;
 
-        return (
-          <svg data-testid="mouse-gesture-trail" className="fixed inset-0 z-[225] pointer-events-none" aria-hidden="true">
-            <defs>
-              <marker
-                id="mouse-gesture-trail-arrow"
-                markerWidth="9"
-                markerHeight="9"
-                refX="7"
-                refY="4.5"
-                orient="auto"
-                markerUnits="strokeWidth"
-              >
-                <path d="M0,0 L8,4.5 L0,9 Z" fill={color} />
-              </marker>
-            </defs>
-            <line
-              x1={mouseGestureTrail.startX}
-              y1={mouseGestureTrail.startY}
-              x2={mouseGestureTrail.currentX}
-              y2={mouseGestureTrail.currentY}
-              stroke="rgba(0, 0, 0, 0.35)"
-              strokeWidth="8"
-              strokeLinecap="round"
-            />
-            <line
-              x1={mouseGestureTrail.startX}
-              y1={mouseGestureTrail.startY}
-              x2={mouseGestureTrail.currentX}
-              y2={mouseGestureTrail.currentY}
-              stroke={color}
-              strokeWidth="3"
-              strokeLinecap="round"
-              markerEnd={distance > 24 ? 'url(#mouse-gesture-trail-arrow)' : undefined}
-            />
-            <circle cx={mouseGestureTrail.startX} cy={mouseGestureTrail.startY} r="4" fill={color} />
-            <circle cx={mouseGestureTrail.currentX} cy={mouseGestureTrail.currentY} r="5" fill={color} />
-            {distance > 18 && (
-              <g>
-                <rect
-                  x={labelX - 8}
-                  y={labelY - 17}
-                  width={label.length * 13 + 16}
-                  height="24"
-                  rx="4"
-                  fill="rgba(15, 23, 42, 0.82)"
-                  stroke="rgba(255, 255, 255, 0.18)"
-                />
-                <text
-                  x={labelX}
-                  y={labelY}
-                  fill="white"
-                  fontSize="12"
-                  fontWeight="600"
+          return (
+            <svg
+              data-testid="mouse-gesture-trail"
+              className="fixed inset-0 z-[225] pointer-events-none"
+              aria-hidden="true"
+            >
+              <defs>
+                <marker
+                  id="mouse-gesture-trail-arrow"
+                  markerWidth="9"
+                  markerHeight="9"
+                  refX="7"
+                  refY="4.5"
+                  orient="auto"
+                  markerUnits="strokeWidth"
                 >
-                  {label}
-                </text>
-              </g>
-            )}
-          </svg>
-        );
-      })()}
+                  <path d="M0,0 L8,4.5 L0,9 Z" fill={color} />
+                </marker>
+              </defs>
+              <line
+                x1={mouseGestureTrail.startX}
+                y1={mouseGestureTrail.startY}
+                x2={mouseGestureTrail.currentX}
+                y2={mouseGestureTrail.currentY}
+                stroke="rgba(0, 0, 0, 0.35)"
+                strokeWidth="8"
+                strokeLinecap="round"
+              />
+              <line
+                x1={mouseGestureTrail.startX}
+                y1={mouseGestureTrail.startY}
+                x2={mouseGestureTrail.currentX}
+                y2={mouseGestureTrail.currentY}
+                stroke={color}
+                strokeWidth="3"
+                strokeLinecap="round"
+                markerEnd={distance > 24 ? 'url(#mouse-gesture-trail-arrow)' : undefined}
+              />
+              <circle cx={mouseGestureTrail.startX} cy={mouseGestureTrail.startY} r="4" fill={color} />
+              <circle cx={mouseGestureTrail.currentX} cy={mouseGestureTrail.currentY} r="5" fill={color} />
+              {distance > 18 && (
+                <g>
+                  <rect
+                    x={labelX - 8}
+                    y={labelY - 17}
+                    width={label.length * 13 + 16}
+                    height="24"
+                    rx="4"
+                    fill="rgba(15, 23, 42, 0.82)"
+                    stroke="rgba(255, 255, 255, 0.18)"
+                  />
+                  <text x={labelX} y={labelY} fill="white" fontSize="12" fontWeight="600">
+                    {label}
+                  </text>
+                </g>
+              )}
+            </svg>
+          );
+        })()}
 
       {mouseGestureDebugStatus && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[230] pointer-events-none">
@@ -825,8 +852,12 @@ function MainApp() {
               <ArrowRight className="h-3.5 w-3.5" />
             )}
             {mouseGestureHint.available
-              ? (mouseGestureHint.action === 'back' ? '返回' : '前进')
-              : (mouseGestureHint.action === 'back' ? '无返回记录' : '无前进记录')}
+              ? mouseGestureHint.action === 'back'
+                ? '返回'
+                : '前进'
+              : mouseGestureHint.action === 'back'
+                ? '无返回记录'
+                : '无前进记录'}
           </div>
         </div>
       )}
@@ -834,11 +865,15 @@ function MainApp() {
       {/* Toast notification */}
       {toast && (
         <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[200] pointer-events-none">
-          <div className={`px-4 py-2 rounded-lg shadow-lg text-sm whitespace-pre-line max-w-[min(720px,90vw)] ${
-            toast.type === 'error' ? 'bg-red-600/90 text-white' :
-            toast.type === 'warn' ? 'bg-yellow-600/90 text-white' :
-            'bg-accent/90 text-white'
-          }`}>
+          <div
+            className={`px-4 py-2 rounded-lg shadow-lg text-sm whitespace-pre-line max-w-[min(720px,90vw)] ${
+              toast.type === 'error'
+                ? 'bg-red-600/90 text-white'
+                : toast.type === 'warn'
+                  ? 'bg-yellow-600/90 text-white'
+                  : 'bg-accent/90 text-white'
+            }`}
+          >
             {toast.message}
           </div>
         </div>
@@ -1001,8 +1036,12 @@ function PanelSlot({
         tabActionPending.current = false;
       }
     };
-    const newTab = () => { void runTabAction(handleNewTab); };
-    const closeTab = () => { void runTabAction(handleCloseTab); };
+    const newTab = () => {
+      void runTabAction(handleNewTab);
+    };
+    const closeTab = () => {
+      void runTabAction(handleCloseTab);
+    };
     const handler = (e: KeyboardEvent) => {
       if (e.defaultPrevented || !(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
       // 弹窗打开时不操作它后面的目录或标签。
@@ -1036,159 +1075,164 @@ function PanelSlot({
   }, [isActive, side, panelDirectoryPath, handleNewTab, handleCloseTab, switchToFileExplorer, notify]);
 
   // 拖放处理
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    if (!dropDirectoryPath) {
-      e.dataTransfer.dropEffect = 'none';
-      return;
-    }
-    e.dataTransfer.dropEffect = getFileDropEffect(e);
-  }, [dropDirectoryPath]);
+  const handleDragOver = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      if (!dropDirectoryPath) {
+        e.dataTransfer.dropEffect = 'none';
+        return;
+      }
+      e.dataTransfer.dropEffect = getFileDropEffect(e);
+    },
+    [dropDirectoryPath],
+  );
 
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
-    e.preventDefault();
-    if (!dropDirectoryPath) {
-      notify('目标面板没有打开文件夹', 'warn');
-      return;
-    }
-    const data = e.dataTransfer.getData('application/x-explore-files');
-    if (!data) return;
-    let sources: string[];
-    try {
-      const payload: unknown = JSON.parse(data);
-      if (!Array.isArray(payload) || !payload.every((path) => typeof path === 'string')) return;
-      sources = payload;
-    } catch {
-      return;
-    }
-    if (sources.length === 0) return;
+  const handleDrop = useCallback(
+    async (e: React.DragEvent) => {
+      e.preventDefault();
+      if (!dropDirectoryPath) {
+        notify('目标面板没有打开文件夹', 'warn');
+        return;
+      }
+      const data = e.dataTransfer.getData('application/x-explore-files');
+      if (!data) return;
+      let sources: string[];
+      try {
+        const payload: unknown = JSON.parse(data);
+        if (!Array.isArray(payload) || !payload.every((path) => typeof path === 'string')) return;
+        sources = payload;
+      } catch {
+        return;
+      }
+      if (sources.length === 0) return;
 
-    const targetDir = dropDirectoryPath;
+      const targetDir = dropDirectoryPath;
 
-    // 同一目录忽略
-    if (sources.every((s) => {
-      const parent = s.replace(/[/\\][^/\\]*$/, '');
-      return parent === targetDir || s === targetDir;
-    })) {
-      notify('已经在同一目录中', 'info');
-      return;
-    }
-
-    // 拖文件夹到自己子目录 → 阻止
-    if (sources.some((s) => targetDir.startsWith(s + '\\') || targetDir.startsWith(s + '/'))) {
-      notify('不能把文件夹复制到它自己里面', 'error');
-      return;
-    }
-
-    const isMove = getFileDropEffect(e) === 'move';
-    try {
-      const conflictStrategy = await resolveCopyConflictStrategyWithChoice(
-        sources,
-        targetDir,
-        (p) => ipc.invoke('file:readDir', { path: p }),
-        (message, buttons) => appDialog.choice({
-          title: '同名冲突',
-          message,
-          buttons,
-          defaultId: 'rename',
-          cancelId: 'cancel',
-        }),
-      );
-      if (!conflictStrategy) {
-        notify('已取消', 'info');
+      // 同一目录忽略
+      if (
+        sources.every((s) => {
+          const parent = s.replace(/[/\\][^/\\]*$/, '');
+          return parent === targetDir || s === targetDir;
+        })
+      ) {
+        notify('已经在同一目录中', 'info');
         return;
       }
 
-      const result = isMove
-        ? await ipc.invoke('file:move', { sources, destDir: targetDir, conflictStrategy })
-        : await ipc.invoke('file:copy', { sources, destDir: targetDir, conflictStrategy });
-      const summary = summarizeFileOpResult(isMove ? 'Move' : 'Copy', result);
-      if (summary) {
-        notify(summary, getFileOpToastType(result));
-      } else {
-        notify(summarizeFileOpToast(isMove ? 'Move' : 'Copy', result), getFileOpToastType(result));
+      // 拖文件夹到自己子目录 → 阻止
+      if (sources.some((s) => targetDir.startsWith(s + '\\') || targetDir.startsWith(s + '/'))) {
+        notify('不能把文件夹复制到它自己里面', 'error');
+        return;
       }
-    } catch (err: any) {
-      notify(`操作失败：${err.message}`, 'error');
-    }
-    useFileStore.getState().refresh(side);
-    const otherSide = side === 'left' ? 'right' : 'left';
-    useFileStore.getState().refresh(otherSide);
-  }, [side, dropDirectoryPath, notify]);
+
+      const isMove = getFileDropEffect(e) === 'move';
+      try {
+        const conflictStrategy = await resolveCopyConflictStrategyWithChoice(
+          sources,
+          targetDir,
+          (p) => ipc.invoke('file:readDir', { path: p }),
+          (message, buttons) =>
+            appDialog.choice({
+              title: '同名冲突',
+              message,
+              buttons,
+              defaultId: 'rename',
+              cancelId: 'cancel',
+            }),
+        );
+        if (!conflictStrategy) {
+          notify('已取消', 'info');
+          return;
+        }
+
+        const result = isMove
+          ? await ipc.invoke('file:move', { sources, destDir: targetDir, conflictStrategy })
+          : await ipc.invoke('file:copy', { sources, destDir: targetDir, conflictStrategy });
+        const summary = summarizeFileOpResult(isMove ? 'Move' : 'Copy', result);
+        if (summary) {
+          notify(summary, getFileOpToastType(result));
+        } else {
+          notify(summarizeFileOpToast(isMove ? 'Move' : 'Copy', result), getFileOpToastType(result));
+        }
+      } catch (err: any) {
+        notify(`操作失败：${err.message}`, 'error');
+      }
+      useFileStore.getState().refresh(side);
+      const otherSide = side === 'left' ? 'right' : 'left';
+      useFileStore.getState().refresh(otherSide);
+    },
+    [side, dropDirectoryPath, notify],
+  );
 
   return (
-    <div
-      className="h-full flex flex-col"
-      data-panel-side={side}
-      onClick={onClick}
-    >
+    <div className="h-full flex flex-col" data-panel-side={side} onClick={onClick}>
       {/* Tab Bar + Panel Header — 统一背景 */}
-      <div className={`flex-shrink-0 border-t ${isActive ? 'border-accent/40 bg-surface-lighter' : 'border-transparent bg-surface'}`}>
-      <ErrorBoundary name={`TabBar-${side}`}>
-        {showExplorerChrome ? (
-          <TabBar
-            side={side}
-            keepEmpty={pluginId === 'viewer'}
-            onTabClick={pluginId === 'viewer' ? (tab) => { switchToFileExplorer(tab.path); } : undefined}
-          />
-        ) : (
-          <div className="h-8 flex items-center px-3 text-[11px] text-text-muted/50 select-none">
-            {pluginId === 'fulltext-search' && '全文搜索'}
-            {pluginId === 'viewer' && '文件预览'}
-            {pluginId === 'bookmarks' && '收藏夹'}
-          </div>
-        )}
-      </ErrorBoundary>
-
-      {/* Panel Header — 地址栏区 */}
       <div
-        className="h-8 flex items-center px-2 text-sm border-b border-border/30"
+        className={`flex-shrink-0 border-t ${isActive ? 'border-accent/40 bg-surface-lighter' : 'border-transparent bg-surface'}`}
       >
-        {/* 地址栏 / 路径面包屑 */}
-        {showExplorerChrome && panelDirectoryPath && (
-          <AddressBar
-            side={side}
-            pathOverride={pluginId === 'viewer' ? panelDirectoryPath : undefined}
-            onNavigate={pluginId === 'viewer' ? handleViewerChromeNavigate : undefined}
-          />
-        )}
-        {!showExplorerChrome && panel.path && (
-          <PathBreadcrumb path={panel.path} />
-        )}
-        {(!panel.path || (showExplorerChrome && !panelDirectoryPath)) && (
-          <span className="flex-1" />
-        )}
+        <ErrorBoundary name={`TabBar-${side}`}>
+          {showExplorerChrome ? (
+            <TabBar
+              side={side}
+              keepEmpty={pluginId === 'viewer'}
+              onTabClick={
+                pluginId === 'viewer'
+                  ? (tab) => {
+                      switchToFileExplorer(tab.path);
+                    }
+                  : undefined
+              }
+            />
+          ) : (
+            <div className="h-8 flex items-center px-3 text-[11px] text-text-muted/50 select-none">
+              {pluginId === 'fulltext-search' && '全文搜索'}
+              {pluginId === 'viewer' && '文件预览'}
+              {pluginId === 'bookmarks' && '收藏夹'}
+            </div>
+          )}
+        </ErrorBoundary>
 
-        {/* 工具栏 — 最右 */}
-        <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
-          {pluginId !== 'file-explorer' && (
+        {/* Panel Header — 地址栏区 */}
+        <div className="h-8 flex items-center px-2 text-sm border-b border-border/30">
+          {/* 地址栏 / 路径面包屑 */}
+          {showExplorerChrome && panelDirectoryPath && (
+            <AddressBar
+              side={side}
+              pathOverride={pluginId === 'viewer' ? panelDirectoryPath : undefined}
+              onNavigate={pluginId === 'viewer' ? handleViewerChromeNavigate : undefined}
+            />
+          )}
+          {!showExplorerChrome && panel.path && <PathBreadcrumb path={panel.path} />}
+          {(!panel.path || (showExplorerChrome && !panelDirectoryPath)) && <span className="flex-1" />}
+
+          {/* 工具栏 — 最右 */}
+          <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
+            {pluginId !== 'file-explorer' && (
+              <button
+                className="text-text-muted hover:text-text-primary hover:bg-white/5 rounded p-0.5 cursor-pointer transition-colors"
+                title={pluginId === 'viewer' ? '关闭预览' : '关闭面板'}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleClosePluginPanel();
+                }}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
             <button
               className="text-text-muted hover:text-text-primary hover:bg-white/5 rounded p-0.5 cursor-pointer transition-colors"
-              title={pluginId === 'viewer' ? '关闭预览' : '关闭面板'}
+              title="打开文件夹 (Ctrl+O)"
               onClick={(e) => {
                 e.stopPropagation();
-                handleClosePluginPanel();
+                handleOpenFolder();
               }}
             >
-              <X className="w-4 h-4" />
+              <FolderOpen className="w-4 h-4" />
             </button>
-          )}
-          <button
-            className="text-text-muted hover:text-text-primary hover:bg-white/5 rounded p-0.5 cursor-pointer transition-colors"
-            title="打开文件夹 (Ctrl+O)"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleOpenFolder();
-            }}
-          >
-            <FolderOpen className="w-4 h-4" />
-          </button>
 
-          {isActive && (
-            <div className="active-dot" title="当前面板" />
-          )}
+            {isActive && <div className="active-dot" title="当前面板" />}
+          </div>
         </div>
-      </div>
       </div>
 
       {/* Panel Content */}
@@ -1199,18 +1243,10 @@ function PanelSlot({
         onDrop={handleDrop}
       >
         {showFileSearch && pluginId === 'file-explorer' && (
-          <FileSearch
-            side={side}
-            open={showFileSearch}
-            onClose={() => setShowFileSearch(false)}
-          />
+          <FileSearch side={side} open={showFileSearch} onClose={() => setShowFileSearch(false)} />
         )}
         {showTabSearch && (
-          <TabSearch
-            side={side}
-            open={showTabSearch}
-            onClose={() => setShowTabSearch(false)}
-          />
+          <TabSearch side={side} open={showTabSearch} onClose={() => setShowTabSearch(false)} />
         )}
         <ErrorBoundary name={`Panel-${side}`} resetKey={`${pluginId}:${panel.panelId}:${panel.path ?? ''}`}>
           {renderPanel()}

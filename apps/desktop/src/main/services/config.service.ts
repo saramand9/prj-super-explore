@@ -27,11 +27,9 @@ interface PinnedTabsData {
 
 function defaultIndexPaths(): string[] {
   try {
-    return [
-      app.getPath('desktop'),
-      app.getPath('documents'),
-      app.getPath('downloads'),
-    ].filter((p) => existsSync(p));
+    return [app.getPath('desktop'), app.getPath('documents'), app.getPath('downloads')].filter((p) =>
+      existsSync(p),
+    );
   } catch {
     return [];
   }
@@ -47,13 +45,16 @@ function isSpaceArray(value: unknown): value is Space[] {
   return value.every((space) => {
     if (!space || typeof space !== 'object') return false;
     const item = space as Space;
-    const valid = (
-      typeof item.id === 'string' && item.id.length > 0 && !ids.has(item.id) &&
+    const valid =
+      typeof item.id === 'string' &&
+      item.id.length > 0 &&
+      !ids.has(item.id) &&
       typeof item.name === 'string' &&
       (item.pinned === undefined || typeof item.pinned === 'boolean') &&
-      (item.lastOpenedAt === undefined || (typeof item.lastOpenedAt === 'number' && Number.isFinite(item.lastOpenedAt))) &&
-      isPanelSnapshot(item.left) && isPanelSnapshot(item.right)
-    );
+      (item.lastOpenedAt === undefined ||
+        (typeof item.lastOpenedAt === 'number' && Number.isFinite(item.lastOpenedAt))) &&
+      isPanelSnapshot(item.left) &&
+      isPanelSnapshot(item.right);
     if (valid) ids.add(item.id);
     return valid;
   });
@@ -62,15 +63,23 @@ function isSpaceArray(value: unknown): value is Space[] {
 function isPanelSnapshot(value: unknown): boolean {
   if (!value || typeof value !== 'object') return false;
   const panel = value as Space['left'];
-  return (panel.path === null || typeof panel.path === 'string')
-    && (panel.activeTabId == null || typeof panel.activeTabId === 'string')
-    && (panel.activeTabPath == null || typeof panel.activeTabPath === 'string')
-    && (panel.activeTabIndex === undefined || (Number.isInteger(panel.activeTabIndex) && panel.activeTabIndex >= -1))
-    && Array.isArray(panel.tabs)
-    && panel.tabs.every((tab) => tab && typeof tab === 'object'
-      && typeof tab.path === 'string' && typeof tab.label === 'string'
-      && (tab.initialPath === undefined || typeof tab.initialPath === 'string')
-      && (tab.pinned === undefined || typeof tab.pinned === 'boolean'));
+  return (
+    (panel.path === null || typeof panel.path === 'string') &&
+    (panel.activeTabId == null || typeof panel.activeTabId === 'string') &&
+    (panel.activeTabPath == null || typeof panel.activeTabPath === 'string') &&
+    (panel.activeTabIndex === undefined ||
+      (Number.isInteger(panel.activeTabIndex) && panel.activeTabIndex >= -1)) &&
+    Array.isArray(panel.tabs) &&
+    panel.tabs.every(
+      (tab) =>
+        tab &&
+        typeof tab === 'object' &&
+        typeof tab.path === 'string' &&
+        typeof tab.label === 'string' &&
+        (tab.initialPath === undefined || typeof tab.initialPath === 'string') &&
+        (tab.pinned === undefined || typeof tab.pinned === 'boolean'),
+    )
+  );
 }
 
 function stringArray(value: unknown): value is string[] {
@@ -107,12 +116,24 @@ export class ConfigService implements Service {
     this.settings = {
       ...DEFAULT_SETTINGS,
       indexPaths: stringArray(saved.indexPaths) ? [...saved.indexPaths] : defaultIndexPaths(),
-      excludePatterns: stringArray(saved.excludePatterns) ? [...saved.excludePatterns] : [...DEFAULT_SETTINGS.excludePatterns],
-      showHiddenFiles: typeof saved.showHiddenFiles === 'boolean' ? saved.showHiddenFiles : DEFAULT_SETTINGS.showHiddenFiles,
-      launcherHotkey: typeof saved.launcherHotkey === 'string' && saved.launcherHotkey ? saved.launcherHotkey : DEFAULT_SETTINGS.launcherHotkey,
-      fulltextMaxResults: Number.isInteger(saved.fulltextMaxResults) && saved.fulltextMaxResults! > 0 ? saved.fulltextMaxResults! : DEFAULT_SETTINGS.fulltextMaxResults,
+      excludePatterns: stringArray(saved.excludePatterns)
+        ? [...saved.excludePatterns]
+        : [...DEFAULT_SETTINGS.excludePatterns],
+      showHiddenFiles:
+        typeof saved.showHiddenFiles === 'boolean' ? saved.showHiddenFiles : DEFAULT_SETTINGS.showHiddenFiles,
+      launcherHotkey:
+        typeof saved.launcherHotkey === 'string' && saved.launcherHotkey
+          ? saved.launcherHotkey
+          : DEFAULT_SETTINGS.launcherHotkey,
+      fulltextMaxResults:
+        Number.isInteger(saved.fulltextMaxResults) && saved.fulltextMaxResults! > 0
+          ? saved.fulltextMaxResults!
+          : DEFAULT_SETTINGS.fulltextMaxResults,
       theme: typeof saved.theme === 'string' && saved.theme ? saved.theme : DEFAULT_SETTINGS.theme,
-      fontScale: typeof saved.fontScale === 'number' && saved.fontScale >= 80 && saved.fontScale <= 250 ? saved.fontScale : DEFAULT_SETTINGS.fontScale,
+      fontScale:
+        typeof saved.fontScale === 'number' && saved.fontScale >= 80 && saved.fontScale <= 250
+          ? saved.fontScale
+          : DEFAULT_SETTINGS.fontScale,
       layoutMode: saved.layoutMode === 'single' ? 'single' : 'dual',
     };
     this.bookmarks = this.loadJSON('bookmarks.json', []);
@@ -136,12 +157,22 @@ export class ConfigService implements Service {
   }
 
   async saveAppearance(value: AppearanceSettings): Promise<void> {
-    if (!value || typeof value.theme !== 'string' || !/^[a-zA-Z0-9_-]{1,40}$/.test(value.theme)
-      || !Number.isFinite(value.fontScale) || value.fontScale < 80 || value.fontScale > 250
-      || (value.layoutMode !== 'single' && value.layoutMode !== 'dual')) {
+    if (
+      !value ||
+      typeof value.theme !== 'string' ||
+      !/^[a-zA-Z0-9_-]{1,40}$/.test(value.theme) ||
+      !Number.isFinite(value.fontScale) ||
+      value.fontScale < 80 ||
+      value.fontScale > 250 ||
+      (value.layoutMode !== 'single' && value.layoutMode !== 'dual')
+    ) {
       throw new Error('外观设置无效');
     }
-    await this.updateSettings({ theme: value.theme, fontScale: value.fontScale, layoutMode: value.layoutMode });
+    await this.updateSettings({
+      theme: value.theme,
+      fontScale: value.fontScale,
+      layoutMode: value.layoutMode,
+    });
   }
 
   getBookmarks(): Bookmark[] {
@@ -226,7 +257,11 @@ export class ConfigService implements Service {
       return parsed;
     } catch (err) {
       this.spacesLoadFailed = true;
-      try { this.backupFile(SPACES_FILENAME, 'invalid'); } catch { /* Preserve the load error if the disk is unavailable. */ }
+      try {
+        this.backupFile(SPACES_FILENAME, 'invalid');
+      } catch {
+        /* Preserve the load error if the disk is unavailable. */
+      }
       const backup = this.loadLatestBackup(SPACES_FILENAME);
       if (backup) {
         this.spacesLoadFailed = false;
@@ -248,7 +283,11 @@ export class ConfigService implements Service {
       renameSync(tempPath, filepath);
     } finally {
       if (existsSync(tempPath)) {
-        try { unlinkSync(tempPath); } catch { /* Best-effort cleanup of our own temporary file. */ }
+        try {
+          unlinkSync(tempPath);
+        } catch {
+          /* Best-effort cleanup of our own temporary file. */
+        }
       }
     }
   }

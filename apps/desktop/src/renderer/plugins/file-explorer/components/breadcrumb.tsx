@@ -69,9 +69,7 @@ export function BreadcrumbBar({ side }: BreadcrumbBarProps) {
       {/* 后退 */}
       <button
         className={`px-0.5 cursor-pointer ${
-          backStack.length > 0
-            ? 'text-text-secondary hover:text-accent'
-            : 'text-text-muted/30 cursor-default'
+          backStack.length > 0 ? 'text-text-secondary hover:text-accent' : 'text-text-muted/30 cursor-default'
         }`}
         onClick={backStack.length > 0 ? handleBack : undefined}
         title="Back (Backspace when no filter)"
@@ -100,9 +98,7 @@ export function BreadcrumbBar({ side }: BreadcrumbBarProps) {
           {i > 0 && <span className="text-text-muted/50">{sep}</span>}
           <button
             className={`hover:text-accent cursor-pointer truncate max-w-[200px] ${
-              i === parts.length - 1
-                ? 'text-text-primary font-medium'
-                : 'text-text-secondary'
+              i === parts.length - 1 ? 'text-text-primary font-medium' : 'text-text-secondary'
             }`}
             onClick={() => handleClick(part.fullPath)}
             title={part.fullPath}

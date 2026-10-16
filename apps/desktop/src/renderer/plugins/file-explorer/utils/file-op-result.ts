@@ -26,14 +26,7 @@ export function summarizeFileOpResult(action: string, result: FileOpResult): str
   const renamed = result.renamed?.length ?? 0;
   const replaced = result.replaced?.length ?? 0;
 
-  if (
-    result.success &&
-    completed === 0 &&
-    renamed === 0 &&
-    replaced === 0 &&
-    skipped === 0 &&
-    failed === 0
-  ) {
+  if (result.success && completed === 0 && renamed === 0 && replaced === 0 && skipped === 0 && failed === 0) {
     return null;
   }
 
@@ -86,9 +79,7 @@ export function summarizeFileOpToast(action: string, result: FileOpResult): stri
   if (replaced) parts.push(`覆盖 ${replaced} 项`);
   if (skipped) parts.push(`跳过 ${skipped} 项`);
 
-  return parts.length > 0
-    ? `${actionName}完成：${parts.join('，')}`
-    : `${actionName}完成`;
+  return parts.length > 0 ? `${actionName}完成：${parts.join('，')}` : `${actionName}完成`;
 }
 
 export function getFileOpToastType(result: FileOpResult): 'info' | 'warn' | 'error' {
@@ -135,7 +126,10 @@ export async function resolveCopyConflictStrategy(
 
   if (conflicts.length === 0) return 'rename';
 
-  const names = conflicts.slice(0, 8).map((entry) => entry.name).join('\n');
+  const names = conflicts
+    .slice(0, 8)
+    .map((entry) => entry.name)
+    .join('\n');
   const extra = conflicts.length > 8 ? `\n还有 ${conflicts.length - 8} 项未显示` : '';
   return choose(
     `目标位置已有 ${conflicts.length} 个同名项目：\n${names}${extra}\n\n请选择对本次操作中所有同名项目应用的策略。`,
@@ -157,7 +151,10 @@ export async function resolveCopyConflictStrategyWithChoice(
 
   if (conflicts.length === 0) return 'rename';
 
-  const names = conflicts.slice(0, 8).map((entry) => entry.name).join('\n');
+  const names = conflicts
+    .slice(0, 8)
+    .map((entry) => entry.name)
+    .join('\n');
   const extra = conflicts.length > 8 ? `\n还有 ${conflicts.length - 8} 项未显示` : '';
   const choice = await choose(
     `目标位置已有 ${conflicts.length} 个同名项目：\n${names}${extra}\n\n请选择对本次操作中所有同名项目应用的策略。`,
@@ -186,7 +183,10 @@ export async function resolveCopyConflictStrategyWithConfirm(
 
   if (conflicts.length === 0) return 'rename';
 
-  const names = conflicts.slice(0, 8).map((entry) => entry.name).join('\n');
+  const names = conflicts
+    .slice(0, 8)
+    .map((entry) => entry.name)
+    .join('\n');
   const extra = conflicts.length > 8 ? `\n还有 ${conflicts.length - 8} 项未显示` : '';
   const proceed = await confirmChoice(
     `目标位置已有同名项目：\n${names}${extra}\n\n确定 = 为本次操作自动重命名全部同名项目\n取消 = 停止操作`,

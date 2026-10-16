@@ -1,6 +1,8 @@
 node_modules
 dist
 out
+# Temporary bundles produced while Electron Vite loads its configuration.
+electron.vite.config.*.mjs
 *.exe
 *.dmg
 *.AppImage

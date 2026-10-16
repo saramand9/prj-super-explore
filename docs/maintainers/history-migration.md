@@ -1,67 +1,44 @@
-# Publishing the normalized history
+# Completed history migrations
 
-The local `master` branch has an English Conventional Commit history. The old
-local master is retained as `backup/pre-open-source-master-20261017`, and the
-original preparation branch is retained as `chore/open-source-preparation`.
-These are private recovery references, not branches intended for publication.
+Two maintainer-requested migrations preceded the current security work:
 
-The verified Git bundle, rewrite callbacks, old-to-new commit map and machine-
-readable verification report are stored outside the repository in the local
-backup directory. Keep them private and retain a second copy before replacing
-the remote history. Do not attach the bundle to a public release: it contains
-the original branch/stash history and author metadata.
+1. Normalize original commit subjects/bodies into English Conventional Commits,
+   retaining the original graph, dates and application blobs. Replace one personal
+   Windows-path example in historical documentation with a generic example.
+2. Adopt MIT, then map the identified author/committer identity to the existing
+   maintainer identity for privacy. All 110 corresponding trees, messages,
+   timestamps and parent order were verified unchanged in the identity rewrite.
 
-## What was preserved
+The cleaned master tip after these migrations is
+`80de54ddd69d266b6dbba513505d000308f624d7`. It was pushed with an explicit,
+exact-tip force-with-lease after checking that the remote had not moved. This is
+historical context, not an instruction to force-push future changes.
 
-The rewrite verified 108 corresponding commits: 106 original product commits
-and two preparation commits. Author/committer identities and timestamps, commit
-count and parent order (including the merge commit) are preserved.
+## Recovery material
 
-Application blobs are unchanged at every corresponding commit. The only
-historical content replacement is a personal directory example in the old
-fork-tab design document, changed to a generic example. Subjects and bodies are
-English ASCII and pass the repository's Conventional Commit policy.
+Original recovery branches and stash remain local. Verified Git bundles,
+rewrite callbacks, old-to-new maps and verification records are outside the
+repository. Keep these private: they intentionally preserve original identities
+and historical personal-path content for recovery. Never push `--all`,
+`--mirror`, backup branches or stash refs. GitHub may retain obsolete objects
+and cached views independently of current branches; Support review is separate
+from successful history replacement.
 
-Later validation/documentation commits are checked normally. A rewritten commit
-ID is not a new attribution or a claim that old code had the current features.
-Rewriting also invalidates any original commit signatures and external links
-that depend on old IDs; evaluate downstream consumers before publication.
+A privacy mapping must not be presented as proof of code ownership or a transfer
+of copyright. Retain private provenance and obtain any necessary contributor or
+employer permission independently.
 
-## Before replacing the remote
+## Normal contributions now use PRs
 
-1. MIT has been selected. Complete the remaining ownership, privacy and
-   asset-provenance decisions in [the readiness review](open-source-readiness.md).
-2. Coordinate with every collaborator and pause pushes temporarily. Preserve
-   their uncommitted work and unpublished branches separately.
-3. Verify the recovery bundle and map, then inspect `git log master` and run
-   `pnpm check:commits`.
-4. Read the current remote master tip immediately before publication. If it has
-   moved since review, stop and inspect the new commits; do not overwrite them.
-5. Obtain explicit approval for the history replacement. Use a branch-scoped
-   force-with-lease pinned to that exact observed remote commit:
+Master is protected, including for administrators: pull requests must have the
+`validate` and `english-conventional-commits` checks passing, be up to date and
+resolve conversations. Force pushes and branch deletion are disabled. There is
+currently one maintainer, so no second-person approving review is required.
+Do not disable protection for a routine release or merge the old unsanitized
+history back into master.
 
-   ```text
-   git push --force-with-lease=refs/heads/master:<verified-remote-sha> origin HEAD:refs/heads/master
-   ```
-
-   Replace the placeholder only after verification. This is a maintainer
-   procedure, not a command automatically executed by this preparation.
-
-6. Verify the remote tip and hosted CI, inspect the resulting README and license,
-   then enable the intended public visibility and repository controls separately.
-
-Never use a blanket `--force`, `--all` or `--mirror` push here. Do not merge the
-old remote master into the normalized branch: that would reconnect the original
-non-English history and defeat the migration.
-
-## Collaborator recovery
-
-For collaborators with no unpublished work, a fresh clone after the remote
-replacement is the simplest path. For collaborators with unpublished work,
-retain the old checkout and use the commit map to identify the equivalent base;
-reapply only their own changes on the new history. Do not prescribe a destructive
-reset or delete their old checkout before their work is recovered.
-
-The MIT License was adopted at the maintainer's explicit request. The visibility
-change, remote force-with-lease and author-email remapping were not performed
-automatically by this preparation.
+For old clones with no unpublished work, a fresh clone is simplest. For those
+with unpublished work, preserve the old checkout and use the private commit map
+to reapply only the intended changes on the cleaned history. Do not prescribe a
+destructive reset or delete uncommitted work. Old commit signatures and links may
+be invalid after a rewrite; downstream consumers need coordination.

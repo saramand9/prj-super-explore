@@ -80,9 +80,7 @@ function searchableKeys(value: string): string[] {
   const lower = value.toLowerCase();
   if (!/[一-鿿]/.test(value)) return [lower];
 
-  const fullPinyin = pinyin(value, { toneType: 'none', type: 'array', v: true })
-    .join('')
-    .toLowerCase();
+  const fullPinyin = pinyin(value, { toneType: 'none', type: 'array', v: true }).join('').toLowerCase();
   const initials = pinyin(value, { pattern: 'first', toneType: 'none', type: 'array' })
     .join('')
     .toLowerCase();
@@ -100,11 +98,7 @@ export function getMostRecentSpace(spaces: Space[]): Space | undefined {
   }, undefined);
 }
 
-export function buildSpaceSections(
-  spaces: Space[],
-  activeSpaceId: string,
-  recentLimit = 5,
-): SpaceSection[] {
+export function buildSpaceSections(spaces: Space[], activeSpaceId: string, recentLimit = 5): SpaceSection[] {
   const used = new Set<string>();
   const sections: SpaceSection[] = [];
   const current = spaces.find((space) => space.id === activeSpaceId);
@@ -114,9 +108,7 @@ export function buildSpaceSections(
     sections.push({ id: 'current', label: '当前', spaces: [current] });
   }
 
-  const pinned = spaces
-    .filter((space) => space.pinned && !used.has(space.id))
-    .sort(compareSpacesByName);
+  const pinned = spaces.filter((space) => space.pinned && !used.has(space.id)).sort(compareSpacesByName);
   if (pinned.length > 0) {
     pinned.forEach((space) => used.add(space.id));
     sections.push({ id: 'pinned', label: '固定', spaces: pinned });
@@ -124,9 +116,7 @@ export function buildSpaceSections(
 
   const recent = spaces
     .filter((space) => !used.has(space.id) && (space.lastOpenedAt ?? 0) > 0)
-    .sort((a, b) =>
-      (b.lastOpenedAt ?? 0) - (a.lastOpenedAt ?? 0) || compareSpacesByName(a, b),
-    )
+    .sort((a, b) => (b.lastOpenedAt ?? 0) - (a.lastOpenedAt ?? 0) || compareSpacesByName(a, b))
     .slice(0, recentLimit);
   if (recent.length > 0) {
     recent.forEach((space) => used.add(space.id));
@@ -156,7 +146,14 @@ function scoreTerm(space: Space, term: string): number | null {
 
   const paths = getSpaceOverview(space).paths;
   if (paths.some((path) => path.toLowerCase().includes(term))) return 40;
-  if (paths.some((path) => searchableKeys(path).slice(1).some((key) => key.includes(term)))) return 50;
+  if (
+    paths.some((path) =>
+      searchableKeys(path)
+        .slice(1)
+        .some((key) => key.includes(term)),
+    )
+  )
+    return 50;
   return null;
 }
 
@@ -180,11 +177,12 @@ export function rankSpaces(spaces: Space[], query: string): Space[] {
   }
 
   return scored
-    .sort((a, b) =>
-      a.score - b.score ||
-      Number(Boolean(b.space.pinned)) - Number(Boolean(a.space.pinned)) ||
-      (b.space.lastOpenedAt ?? 0) - (a.space.lastOpenedAt ?? 0) ||
-      compareSpacesByName(a.space, b.space),
+    .sort(
+      (a, b) =>
+        a.score - b.score ||
+        Number(Boolean(b.space.pinned)) - Number(Boolean(a.space.pinned)) ||
+        (b.space.lastOpenedAt ?? 0) - (a.space.lastOpenedAt ?? 0) ||
+        compareSpacesByName(a.space, b.space),
     )
     .map(({ space }) => space);
 }

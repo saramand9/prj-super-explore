@@ -29,7 +29,8 @@ export function SearchPanel({ side }: { side: 'left' | 'right' }) {
   const previewSide = side === 'left' ? '右侧' : '左侧';
 
   useEffect(() => {
-    resultsRef.current?.querySelector(`[data-result-index="${selectedIdx}"]`)
+    resultsRef.current
+      ?.querySelector(`[data-result-index="${selectedIdx}"]`)
       ?.scrollIntoView({ block: 'nearest' });
   }, [selectedIdx]);
 
@@ -116,13 +117,16 @@ export function SearchPanel({ side }: { side: 'left' | 'right' }) {
       </div>
 
       {/* Results */}
-      <div ref={resultsRef} tabIndex={0} aria-label="全文搜索结果" className="flex-1 overflow-auto focus:outline-none">
+      <div
+        ref={resultsRef}
+        tabIndex={0}
+        aria-label="全文搜索结果"
+        className="flex-1 overflow-auto focus:outline-none"
+      >
         <TaskWarnings warnings={warnings} />
         {cancelled && <div className="px-3 py-2 text-xs text-text-muted">已停止搜索，保留已找到的结果</div>}
         {error && (
-          <div className="px-3 py-3 text-red-400 text-xs whitespace-pre-wrap break-words">
-            {error}
-          </div>
+          <div className="px-3 py-3 text-red-400 text-xs whitespace-pre-wrap break-words">{error}</div>
         )}
         {previewError && (
           <div role="alert" className="px-3 py-3 text-red-400 text-xs whitespace-pre-wrap break-words">
@@ -131,15 +135,11 @@ export function SearchPanel({ side }: { side: 'left' | 'right' }) {
         )}
 
         {results.length === 0 && !searching && !error && !cancelled && query && (
-          <div className="text-center text-text-muted py-8 text-sm">
-            未找到结果
-          </div>
+          <div className="text-center text-text-muted py-8 text-sm">未找到结果</div>
         )}
 
         {results.length === 0 && !searching && !error && !query && (
-          <div className="text-center text-text-muted py-8 text-sm">
-            输入搜索内容后按 Enter
-          </div>
+          <div className="text-center text-text-muted py-8 text-sm">输入搜索内容后按 Enter</div>
         )}
 
         {grouped.map((group) => (
@@ -172,9 +172,7 @@ export function SearchPanel({ side }: { side: 'left' | 'right' }) {
                   data-result-index={globalIdx}
                   title={`在${previewSide}预览第 ${match.lineNumber} 行`}
                   className={`flex items-start gap-2 px-3 py-1 text-xs cursor-pointer ${
-                    isSelected
-                      ? 'bg-accent/40 text-white'
-                      : 'hover:bg-surface-lighter text-text-secondary'
+                    isSelected ? 'bg-accent/40 text-white' : 'hover:bg-surface-lighter text-text-secondary'
                   }`}
                   onClick={() => {
                     useSearchStore.setState({ selectedIdx: globalIdx });
@@ -182,10 +180,10 @@ export function SearchPanel({ side }: { side: 'left' | 'right' }) {
                     void openFile(match, side);
                   }}
                 >
-                  <span className="text-text-muted w-10 text-right flex-shrink-0">
-                    {match.lineNumber}
+                  <span className="text-text-muted w-10 text-right flex-shrink-0">{match.lineNumber}</span>
+                  <span className="truncate">
+                    <HighlightedMatch text={match.lineContent.trim()} query={match.matchText || query} />
                   </span>
-                  <span className="truncate"><HighlightedMatch text={match.lineContent.trim()} query={match.matchText || query} /></span>
                 </div>
               );
             })}
@@ -197,7 +195,9 @@ export function SearchPanel({ side }: { side: 'left' | 'right' }) {
       <div className="flex-shrink-0 px-2 py-1.5 border-t border-border text-xs text-text-muted flex flex-wrap gap-x-3 gap-y-1">
         <span>{results.length} 个结果</span>
         {searching && <span>搜索中…</span>}
-        {results.length >= FULLTEXT_RESULT_LIMIT && <span>已达 {FULLTEXT_RESULT_LIMIT} 条上限，请缩小搜索范围</span>}
+        {results.length >= FULLTEXT_RESULT_LIMIT && (
+          <span>已达 {FULLTEXT_RESULT_LIMIT} 条上限，请缩小搜索范围</span>
+        )}
         <span>↑↓ 选择</span>
         <span>↵ {previewSide}预览</span>
         <span>Esc 清空</span>
@@ -209,11 +209,15 @@ export function SearchPanel({ side }: { side: 'left' | 'right' }) {
 function HighlightedMatch({ text, query }: { text: string; query: string }) {
   const start = query ? text.toLowerCase().indexOf(query.toLowerCase()) : -1;
   if (start < 0) return <>{text}</>;
-  return <>
-    {text.slice(0, start)}
-    <mark className="bg-accent/20 text-accent font-semibold">{text.slice(start, start + query.length)}</mark>
-    {text.slice(start + query.length)}
-  </>;
+  return (
+    <>
+      {text.slice(0, start)}
+      <mark className="bg-accent/20 text-accent font-semibold">
+        {text.slice(start, start + query.length)}
+      </mark>
+      {text.slice(start + query.length)}
+    </>
+  );
 }
 
 /** 按文件分组搜索结果 */

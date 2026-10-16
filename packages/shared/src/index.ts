@@ -1,4 +1,11 @@
-export type { FileEntry, FileStat, FileOpResult, SortKey, SortConfig, FileConflictStrategy } from './types/file';
+export type {
+  FileEntry,
+  FileStat,
+  FileOpResult,
+  SortKey,
+  SortConfig,
+  FileConflictStrategy,
+} from './types/file';
 export type {
   IpcChannels,
   IpcEvents,
@@ -41,3 +48,5 @@ export type {
   AppSettings,
   AppearanceSettings,
 } from './types/config';
+export { REQUEST_CHANNELS, EVENT_CHANNELS } from './bridge';
+export type { ExploreApi } from './bridge';

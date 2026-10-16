@@ -6,6 +6,7 @@ export const createFixture = (name: string) => mkdtemp(join(tmpdir(), `explore-$
 
 export async function removeFixture(root: string): Promise<void> {
   const target = resolve(root);
-  if (dirname(target) !== resolve(tmpdir()) || !basename(target).startsWith('explore-')) throw new Error('Unexpected fixture directory');
+  if (dirname(target) !== resolve(tmpdir()) || !basename(target).startsWith('explore-'))
+    throw new Error('Unexpected fixture directory');
   await rm(target, { recursive: true, force: true });
 }

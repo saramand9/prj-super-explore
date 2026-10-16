@@ -59,13 +59,8 @@ function normalizePath(path: string): string {
   return path.replace(/\\/g, '/').toLowerCase();
 }
 
-function keepHighlightForPath(
-  highlight: SearchHighlight | null,
-  path: string,
-): SearchHighlight | null {
-  return highlight && normalizePath(highlight.filePath) === normalizePath(path)
-    ? highlight
-    : null;
+function keepHighlightForPath(highlight: SearchHighlight | null, path: string): SearchHighlight | null {
+  return highlight && normalizePath(highlight.filePath) === normalizePath(path) ? highlight : null;
 }
 
 function toReadInfo(result: FileReadResult, full: boolean): ViewerPanelState['readInfo'] {
@@ -183,8 +178,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
     }
   },
 
-  setSearchHighlight: (side, searchHighlight) =>
-    set((s) => ({ [side]: { ...s[side], searchHighlight } })),
+  setSearchHighlight: (side, searchHighlight) => set((s) => ({ [side]: { ...s[side], searchHighlight } })),
 
   clear: (side) => {
     ++readRequests[side];

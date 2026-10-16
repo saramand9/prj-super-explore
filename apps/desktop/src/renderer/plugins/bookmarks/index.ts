@@ -21,9 +21,7 @@ const manifest = {
       { id: 'bookmarks.add', title: 'Add Bookmark', category: 'Bookmarks' },
       { id: 'bookmarks.openPanel', title: 'Show Bookmarks', category: 'Bookmarks' },
     ],
-    keybindings: [
-      { command: 'bookmarks.openPanel', key: 'Ctrl+B' },
-    ],
+    keybindings: [{ command: 'bookmarks.openPanel', key: 'Ctrl+B' }],
   },
 };
 

@@ -29,9 +29,14 @@ export function SpaceDropdown() {
         aria-haspopup="dialog"
       >
         <Layers className="h-3.5 w-3.5 flex-shrink-0 text-accent" />
-        <span className="max-w-[160px] truncate font-medium">{activeSpace ? getWorkspaceDisplayName(activeSpace) : '默认工作区'}</span>
+        <span className="max-w-[160px] truncate font-medium">
+          {activeSpace ? getWorkspaceDisplayName(activeSpace) : '默认工作区'}
+        </span>
         {overview && (
-          <span className="hidden rounded-sm bg-surface-lighter px-1 text-[0.6875rem] tabular-nums text-text-secondary lg:inline" aria-label={`${overview.pathCount} 个目录`}>
+          <span
+            className="hidden rounded-sm bg-surface-lighter px-1 text-[0.6875rem] tabular-nums text-text-secondary lg:inline"
+            aria-label={`${overview.pathCount} 个目录`}
+          >
             {overview.pathCount}
           </span>
         )}

@@ -51,9 +51,9 @@ export function getWorkspaceDisplayName(space: Pick<Space, 'name'>): string {
 
 function rankWorkspaceOptions(spaces: Space[], query: string): Space[] {
   // Localize the built-in name for display/search without rewriting saved workspaces.
-  const searchable = spaces.map((space) => space.name === 'Default'
-    ? { ...space, name: `${getWorkspaceDisplayName(space)} Default` }
-    : space);
+  const searchable = spaces.map((space) =>
+    space.name === 'Default' ? { ...space, name: `${getWorkspaceDisplayName(space)} Default` } : space,
+  );
   const byId = new Map(spaces.map((space) => [space.id, space]));
   return rankSpaces(searchable, query).map((space) => byId.get(space.id)!);
 }
@@ -103,11 +103,15 @@ function WorkspaceRow({
       <Layers className={`h-[14px] w-[14px] flex-shrink-0 ${active ? 'text-accent' : 'text-text-muted'}`} />
       <span className="min-w-0 flex-1">
         <span className="flex min-w-0 items-center gap-1.5">
-          <span className={`truncate text-xs font-medium leading-snug ${active ? 'text-accent' : 'text-text-primary'}`}>
+          <span
+            className={`truncate text-xs font-medium leading-snug ${active ? 'text-accent' : 'text-text-primary'}`}
+          >
             {getWorkspaceDisplayName(space)}
           </span>
           {active && (
-            <span className="flex-shrink-0 rounded-sm bg-accent/15 px-1 text-[0.6875rem] text-accent">当前</span>
+            <span className="flex-shrink-0 rounded-sm bg-accent/15 px-1 text-[0.6875rem] text-accent">
+              当前
+            </span>
           )}
           {space.pinned && <Pin className="h-3 w-3 flex-shrink-0 fill-current text-text-muted" />}
         </span>
@@ -199,7 +203,9 @@ function WorkspacePreview({
           </>
         ) : (
           <>
-            <span className="min-w-0 flex-1 truncate text-xs font-medium text-text-primary">{getWorkspaceDisplayName(space)}</span>
+            <span className="min-w-0 flex-1 truncate text-xs font-medium text-text-primary">
+              {getWorkspaceDisplayName(space)}
+            </span>
             <button
               data-testid="workspace-pin-toggle"
               className={`flex h-[28px] w-[28px] items-center justify-center rounded transition-colors hover:bg-surface-lighter ${
@@ -239,13 +245,19 @@ function WorkspacePreview({
 
         <div className="border-b border-border px-3 py-2">
           <div className="mb-1 text-[0.6875rem] text-text-secondary">左侧目录</div>
-          <div className="line-clamp-2 break-all font-mono text-xs leading-relaxed text-text-primary" title={overview.leftPath ?? undefined}>
+          <div
+            className="line-clamp-2 break-all font-mono text-xs leading-relaxed text-text-primary"
+            title={overview.leftPath ?? undefined}
+          >
             {overview.leftPath ?? '未打开'}
           </div>
         </div>
         <div className="border-b border-border px-3 py-2">
           <div className="mb-1 text-[0.6875rem] text-text-secondary">右侧目录</div>
-          <div className="line-clamp-2 break-all font-mono text-xs leading-relaxed text-text-primary" title={overview.rightPath ?? undefined}>
+          <div
+            className="line-clamp-2 break-all font-mono text-xs leading-relaxed text-text-primary"
+            title={overview.rightPath ?? undefined}
+          >
             {overview.rightPath ?? '未打开'}
           </div>
         </div>
@@ -255,12 +267,18 @@ function WorkspacePreview({
             <div className="mb-1.5 text-[0.6875rem] text-text-secondary">其他已保存目录</div>
             <div className="space-y-1">
               {otherPaths.slice(0, 4).map((path) => (
-                <div key={path} className="truncate font-mono text-[0.6875rem] text-text-secondary" title={path}>
+                <div
+                  key={path}
+                  className="truncate font-mono text-[0.6875rem] text-text-secondary"
+                  title={path}
+                >
                   {formatSpacePath(path, 3)}
                 </div>
               ))}
               {otherPaths.length > 4 && (
-                <div className="text-[0.6875rem] text-text-secondary">另有 {otherPaths.length - 4} 个目录</div>
+                <div className="text-[0.6875rem] text-text-secondary">
+                  另有 {otherPaths.length - 4} 个目录
+                </div>
               )}
             </div>
           </div>

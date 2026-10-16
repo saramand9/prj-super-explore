@@ -3,7 +3,7 @@
 A Windows file manager for finding, previewing and organizing files without
 losing your place.
 
-[Download for Windows](https://dl.10yyds.cloud/explore/releases/1.0.1/windows-x64/Explore-Setup-1.0.1-windows-x64.exe)
+[Download for Windows](https://github.com/saramand9/prj-super-explore/releases/tag/v1.0.2)
  | [Getting started](#getting-started)
  | [Contributing](CONTRIBUTING.md)
  | [Security](SECURITY.md)
@@ -15,7 +15,8 @@ The current interface is primarily Chinese; this README and contributor-facing
 guides are in English.*
 
 > Explore's original code and documentation are licensed under the MIT License.
-> Public launch is still in preparation. See [License](#license) and the
+> This source repository is public. Release 1.0.2 includes the Electron security
+> hardening described below. See [License](#license) and the
 > [maintainer readiness review](docs/maintainers/open-source-readiness.md).
 
 ## Why Explore?
@@ -38,27 +39,21 @@ trusted local code, not sandboxed extensions.
 
 ## Download
 
-The current Windows x64 installer is **1.0.1**, released **October 16, 2026**.
+The Windows x64 release prepared by this source is **1.0.2**, dated **October 17, 2026**.
 
-- [Windows installer, 81.6 MiB](https://dl.10yyds.cloud/explore/releases/1.0.1/windows-x64/Explore-Setup-1.0.1-windows-x64.exe)
-- [SHA-256 checksum file](https://dl.10yyds.cloud/explore/releases/1.0.1/windows-x64/Explore-Setup-1.0.1-windows-x64.exe.sha256)
+- [Release notes and Windows installer](https://github.com/saramand9/prj-super-explore/releases/tag/v1.0.2)
+- [SHA-256 checksum file](https://github.com/saramand9/prj-super-explore/releases/download/v1.0.2/SHA256SUMS.txt)
 
-Expected SHA-256:
-
-```text
-18b358ecbe9e52d14b54258b67caef345e04e441782d78a6c5df66def8258e49
-```
-
-Verify a downloaded installer in PowerShell:
+Compare the checksum file with a downloaded installer in PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Explore-Setup-1.0.1-windows-x64.exe
+Get-FileHash -Algorithm SHA256 '.\Explore-Setup-1.0.2-windows-x64.exe'
 ```
 
 Installers are currently unsigned. A checksum is useful for integrity checking
-but is not an independent publisher signature. The prebuilt installer predates
-this documentation/history preparation; rebuilding this branch is a separate
-development workflow, not a claim that a new binary has been released.
+but is not an independent publisher signature. A release link becomes available
+only when its draft passes acceptance and is explicitly published. Rebuilding a
+branch or tagging it does not itself publish a new binary.
 
 ### System requirements
 
@@ -105,11 +100,12 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-The repository is private until the maintainer completes the public-launch
-checklist, so cloning currently requires repository access.
+The repository is public; cloning does not require maintainer-granted access.
 
 ```powershell
 pnpm typecheck
+pnpm lint
+pnpm format:check
 pnpm test:unit
 pnpm test:e2e
 pnpm test:commit-policy
@@ -126,7 +122,8 @@ pnpm test:package
 ```
 
 Artifacts are written to `apps/desktop/dist-electron/`. The CI workflow runs
-Windows checks but does not automatically publish installers.
+Windows checks. Version tags additionally build a draft GitHub Release; a
+maintainer must review and publish it explicitly. See [release procedure](docs/releasing.md).
 See [development and packaging](docs/development.md) for isolated tests,
 ripgrep verification and troubleshooting.
 

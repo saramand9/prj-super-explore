@@ -16,7 +16,11 @@ describe('appearance persistence', () => {
   it('loads the saved appearance without writing defaults back', async () => {
     vi.mocked(ipc.invoke).mockResolvedValueOnce({ theme: 'linear', fontScale: 160, layoutMode: 'single' });
     await useLayoutStore.getState().loadPreferences();
-    expect(useLayoutStore.getState()).toMatchObject({ theme: 'linear', fontScale: 160, layout: { mode: 'single' } });
+    expect(useLayoutStore.getState()).toMatchObject({
+      theme: 'linear',
+      fontScale: 160,
+      layout: { mode: 'single' },
+    });
     expect(ipc.invoke).toHaveBeenCalledTimes(1);
   });
 
@@ -26,7 +30,8 @@ describe('appearance persistence', () => {
     useLayoutStore.getState().setMode('single');
     await useLayoutStore.getState().savePreferences();
     expect(vi.mocked(ipc.invoke).mock.calls.at(-1)).toEqual([
-      'settings:saveAppearance', { theme: 'linear', fontScale: 160, layoutMode: 'single' },
+      'settings:saveAppearance',
+      { theme: 'linear', fontScale: 160, layoutMode: 'single' },
     ]);
     expect(useLayoutStore.getState().preferencesDirty).toBe(false);
   });
@@ -35,7 +40,11 @@ describe('appearance persistence', () => {
     vi.mocked(ipc.invoke).mockRejectedValue(new Error('disk full'));
     useLayoutStore.getState().setFontScale(180);
     await expect(useLayoutStore.getState().savePreferences()).resolves.toBe(false);
-    expect(useLayoutStore.getState()).toMatchObject({ fontScale: 180, preferencesDirty: true, preferenceError: 'disk full' });
+    expect(useLayoutStore.getState()).toMatchObject({
+      fontScale: 180,
+      preferencesDirty: true,
+      preferenceError: 'disk full',
+    });
     vi.mocked(ipc.invoke).mockResolvedValue(undefined);
     await expect(useLayoutStore.getState().savePreferences()).resolves.toBe(true);
     expect(useLayoutStore.getState()).toMatchObject({ preferencesDirty: false, preferenceError: null });

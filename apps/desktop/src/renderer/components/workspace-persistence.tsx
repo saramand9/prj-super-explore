@@ -19,7 +19,10 @@ export function WorkspacePersistence() {
       stopAutoSave = initAutoSave();
       if (useSpaceStore.getState().loaded) void useSpaceStore.getState().saveCurrentSpace();
     });
-    return () => { disposed = true; stopAutoSave?.(); };
+    return () => {
+      disposed = true;
+      stopAutoSave?.();
+    };
   }, []);
 
   useEffect(() => {
@@ -41,26 +44,36 @@ export function WorkspacePersistence() {
         allow = results.every(Boolean);
         if (!allow) {
           await ipc.invoke('window:closePending', { requestId });
-          allow = await appDialog.choice({
-            title: '有更改尚未保存',
-            message: '工作空间或设置保存失败。可以返回后重试，或放弃本次未保存的更改并退出。',
-            type: 'warning',
-            buttons: [{ id: 'stay', label: '返回并重试' }, { id: 'discard', label: '不保存并退出' }],
-            defaultId: 'stay',
-            cancelId: 'stay',
-          }) === 'discard';
+          allow =
+            (await appDialog.choice({
+              title: '有更改尚未保存',
+              message: '工作空间或设置保存失败。可以返回后重试，或放弃本次未保存的更改并退出。',
+              type: 'warning',
+              buttons: [
+                { id: 'stay', label: '返回并重试' },
+                { id: 'discard', label: '不保存并退出' },
+              ],
+              defaultId: 'stay',
+              cancelId: 'stay',
+            })) === 'discard';
         }
       } catch (error) {
         reportError('close-save', error);
       } finally {
         if (pendingRequest === requestId) {
           pendingRequest = null;
-          await ipc.invoke('window:resolveClose', { allow, requestId }).catch((error) => reportError('close-response', error));
+          await ipc
+            .invoke('window:resolveClose', { allow, requestId })
+            .catch((error) => reportError('close-response', error));
         }
       }
     });
     void ipc.invoke('window:readyForClose', undefined).catch(() => {});
-    return () => { pendingRequest = null; off(); offCancel(); };
+    return () => {
+      pendingRequest = null;
+      off();
+      offCancel();
+    };
   }, []);
 
   if (!loadError && !saveError && !preferenceError) return null;
@@ -72,7 +85,8 @@ export function WorkspacePersistence() {
       if (useSpaceStore.getState().loaded) await useSpaceStore.getState().saveCurrentSpace();
       const preferences = useLayoutStore.getState();
       if (preferenceError) {
-        if (!preferences.preferencesLoaded && !preferences.preferencesDirty) await preferences.loadPreferences();
+        if (!preferences.preferencesLoaded && !preferences.preferencesDirty)
+          await preferences.loadPreferences();
         else await preferences.savePreferences();
       }
     } finally {
@@ -81,13 +95,21 @@ export function WorkspacePersistence() {
   };
 
   return (
-    <div role="alert" data-testid="persistence-error" className="flex flex-shrink-0 items-center gap-3 border-b border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+    <div
+      role="alert"
+      data-testid="persistence-error"
+      className="flex flex-shrink-0 items-center gap-3 border-b border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200"
+    >
       <div className="min-w-0 flex-1 whitespace-pre-wrap break-words">
         {loadError && <div>工作空间未能恢复，自动保存已暂停：{loadError}</div>}
         {saveError && <div>工作空间尚未保存：{saveError}</div>}
         {preferenceError && <div>设置未能加载或保存：{preferenceError}</div>}
       </div>
-      <button className="flex-shrink-0 rounded border border-amber-400/40 px-2 py-1 hover:bg-amber-400/10 disabled:opacity-50" onClick={() => void retry()} disabled={retrying}>
+      <button
+        className="flex-shrink-0 rounded border border-amber-400/40 px-2 py-1 hover:bg-amber-400/10 disabled:opacity-50"
+        onClick={() => void retry()}
+        disabled={retrying}
+      >
         {retrying ? '正在重试…' : '重试'}
       </button>
     </div>
