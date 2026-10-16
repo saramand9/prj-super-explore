@@ -75,6 +75,16 @@ describe('SearchService', () => {
     );
   });
 
+  it('ignores an environment-selected search executable', async () => {
+    vi.stubEnv('RG_PATH', 'C:\\untrusted\\program.exe');
+    mockRipgrep({ code: 1, stdoutLines: [] });
+    const service = createService();
+    await service.fulltext('D:/repo', 'query', 'trusted-executable');
+    const [executable] = spawnMock.mock.calls[0];
+    expect(executable).not.toBe(process.env.RG_PATH);
+    expect(String(executable)).toMatch(/[/\\]ripgrep[/\\]bin[/\\]rg(?:\.exe)?$/);
+  });
+
   it('returns empty results for empty directories or no matches', async () => {
     mockRipgrep({ code: 1, stdoutLines: [] });
 

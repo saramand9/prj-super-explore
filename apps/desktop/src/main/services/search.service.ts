@@ -244,9 +244,6 @@ export class SearchService implements Service {
   // ── private ──
 
   private findRgPath(): string | null {
-    // 优先从环境变量
-    if (process.env.RG_PATH) return process.env.RG_PATH;
-
     const executable = process.platform === 'win32' ? 'rg.exe' : 'rg';
     const candidates: string[] = [];
 
@@ -277,25 +274,12 @@ export class SearchService implements Service {
       // The packaged binary is optional in development; fall back below.
     }
 
-    candidates.push(join(process.cwd(), 'node_modules', '@lvce-editor', 'ripgrep', 'bin', executable));
-    candidates.push(
-      join(process.cwd(), 'node_modules', '@lvce-editor', '.ignored_ripgrep', 'bin', executable),
-    );
-
     for (const candidate of candidates) {
       if (existsSync(candidate)) return candidate;
     }
 
-    return this.findExecutableInPath(executable);
-  }
-
-  private findExecutableInPath(executable: string): string | null {
-    const pathEnv = process.env.PATH ?? '';
-    for (const dir of pathEnv.split(process.platform === 'win32' ? ';' : ':')) {
-      if (!dir) continue;
-      const candidate = join(dir, executable);
-      if (existsSync(candidate)) return candidate;
-    }
+    // Never execute an environment/CWD-selected program. Use the JS fallback
+    // when the application-owned search binary is missing.
     return null;
   }
 

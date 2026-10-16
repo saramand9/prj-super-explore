@@ -62,3 +62,18 @@ The published installer is unsigned. This test covers the hosted runner OS,
 not every Windows version, SmartScreen policy, network share, antivirus setup
 or hardware configuration. Existing manual/E2E functional evidence complements
 it; it is not a universal installation or security certificate.
+
+## CodeQL triage
+
+The application no longer selects a search executable through RG_PATH, PATH or
+the working directory. It runs its own bundled binary or falls back to JS.
+
+Two non-application findings were manually reviewed: the commit-policy CLI
+intentionally reads the filename supplied by its local invoker (there is no
+remote request handler or privilege boundary), and the installer acceptance test
+intentionally executes first-party installers on a disposable runner. The old
+installer bytes are checksum-pinned, the new installer is built from the tested
+repository, and spawn receives separate arguments without a shell. These are
+intentional tool capabilities, not remotely controlled command/path injection.
+Any false-positive dismissal must be limited to these reviewed locations; it
+must not suppress the query or scanner for other code.

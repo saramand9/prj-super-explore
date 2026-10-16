@@ -15,6 +15,8 @@ No changes yet.
 - Block foreign navigation, popups, embedded frames, webviews and permission requests.
 - Add production CSP while preserving explicitly trusted local plugin Blob modules.
 - Validate plugin IDs and canonical paths; require confirmation before installation.
+- Execute only the application-owned search binary; ignore RG_PATH, working-directory
+  and PATH executable overrides and use basic search if the bundled binary is missing.
 
 ### Development and releases
 
