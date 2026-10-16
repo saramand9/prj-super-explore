@@ -6,6 +6,8 @@ export type {
   IpcErrorInfo,
   FileReadResult,
   FulltextMatch,
+  SearchResult,
+  ScanSummary,
   IndexResult,
   DirSizeResult,
 } from './types/ipc';
@@ -37,4 +39,5 @@ export type {
   PanelConfig,
   LayoutConfig,
   AppSettings,
+  AppearanceSettings,
 } from './types/config';

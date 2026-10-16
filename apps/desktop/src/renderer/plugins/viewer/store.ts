@@ -4,6 +4,9 @@ import { getIpcErrorMessage, ipc } from '../../framework/bridge/ipc-client';
 
 type ViewerSide = 'left' | 'right';
 
+const readRequests: Record<ViewerSide, number> = { left: 0, right: 0 };
+const fileSessions: Record<ViewerSide, number> = { left: 0, right: 0 };
+
 export interface SearchHighlight {
   filePath: string;
   lineNumber: number;
@@ -76,15 +79,30 @@ function toReadInfo(result: FileReadResult, full: boolean): ViewerPanelState['re
   };
 }
 
+function isCurrentRead(side: ViewerSide, path: string, request: number): boolean {
+  return readRequests[side] === request && useViewerStore.getState()[side].filePath === path;
+}
+
+function isCurrentSession(side: ViewerSide, path: string, session: number): boolean {
+  return fileSessions[side] === session && useViewerStore.getState()[side].filePath === path;
+}
+
+function releaseUnusedWatcher(path: string): void {
+  const state = useViewerStore.getState();
+  // The main process shares one watcher for an exact path across both panels.
+  if (state.left.filePath !== path && state.right.filePath !== path) {
+    void ipc.invoke('file:unwatchFile', { path }).catch(() => {});
+  }
+}
+
 export const useViewerStore = create<ViewerState>((set, get) => ({
   left: defaultPanel(),
   right: defaultPanel(),
 
   loadFile: async (side, path) => {
+    const request = ++readRequests[side];
+    const session = ++fileSessions[side];
     const prev = get()[side].filePath;
-    if (prev && prev !== path) {
-      ipc.invoke('file:unwatchFile', { path: prev }).catch(() => {});
-    }
 
     set((s) => ({
       [side]: {
@@ -98,9 +116,11 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
         searchHighlight: keepHighlightForPath(s[side].searchHighlight, path),
       },
     }));
+    if (prev && prev !== path) releaseUnusedWatcher(prev);
 
     try {
       const result = await ipc.invoke('file:read', { path });
+      if (!isCurrentRead(side, path, request)) return;
       set((s) => ({
         [side]: {
           ...s[side],
@@ -109,15 +129,22 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
           loading: false,
         },
       }));
-      ipc.invoke('file:watchFile', { path }).catch((err) => {
-        set((s) => ({
-          [side]: {
-            ...s[side],
-            watchError: getIpcErrorMessage(err, '文件监听失败，内容不会自动刷新'),
-          },
-        }));
-      });
+      void ipc.invoke('file:watchFile', { path }).then(
+        () => {
+          if (!isCurrentSession(side, path, session)) releaseUnusedWatcher(path);
+        },
+        (err) => {
+          if (!isCurrentSession(side, path, session)) return;
+          set((s) => ({
+            [side]: {
+              ...s[side],
+              watchError: getIpcErrorMessage(err, '文件监听失败，内容不会自动刷新'),
+            },
+          }));
+        },
+      );
     } catch (err: any) {
+      if (!isCurrentRead(side, path, request)) return;
       set((s) => ({
         [side]: {
           ...s[side],
@@ -131,9 +158,11 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   loadFullFile: async (side) => {
     const path = get()[side].filePath;
     if (!path) return;
+    const request = ++readRequests[side];
     set((s) => ({ [side]: { ...s[side], loading: true, error: null } }));
     try {
       const result = await ipc.invoke('file:read', { path, loadFull: true });
+      if (!isCurrentRead(side, path, request)) return;
       set((s) => ({
         [side]: {
           ...s[side],
@@ -143,6 +172,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
         },
       }));
     } catch (err) {
+      if (!isCurrentRead(side, path, request)) return;
       set((s) => ({
         [side]: {
           ...s[side],
@@ -157,18 +187,22 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
     set((s) => ({ [side]: { ...s[side], searchHighlight } })),
 
   clear: (side) => {
+    ++readRequests[side];
+    ++fileSessions[side];
     const prev = get()[side].filePath;
-    if (prev) ipc.invoke('file:unwatchFile', { path: prev }).catch(() => {});
     set((s) => ({ [side]: { ...s[side], ...defaultPanel() } }));
+    if (prev) releaseUnusedWatcher(prev);
   },
 
   reload: async (side) => {
     const path = get()[side].filePath;
     if (!path) return;
+    const request = ++readRequests[side];
     set((s) => ({ [side]: { ...s[side], loading: true, error: null } }));
     try {
       const loadFull = get()[side].readInfo?.full ?? false;
       const result = await ipc.invoke('file:read', { path, loadFull });
+      if (!isCurrentRead(side, path, request)) return;
       set((s) => ({
         [side]: {
           ...s[side],
@@ -178,6 +212,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
         },
       }));
     } catch (err: any) {
+      if (!isCurrentRead(side, path, request)) return;
       set((s) => ({
         [side]: {
           ...s[side],
@@ -190,10 +225,12 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
 
   silentReload: async (side) => {
     const path = get()[side].filePath;
-    if (!path) return;
+    if (!path || get()[side].loading) return;
+    const request = ++readRequests[side];
     try {
       const loadFull = get()[side].readInfo?.full ?? false;
       const result = await ipc.invoke('file:read', { path, loadFull });
+      if (!isCurrentRead(side, path, request)) return;
       set((s) => ({
         [side]: {
           ...s[side],
@@ -203,6 +240,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
         },
       }));
     } catch (err) {
+      if (!isCurrentRead(side, path, request)) return;
       set((s) => ({
         [side]: {
           ...s[side],

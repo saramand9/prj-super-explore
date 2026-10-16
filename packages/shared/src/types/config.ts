@@ -11,11 +11,17 @@ export interface Bookmark {
 export interface Space {
   id: string;
   name: string;
+  /** 是否固定在工作区选择器顶部。 */
+  pinned?: boolean;
+  /** 最近一次成功切换到该工作区的 Unix 毫秒时间戳。 */
+  lastOpenedAt?: number;
   left: {
     tabs: { path: string; label: string; initialPath: string; pinned: boolean }[];
     activeTabId: string | null;
     /** 活跃标签的 path，用于恢复时匹配（id 在恢复时会重新生成） */
     activeTabPath?: string | null;
+    /** 区分指向同一路径的多个标签；兼容旧版按路径恢复。 */
+    activeTabIndex?: number;
     path: string | null;
   };
   right: {
@@ -23,6 +29,7 @@ export interface Space {
     activeTabId: string | null;
     /** 活跃标签的 path，用于恢复时匹配（id 在恢复时会重新生成） */
     activeTabPath?: string | null;
+    activeTabIndex?: number;
     path: string | null;
   };
 }
@@ -52,8 +59,14 @@ export interface LayoutConfig {
   };
 }
 
+export interface AppearanceSettings {
+  theme: string;
+  fontScale: number;
+  layoutMode: 'single' | 'dual';
+}
+
 /** 应用设置 */
-export interface AppSettings {
+export interface AppSettings extends AppearanceSettings {
   // 索引路径
   indexPaths: string[];
   // 排除模式
@@ -64,6 +77,4 @@ export interface AppSettings {
   launcherHotkey: string;
   // 全文搜索最大结果
   fulltextMaxResults: number;
-  // 主题
-  theme: 'light' | 'dark' | 'system';
 }

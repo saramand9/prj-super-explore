@@ -19,7 +19,9 @@ function getIcon(iconName: string) {
   return Icon;
 }
 
-export function ActivityBar() {
+export function ActivityBar({ onPluginChange }: {
+  onPluginChange: (side: 'left' | 'right', pluginId: string, panelId: string) => void;
+}) {
   const activePanel = useLayoutStore((s) => s.layout.id);
   const leftPlugin = useLayoutStore((s) => s.layout.left.pluginId);
   const rightPlugin = useLayoutStore((s) => s.layout.right.pluginId);
@@ -33,8 +35,8 @@ export function ActivityBar() {
   const handleClick = useCallback((pluginId: string, panelId: string) => {
     const layout = useLayoutStore.getState().layout;
     const targetSide = layout.id === 'left' || layout.id === 'right' ? layout.id : 'left';
-    useLayoutStore.getState().setPanelPlugin(targetSide as 'left' | 'right', pluginId, panelId);
-  }, []);
+    onPluginChange(targetSide, pluginId, panelId);
+  }, [onPluginChange]);
 
   return (
     <div className="w-10 flex-shrink-0 bg-surface-light border-r border-border flex flex-col items-center py-2 gap-1">

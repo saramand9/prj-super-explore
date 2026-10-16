@@ -21,9 +21,7 @@ export class FileSearchIndex {
   // 条目存储（用数字 ID 去重）
   private entryStore: FileEntry[] = [];
   private entryIdMap = new Map<string, number>(); // path → id
-
-  // Cached phonetic variants used by trigram and substring searches.
-  private pinyinData = new Map<number, { full: string; initials: string }>();
+  private searchKeys: string[][] = [];
 
   private _ready = false;
 
@@ -38,49 +36,43 @@ export class FileSearchIndex {
   /** 构建全部索引 */
   build(entries: FileEntry[]): void {
     this.clear();
+    this.append(entries);
+  }
 
-    // 1. 分配 ID，建立条目表
-    let nextId = 0;
+  /** Append a scan batch without rebuilding or duplicating the existing index. */
+  append(entries: FileEntry[]): void {
     for (const entry of entries) {
       if (this.entryIdMap.has(entry.path)) continue;
-      const id = nextId++;
+      const i = this.entryStore.length;
       this.entryStore.push(entry);
-      this.entryIdMap.set(entry.path, id);
-    }
-
-    // 2. 构建 Prefix Trie + Trigram Index + 拼音
-    for (let i = 0; i < this.entryStore.length; i++) {
-      const entry = this.entryStore[i];
+      this.entryIdMap.set(entry.path, i);
       const name = entry.name.toLowerCase();
 
-      // 收集所有搜索 key
-      const keys: string[] = [name];
+      // 收集所有搜索 key，并去掉中文名与拼音转换产生的重复项。
+      const keys = new Set<string>([name]);
 
       // 拼音扩展
       if (/[一-鿿]/.test(name)) {
-        const full = pinyin(name, { toneType: 'none' }).toLowerCase().replace(/\s+/g, '');
-        const lettersOnly = full.replace(/[^a-z]/g, '');
-        const initials = pinyin(name, { pattern: 'first', toneType: 'none' })
-          .toLowerCase()
-          .replace(/\s+/g, '');
-
-        keys.push(full); // 全拼
-        keys.push(lettersOnly); // 纯字母
-        keys.push(initials); // 首字母
-        this.pinyinData.set(i, { full, initials });
+        const fullPinyin = pinyin(name, { toneType: 'none', type: 'array', v: true })
+          .join('')
+          .toLowerCase();
+        const initials = pinyin(name, { pattern: 'first', toneType: 'none', type: 'array' })
+          .join('')
+          .toLowerCase();
+        if (fullPinyin) keys.add(fullPinyin);
+        // Preserve the local fix for pinyin queries that omit numbers/separators.
+        const lettersOnly = fullPinyin.replace(/[^a-z]/g, '');
+        if (lettersOnly) keys.add(lettersOnly);
+        if (initials) keys.add(initials);
       }
+
+      const entryKeys = [...keys];
+      this.searchKeys[i] = entryKeys;
 
       // 插入 Prefix Trie
-      for (const key of keys) {
+      for (const key of entryKeys) {
         this.insertTrie(key, i);
-      }
-
-      // 插入 Trigram Index（原始名 + 拼音变体）
-      this.insertTrigrams(name, i);
-      const phonetic = this.pinyinData.get(i);
-      if (phonetic) {
-        this.insertTrigrams(phonetic.full, i);
-        this.insertTrigrams(phonetic.initials, i);
+        this.insertTrigrams(key, i);
       }
     }
 
@@ -91,6 +83,7 @@ export class FileSearchIndex {
   search(query: string, maxResults = 50): FileEntry[] {
     if (!query || !this._ready) return [];
     const q = query.toLowerCase().trim();
+    if (!q || maxResults <= 0) return [];
 
     // 通配符 → 正则匹配全量
     if (q.includes('*') || q.includes('?')) {
@@ -113,7 +106,7 @@ export class FileSearchIndex {
     this.trigramIndex.clear();
     this.entryStore = [];
     this.entryIdMap.clear();
-    this.pinyinData.clear();
+    this.searchKeys = [];
     this._ready = false;
   }
 
@@ -195,50 +188,33 @@ export class FileSearchIndex {
     const trigrams = this.makeNgrams(query, 3);
 
     // 查每个 trigram 的倒排列表
-    const postings: Set<number>[] = [];
-    for (const tri of trigrams) {
-      const posting = this.trigramIndex.get(tri);
-      if (!posting) {
-        // 任一片段缺失都不可能是完整子串，转入拼音回退检查。
-        return this.fallbackSubstring(query, max);
-      }
-      postings.push(posting);
-    }
+    const postings = trigrams.map((tri) => this.trigramIndex.get(tri));
 
-    // 取交集
-    const [first, ...rest] = postings;
-    let intersection = new Set(first);
-    for (const posting of rest) {
-      intersection = new Set([...intersection].filter((id) => posting.has(id)));
-    }
-
-    if (intersection.size === 0) {
+    if (postings.some((posting) => !posting)) {
+      // 任一片段缺失都不可能完整命中，回退处理短文本等未建索引情况。
       return this.fallbackSubstring(query, max);
     }
 
-    // 按 trigram 命中数量排序（重叠度越高越相关）
-    const scored = [...intersection].map((id) => {
-      const name = this.entryStore[id].name.toLowerCase();
-      const phonetic = this.pinyinData.get(id);
-      let overlap = 0;
-      for (const tri of trigrams) {
-        if (name.includes(tri)) overlap++;
-        else if (
-          phonetic &&
-          (phonetic.full.includes(tri) || phonetic.initials.includes(tri))
-        ) {
-          overlap++;
-        }
+    // Begin with the rarest fragment and keep only the requested best matches.
+    // Broad prefixes must not allocate/sort all 100k matching entries on each keystroke.
+    const [first, ...rest] = (postings as Set<number>[]).sort((a, b) => a.size - b.size);
+    const scored: { id: number; position: number }[] = [];
+    for (const id of first) {
+      if (!rest.every((posting) => posting.has(id))) continue;
+      let position = Infinity;
+      for (const key of this.searchKeys[id]) {
+        const found = key.indexOf(query);
+        if (found >= 0) position = Math.min(position, found);
       }
-      return { id, overlap };
-    });
-
-    scored.sort((a, b) => b.overlap - a.overlap);
-
-    return scored
-      .slice(0, max)
-      .map((s) => this.entryStore[s.id])
-      .filter(Boolean);
+      if (!Number.isFinite(position)) continue;
+      const insertAt = scored.findIndex((item) => item.position > position);
+      if (insertAt >= 0) scored.splice(insertAt, 0, { id, position });
+      else if (scored.length < max) scored.push({ id, position });
+      if (scored.length > max) scored.pop();
+      // Posting sets retain entry order, so no later candidate can improve tied prefix matches.
+      if (scored.length === max && scored[max - 1].position === 0) break;
+    }
+    return scored.map(({ id }) => this.entryStore[id]);
   }
 
   /** 通配符搜索：将 * → .*?  ? → .  转为正则，遍历全量匹配 */
@@ -260,23 +236,10 @@ export class FileSearchIndex {
   /** 回退：全量子串匹配（含拼音） */
   private fallbackSubstring(query: string, max: number): FileEntry[] {
     const result: FileEntry[] = [];
-    const lower = query;
-    const isAsciiQuery = /^[a-z0-9]+$/.test(lower);
-
     for (let id = 0; id < this.entryStore.length; id++) {
       if (result.length >= max) break;
-      const entry = this.entryStore[id];
-      if (entry.name.toLowerCase().includes(lower)) {
-        result.push(entry);
-        continue;
-      }
-
-      const phonetic = isAsciiQuery ? this.pinyinData.get(id) : undefined;
-      if (
-        phonetic &&
-        (phonetic.full.includes(lower) || phonetic.initials.includes(lower))
-      ) {
-        result.push(entry);
+      if (this.searchKeys[id].some((key) => key.includes(query))) {
+        result.push(this.entryStore[id]);
       }
     }
     return result;

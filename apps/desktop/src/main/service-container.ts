@@ -36,10 +36,13 @@ export class ServiceContainer {
   }
 
   async disposeAll(): Promise<void> {
-    for (const token of this.factoryOrder.reverse()) {
+    const errors: unknown[] = [];
+    for (const token of [...this.factoryOrder].reverse()) {
       const svc = this.services.get(token) as Service;
-      if (svc?.dispose) await svc.dispose();
+      try { if (svc?.dispose) await svc.dispose(); } catch (error) { errors.push(error); }
     }
     this.services.clear();
+    this.factoryOrder = [];
+    if (errors.length) throw new AggregateError(errors, 'Some services could not be disposed');
   }
 }

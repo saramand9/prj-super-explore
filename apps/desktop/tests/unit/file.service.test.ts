@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'fs/promises';
+import { mkdtemp, mkdir, readFile, rm, rmdir, stat, lstat, symlink, writeFile, rename, copyFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { FileService } from '../../src/main/services/file.service';
+import { removeFixture } from '../helpers/fixture';
 
 const electronMocks = vi.hoisted(() => ({
   shell: {
@@ -13,6 +14,10 @@ const electronMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('electron', () => electronMocks);
+vi.mock('fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs/promises')>();
+  return { ...actual, rename: vi.fn(actual.rename), copyFile: vi.fn(actual.copyFile) };
+});
 
 describe('FileService file operations', () => {
   let root: string;
@@ -27,7 +32,7 @@ describe('FileService file operations', () => {
   });
 
   afterEach(async () => {
-    await rm(root, { recursive: true, force: true });
+    await removeFixture(root);
     vi.clearAllMocks();
   });
 
@@ -143,5 +148,106 @@ describe('FileService file operations', () => {
 
     expect(result.success).toBe(true);
     await expect(readFile(join(dir, '新 name.txt'), 'utf8')).resolves.toBe('content');
+  });
+
+  it('preserves both files when renaming to an existing name', async () => {
+    const source = join(root, 'source.txt');
+    const target = join(root, 'existing.txt');
+    await writeFile(source, 'source');
+    await writeFile(target, 'keep me');
+
+    expect((await service.renameFile(source, 'existing.txt')).success).toBe(false);
+    await expect(readFile(source, 'utf8')).resolves.toBe('source');
+    await expect(readFile(target, 'utf8')).resolves.toBe('keep me');
+  });
+
+  it.each(['../escape.txt', '..\\escape.txt', '.', '..', ''])('rejects invalid rename %j', async (name) => {
+    const source = join(root, 'source.txt');
+    await writeFile(source, 'keep me');
+
+    expect((await service.renameFile(source, name)).success).toBe(false);
+    await expect(readFile(source, 'utf8')).resolves.toBe('keep me');
+  });
+
+  it.skipIf(process.platform !== 'win32')('allows case-only renames on Windows', async () => {
+    const source = join(root, 'original.txt');
+    await writeFile(source, 'content');
+    expect((await service.renameFile(source, 'Original.txt')).success).toBe(true);
+    await expect(readFile(join(root, 'Original.txt'), 'utf8')).resolves.toBe('content');
+  });
+
+  it('reports OS errors when opening a file', async () => {
+    electronMocks.shell.openPath.mockResolvedValueOnce('No application is associated with this file');
+    await expect(service.open(join(root, 'unknown.bin'))).rejects.toThrow('No application');
+  });
+
+  it('copies a junction as a link and does not recurse through a parent cycle', async () => {
+    const source = join(root, 'source');
+    const destination = join(root, 'dest');
+    await mkdir(source);
+    await mkdir(destination);
+    await writeFile(join(source, 'keep.txt'), 'keep');
+    await symlink(source, join(source, 'loop'), 'junction');
+    const result = await service.copyFiles([source], destination);
+    expect(result.success).toBe(true);
+    expect((await lstat(join(destination, 'source/loop'))).isSymbolicLink()).toBe(true);
+    expect(await readFile(join(source, 'keep.txt'), 'utf8')).toBe('keep');
+    expect((await service.readDir(source)).find((entry) => entry.name === 'loop')).toMatchObject({ isDirectory: true, isSymlink: true });
+    expect(await service.getStat(join(source, 'loop'))).toMatchObject({ isDirectory: true, isSymlink: true });
+    expect((await service.getDirSizes([source]))[source].size).toBe(4);
+  });
+
+  it('rejects copying into the source through a directory alias', async () => {
+    const source = join(root, 'source');
+    await mkdir(join(source, 'child'), { recursive: true });
+    const alias = join(root, 'alias');
+    await symlink(join(source, 'child'), alias, 'junction');
+    expect((await service.copyFiles([source], alias)).success).toBe(false);
+    expect(existsSync(join(source, 'child/source'))).toBe(false);
+  });
+
+  it('preserves the source when a cross-volume move cannot copy a locked file', async () => {
+    const source = join(root, 'source.txt');
+    const dest = join(root, 'destination');
+    await mkdir(dest);
+    await writeFile(source, 'must survive');
+    vi.mocked(rename).mockRejectedValueOnce(Object.assign(new Error('different volume'), { code: 'EXDEV' }));
+    vi.mocked(copyFile).mockRejectedValueOnce(Object.assign(new Error('access denied'), { code: 'EACCES' }));
+    const result = await service.moveFiles([source], dest);
+    expect(result.success).toBe(false);
+    expect(result.failures?.[0].code).toBe('EACCES');
+    expect(await readFile(source, 'utf8')).toBe('must survive');
+  });
+
+  it('recognizes a dangling junction as an occupied destination', async () => {
+    const target = join(root, 'target');
+    const link = join(root, 'link');
+    await mkdir(target);
+    await symlink(target, link, 'junction');
+    await rmdir(target);
+    expect(await service.exists(link)).toBe(true);
+    expect(await service.getStat(link)).toMatchObject({ isSymlink: true });
+  });
+
+  it('rejects a descendant whose name begins with two dots', async () => {
+    const source = join(root, 'source');
+    const child = join(source, '..child');
+    await mkdir(child, { recursive: true });
+    const result = await service.copyFiles([source], child);
+    expect(result.failures?.[0].reason).toBe('不能把文件夹复制到它自己里面');
+    expect(existsSync(join(child, 'source'))).toBe(false);
+  });
+
+  it('removes the source only after a cross-volume directory copy completes', async () => {
+    const source = join(root, 'source');
+    const destination = join(root, 'dest');
+    await mkdir(source);
+    await mkdir(destination);
+    await writeFile(join(source, 'keep.txt'), 'content');
+    vi.mocked(rename).mockRejectedValueOnce(Object.assign(new Error('different volume'), { code: 'EXDEV' }));
+    const result = await service.moveFiles([source], destination);
+    expect(result.success).toBe(true);
+    expect(await readFile(join(destination, 'source/keep.txt'), 'utf8')).toBe('content');
+    expect(existsSync(source)).toBe(false);
   });
 });

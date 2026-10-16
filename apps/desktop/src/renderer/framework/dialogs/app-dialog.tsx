@@ -135,6 +135,9 @@ export function AppDialogHost() {
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         className="bg-surface-light border border-border rounded-lg shadow-2xl p-4 min-w-[360px] max-w-[min(720px,90vw)]"
         onClick={(e) => e.stopPropagation()}
       >

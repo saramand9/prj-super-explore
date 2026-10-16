@@ -126,6 +126,14 @@ export interface IpcChannels {
     req: { path: string; maxDepth?: number; excludePatterns?: string[] };
     res: FileEntry[];
   };
+  'file:scan': {
+    req: { path: string; scanId: string; maxDepth?: number; excludePatterns?: string[] };
+    res: ScanSummary;
+  };
+  'file:cancelScan': {
+    req: { scanId: string };
+    res: void;
+  };
 
   // 批量目录大小计算（递归，带缓存）
   'file:dirSizes': {
@@ -149,6 +157,10 @@ export interface IpcChannels {
   'search:cancel': {
     req: { searchId: string };
     res: void;
+  };
+  'search:run': {
+    req: IpcChannels['search:fulltext']['req'] & { searchId: string };
+    res: SearchResult;
   };
 
   // Index (filename index for quick launcher)
@@ -226,6 +238,18 @@ export interface IpcChannels {
   };
 
   // Window
+  'window:readyForClose': {
+    req: void;
+    res: void;
+  };
+  'window:resolveClose': {
+    req: { allow: boolean; requestId: number };
+    res: void;
+  };
+  'window:closePending': {
+    req: { requestId: number };
+    res: void;
+  };
   'window:toggleLauncher': {
     req: void;
     res: void;
@@ -261,9 +285,29 @@ export interface IpcChannels {
   };
 
   // App
+  'settings:getAppearance': {
+    req: void;
+    res: import('./config').AppearanceSettings;
+  };
+  'settings:saveAppearance': {
+    req: import('./config').AppearanceSettings;
+    res: void;
+  };
   'app:getVersion': {
     req: void;
     res: string;
+  };
+  'app:reportError': {
+    req: { source: string; message: string; stack?: string };
+    res: void;
+  };
+  'app:copyDiagnostics': {
+    req: { source?: string; message?: string; stack?: string };
+    res: void;
+  };
+  'app:openLogs': {
+    req: void;
+    res: void;
   };
   'app:getPlatform': {
     req: void;
@@ -278,6 +322,10 @@ export interface IpcChannels {
 // ── 事件推送 channels (main → renderer) ─────────
 
 export interface IpcEvents {
+  'window:beforeClose': { requestId: number };
+  'window:closeCancelled': { requestId: number };
+  'file:scanProgress': ScanSummary & { scanId: string; entries: FileEntry[] };
+  'search:progress': { searchId: string; matches: FulltextMatch[]; total: number };
   'fs:changed': {
     watcherId: string;
     events: Array<{ type: 'add' | 'remove' | 'change'; path: string }>;
@@ -337,4 +385,20 @@ export interface IndexResult {
   name: string;
   isDirectory: boolean;
   extension: string;
+}
+
+export interface ScanSummary {
+  scanned: number;
+  directories: number;
+  skipped: number;
+  cancelled: boolean;
+  truncated: boolean;
+  warnings: string[];
+}
+
+export interface SearchResult {
+  matches: FulltextMatch[];
+  cancelled: boolean;
+  truncated: boolean;
+  warnings: string[];
 }

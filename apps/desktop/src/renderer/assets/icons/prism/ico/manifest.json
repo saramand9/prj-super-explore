@@ -1,0 +1,17 @@
+{
+  "app_logo": "app_logo.png",
+  "open_folder": "open_folder.png",
+  "new_folder": "new_folder.png",
+  "search": "search.png",
+  "copy": "copy.png",
+  "move": "move.png",
+  "delete": "delete.png",
+  "permanent_delete": "permanent_delete.png",
+  "settings": "settings.png",
+  "plugin": "plugin.png",
+  "favorite": "favorite.png",
+  "file": "file.png",
+  "dual_pane": "dual_pane.png",
+  "rename": "rename.png",
+  "open_in_explorer": "open_in_explorer.png"
+}

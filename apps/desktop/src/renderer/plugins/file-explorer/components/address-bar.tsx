@@ -1,5 +1,5 @@
 import { useCallback, useState, useRef, useEffect } from 'react';
-import { ExternalLink, Home } from 'lucide-react';
+import { ExternalLink, Home, Pencil } from 'lucide-react';
 import { useFileStore } from '../store';
 import { useLayoutStore } from '../../../framework/store/layout-store';
 import { ipc } from '../../../framework/bridge/ipc-client';
@@ -54,6 +54,18 @@ export function AddressBar({ side, pathOverride, onNavigate }: AddressBarProps) 
     }, 0);
   }, [path]);
 
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'l'
+        && useLayoutStore.getState().layout.id === side) {
+        event.preventDefault();
+        startEdit();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [side, startEdit]);
+
   const confirmEdit = useCallback(() => {
     setEditing(false);
     if (editValue.trim() && editValue !== path) {
@@ -85,10 +97,8 @@ export function AddressBar({ side, pathOverride, onNavigate }: AddressBarProps) 
     return () => window.removeEventListener('keydown', handleKey);
   }, [expanded]);
 
-  if (!path) return null;
-
-  const sep = path.includes('\\') ? '\\' : '/';
-  const segments = path.split(sep).filter(Boolean);
+  const sep = path?.includes('\\') ? '\\' : '/';
+  const segments = (path ?? '').split(sep).filter(Boolean);
 
   const parts: { label: string; fullPath: string }[] = [];
   if (segments.length > 0 && /^[A-Za-z]:$/.test(segments[0])) {
@@ -149,6 +159,8 @@ export function AddressBar({ side, pathOverride, onNavigate }: AddressBarProps) 
     [],
   );
   const initialName = initialPath ? (initialPath.split(/[/\\]/).pop() || initialPath) : null;
+
+  if (!path) return null;
 
   return (
     <div className="flex items-center gap-0.5 flex-1 min-w-0 overflow-hidden text-sm">
@@ -213,9 +225,10 @@ export function AddressBar({ side, pathOverride, onNavigate }: AddressBarProps) 
           return (
         <div
           ref={containerRef}
+          data-testid={`address-bar-${side}`}
           className="flex items-center gap-0.5 cursor-text flex-1 min-w-0 overflow-x-auto overflow-y-hidden whitespace-nowrap scrollbar-none"
           onClick={startEdit}
-          title="Click to edit path"
+          title="点击编辑路径"
         >
           {expanded ? (
             /* 展开模式 — 所有段自然换行 */
@@ -252,7 +265,7 @@ export function AddressBar({ side, pathOverride, onNavigate }: AddressBarProps) 
                   <span
                     className="text-xs text-accent hover:bg-accent/20 rounded px-0.5 cursor-pointer"
                     onClick={handleToggleExpand}
-                    title="Click to expand full path"
+                    title="展开完整路径"
                   >
                     ...
                   </span>
@@ -297,13 +310,22 @@ export function AddressBar({ side, pathOverride, onNavigate }: AddressBarProps) 
           );
         })()}
 
-      {/* Open in Explorer */}
+      {/* 在资源管理器中打开 */}
+      <button
+        type="button"
+        data-testid={`edit-path-${side}`}
+        className="flex-shrink-0 p-0.5 text-text-muted hover:text-text-primary hover:bg-white/5 rounded"
+        onClick={startEdit}
+        title="编辑路径 (Ctrl+L)"
+      >
+        <Pencil className="w-3.5 h-3.5" />
+      </button>
       <button
         className="flex-shrink-0 p-0.5 text-text-muted hover:text-text-primary hover:bg-white/5 rounded transition-colors"
         onClick={() => {
           if (path) ipc.invoke('file:openInExplorer', { path });
         }}
-        title="Open in Explorer"
+        title="在资源管理器中打开"
       >
         <ExternalLink className="w-4 h-4" />
       </button>

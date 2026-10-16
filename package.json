@@ -12,7 +12,12 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm --filter @explore/desktop test",
     "test:unit": "pnpm --filter @explore/desktop test:unit",
-    "test:e2e": "pnpm --filter @explore/desktop test:e2e"
+    "test:e2e": "pnpm --filter @explore/desktop test:e2e",
+    "test:package": "pnpm --filter @explore/desktop test:package",
+    "benchmark:scan": "pnpm --filter @explore/desktop benchmark:scan",
+    "verify:search": "pnpm --filter @explore/desktop verify:search",
+    "pack:dir": "pnpm --filter @explore/desktop pack:dir",
+    "pack:win": "pnpm --filter @explore/desktop pack"
   },
   "engines": {
     "node": ">=22.0.0",
@@ -20,15 +25,12 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "@lvce-editor/ripgrep",
       "electron",
       "esbuild"
     ]
   },
-  "dependencies": {
-    "highlight.js": "^11.11.1",
-    "marked": "^18.0.3"
-  },
   "devDependencies": {
-    "@lvce-editor/ripgrep": "^4.1.0"
+    "typescript": "^5.9.3"
   }
 }

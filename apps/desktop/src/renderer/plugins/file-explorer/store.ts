@@ -38,6 +38,7 @@ interface FileExplorerState {
   goBack: (side: 'left' | 'right') => Promise<void>;
   goForward: (side: 'left' | 'right') => Promise<void>;
   refresh: (side: 'left' | 'right') => Promise<void>;
+  resetPanel: (side: 'left' | 'right') => void;
   setFilter: (side: 'left' | 'right', text: string) => void;
   toggleSelect: (side: 'left' | 'right', path: string) => void;
   selectRange: (side: 'left' | 'right', from: string, to: string, orderedPaths?: string[]) => void;
@@ -61,6 +62,7 @@ interface FileExplorerState {
 }
 
 let tabSeq = 0;
+const directoryRequests = { left: 0, right: 0 };
 function nextTabId(): string {
   return `tab-${Date.now()}-${++tabSeq}`;
 }
@@ -104,6 +106,7 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
   dirSizeMap: {},
 
   navigateTo: async (side, path, addToHistory = true) => {
+    const request = ++directoryRequests[side];
     const panel = get()[side];
     const isPathChange = panel.path !== path;
     const shouldAddHistory = addToHistory && isPathChange && Boolean(panel.path);
@@ -113,6 +116,7 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
       [side]: {
         ...s[side],
         loading: true,
+        entries: [],
         error: null,
         errorInfo: null,
         path,
@@ -131,8 +135,10 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
 
     try {
       const entries = await loadDir(path, panel.sort, panel.showHidden);
+      if (directoryRequests[side] !== request) return;
       set((s) => ({ [side]: { ...s[side], entries, loading: false, error: null, errorInfo: null } }));
     } catch (err) {
+      if (directoryRequests[side] !== request) return;
       set((s) => ({
         [side]: {
           ...s[side],
@@ -178,11 +184,14 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
   refresh: async (side) => {
     const panel = get()[side];
     if (!panel.path) return;
+    const request = ++directoryRequests[side];
     set((s) => ({ [side]: { ...s[side], loading: true, error: null, errorInfo: null } }));
     try {
       const entries = await loadDir(panel.path, panel.sort, panel.showHidden);
+      if (directoryRequests[side] !== request) return;
       set((s) => ({ [side]: { ...s[side], entries, loading: false, error: null, errorInfo: null } }));
     } catch (err) {
+      if (directoryRequests[side] !== request) return;
       set((s) => ({
         [side]: {
           ...s[side],
@@ -192,6 +201,13 @@ export const useFileStore = create<FileExplorerState>((set, get) => ({
         },
       }));
     }
+  },
+
+  resetPanel: (side) => {
+    ++directoryRequests[side];
+    set((s) => ({
+      [side]: { ...defaultPanel(), sort: s[side].sort, showHidden: s[side].showHidden },
+    }));
   },
 
   setFilter: (side, text) =>
