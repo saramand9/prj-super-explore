@@ -17,6 +17,7 @@ async function downloadBaseline(): Promise<Buffer> {
   const size = 85572961;
   const chunkSize = 1024 * 1024;
   const output = Buffer.alloc(size);
+  const deadline = AbortSignal.timeout(150000);
   let next = 0;
   // The original host serves large single responses slowly. Bounded ranges
   // retain HTTPS, exact Content-Range checks and the full-file SHA-256 pin.
@@ -28,19 +29,27 @@ async function downloadBaseline(): Promise<Buffer> {
         next += chunkSize;
         if (start >= size) return;
         const end = Math.min(start + chunkSize, size) - 1;
-        const response = await fetch(baselineUrl, {
-          headers: { Range: `bytes=${start}-${end}` },
-          signal: AbortSignal.timeout(30000),
-        });
-        if (
-          response.status !== 206 ||
-          response.headers.get('content-range') !== `bytes ${start}-${end}/${size}`
-        ) {
-          throw new Error(`Unexpected baseline range response: HTTP ${response.status}`);
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            const response = await fetch(baselineUrl, {
+              headers: { Range: `bytes=${start}-${end}` },
+              signal: AbortSignal.any([deadline, AbortSignal.timeout(30000)]),
+            });
+            if (
+              response.status !== 206 ||
+              response.headers.get('content-range') !== `bytes ${start}-${end}/${size}`
+            ) {
+              throw new Error(`Unexpected baseline range response: HTTP ${response.status}`);
+            }
+            const chunk = Buffer.from(await response.arrayBuffer());
+            if (chunk.length !== end - start + 1) throw new Error('Truncated baseline range');
+            chunk.copy(output, start);
+            break;
+          } catch (error) {
+            if (deadline.aborted || attempt === 2) throw error;
+            console.log(`Retrying baseline range ${start}-${end} after transient download failure`);
+          }
         }
-        const chunk = Buffer.from(await response.arrayBuffer());
-        if (chunk.length !== end - start + 1) throw new Error('Truncated baseline range');
-        chunk.copy(output, start);
       }
     }),
   );
