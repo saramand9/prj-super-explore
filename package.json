@@ -16,6 +16,9 @@
     "test:package": "pnpm --filter @explore/desktop test:package",
     "benchmark:scan": "pnpm --filter @explore/desktop benchmark:scan",
     "verify:search": "pnpm --filter @explore/desktop verify:search",
+    "check:commits": "node scripts/check-commit-messages.mjs --ref HEAD",
+    "test:commit-policy": "node --test scripts/tests/check-commit-messages.test.mjs",
+    "hooks:install": "git config --local core.hooksPath .githooks",
     "pack:dir": "pnpm --filter @explore/desktop pack:dir",
     "pack:win": "pnpm --filter @explore/desktop pack"
   },

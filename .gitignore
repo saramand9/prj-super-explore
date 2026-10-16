@@ -12,3 +12,17 @@ out
 test-results
 playwright-report
 scripts/benchmark/data/*.log
+
+# Local recordings, caches and unrelated deployment experiments.
+/.electron-cache/
+/.playwright-mcp/
+/.pnpm-store/
+/.tmp-*/
+/ops/
+.env.*
+!.env.example
+!.env.template
+*.pem
+*.key
+*.p12
+*.pfx
