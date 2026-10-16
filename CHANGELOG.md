@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+No changes yet.
+
+## 1.0.2 - 2026-10-17
+
 ### Security
 
 - Upgrade Electron to 44.8.0 and DOMPurify to 3.4.17.
@@ -20,9 +24,14 @@
 - Add a tag-triggered, tested Windows installer workflow that creates drafts only.
 - Fix Windows packaging to run the desktop build script, not pnpm's source-tarball command.
 - Bundle the project license and third-party inventory with the application.
+- Collect complete installed npm license/notice texts and retain ripgrep/PCRE2 notices.
+- Gate release drafts on installing 1.0.1, upgrading while preserving sample data,
+  launching the hardened build and uninstalling on a disposable Windows runner.
 - Synchronize public-repository, private-reporting and protected-branch documentation.
 
-These source changes have not yet been distributed in a new public installer.
+Windows x64 installers remain unsigned. External plugins remain trusted code,
+not isolated extensions. Dependency audit findings are scoped in the readiness
+review; this release is not a claim of zero vulnerabilities.
 
 ## 1.0.1 - 2026-10-16
 

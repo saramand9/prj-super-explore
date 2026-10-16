@@ -11,7 +11,7 @@ permissions:
 jobs:
   validate:
     runs-on: windows-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -33,3 +33,8 @@ jobs:
       - run: pnpm test:package
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - run: pnpm pack:win
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Validate installation, upgrade and uninstall on the disposable runner
+        run: pnpm --filter @explore/desktop test:installer

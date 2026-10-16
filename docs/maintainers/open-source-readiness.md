@@ -1,7 +1,7 @@
 # Open-source readiness
 
-Updated October 17, 2026. This describes the hardened source branch, not a claim
-that its changes have already reached the existing 1.0.1 installer. The initial
+Updated October 17, 2026. This describes the hardened 1.0.2 source; publication is
+tracked by its GitHub Release, not by this checklist. The initial
 review covered the 106 original product commits. Later history normalization,
 MIT adoption and author-privacy mapping are recorded in [history migration](history-migration.md).
 
@@ -26,7 +26,7 @@ MIT adoption and author-privacy mapping are recorded in [history migration](hist
   the remote-and-local threat model. Its initial validation scan passed for both
   languages, independently of the new source branch's CI. A passing analysis job
   does not establish that the code has no findings.
-- Separate tag/version-checked draft release workflow and an Unreleased changelog.
+- Separate tag/version-checked draft release workflow and a versioned changelog.
   No installer is published automatically; see [releasing](../releasing.md).
 
 ## Remaining release gates
@@ -35,19 +35,20 @@ MIT adoption and author-privacy mapping are recorded in [history migration](hist
   any reference-image rights. Do not assume that AI origin removes all conditions.
 - [ ] Confirm code/contribution ownership, including any applicable employer rights.
   A privacy-driven Git identity mapping is not a transfer of copyright.
-- [ ] Assemble complete license/attribution texts for every bundled component.
-  Project LICENSE and the inventory are copied to resources/licenses, but the
-  inventory alone is not a complete binary compliance certificate.
+- [x] Collect installed npm graph/renderer-root license texts and ripgrep/PCRE2
+  notices in resources/licenses/components; retain Electron/Chromium notices.
+  Review newly added dependencies; this is not a legal compliance certificate.
 - [ ] Triage remaining dependency advisories. The current production audit reports
   two high extract-zip findings via the ripgrep installation wrapper; the complete
   audit reports 3 critical, 42 high, 16 moderate and 2 low findings. These are
   package-manager alerts, not confirmed exploits. Electron is shipped even though
   declared under devDependencies; production-only audit is not sufficient.
-- [ ] Validate installation, upgrade preserving data, and uninstallation on clean
-  Windows machines before publishing a new binary. Document unsigned builds and
-  the absence of automatic updates accurately.
-- [ ] Verify the new source branch's hosted CI after it is submitted through PR.
-  The existing master CI success predates these source changes.
+- [ ] Confirm the 1.0.2 installer acceptance job passes before publishing: its
+  disposable Windows runner installs pinned 1.0.1, upgrades with isolated sample
+  data and uninstalls. Additional supported-Windows/manual testing remains due.
+- [ ] Confirm protected PR and tag-workflow checks pass for the exact release
+  commit. The initial security branch Windows checks passed; later preparation
+  changes and the actual tagged installer require their own results.
 - [ ] Follow up on GitHub's review of old commit-object/cache removal. Current
   history is sanitized, but old SHA URLs may remain retrievable until the host
   completes cleanup. Do not publish recovery bundles, backup refs or stash refs.
@@ -64,11 +65,12 @@ sharing. No automated scan establishes the absence of all privacy or security ri
 
 ## Verification records
 
-The hardened branch passed local lint, formatting, strict type checks, 126 unit
+The hardened source passed local lint, formatting, strict type checks, 126 unit
 tests, 30 Electron E2E tests, commit-policy/release-guard tests, default packaged-app
 smoke testing and NSIS installer generation. The packaged project LICENSE matches
 the source license byte-for-byte. The generated installer is unsigned and has not
-been published or validated by a clean-machine install/upgrade/uninstall session.
+been a certificate of clean-machine acceptance. The 1.0.2 release additionally
+requires successful hosted installer acceptance; see [its validation scope](release-1.0.2-validation.md).
 
 A standard local directory build initially failed with electron-builder 25 while
 extracting macOS symlinks in its Windows resource-tool archive. The builder was

@@ -22,8 +22,16 @@ Chromium/Node.js and upstream third-party notices. Being declared as a
 
 The ripgrep executable has its own upstream license in addition to the npm
 wrapper's license. Preserve Electron's and ripgrep's distribution notices, and
-assemble the required texts for every shipped JavaScript and native component
-before distributing a new installer.
+retain the required texts when distributing a new installer. The build runs
+`apps/desktop/scripts/collect-licenses.mjs` to copy upstream license/notice files
+for the production dependency graph and renderer runtime roots into
+`resources/licenses/components/`, with a path-free `components.json` inventory.
+It fails when a selected package has no license text. This includes install-time
+dependencies as a conservative superset, not a claim they all execute in Explore.
+Electron's `LICENSE.electron.txt` and `LICENSES.chromium.html` are preserved next
+to the executable. Ripgrep 15.0.0 and its PCRE2 10.45 license texts are retained;
+the source URLs and release-risk assessment are recorded in
+[1.0.2 validation](docs/maintainers/release-1.0.2-validation.md).
 
 Use the actual lockfile and packaged artifacts for that work:
 

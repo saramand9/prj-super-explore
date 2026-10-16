@@ -1,6 +1,6 @@
 {
   "name": "@explore/desktop",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "license": "MIT",
   "description": "Explore for Windows: dual-pane file browsing, workspaces, search and previews.",
   "author": {
@@ -11,13 +11,14 @@
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "electron-vite build",
+    "build": "electron-vite build && node scripts/collect-licenses.mjs",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
     "test:e2e": "pnpm build && playwright test -c playwright.config.ts",
     "test:package": "pnpm pack:dir && playwright test -c playwright.package.config.ts",
+    "test:installer": "playwright test -c playwright.installer.config.ts",
     "benchmark:scan": "vitest run -c vitest.benchmark.config.ts",
     "verify:search": "node scripts/verify-search.mjs",
     "pack:dir": "pnpm build && pnpm verify:search && electron-builder --win --x64 --dir --publish never && node scripts/verify-search.mjs --packaged",
@@ -29,6 +30,10 @@
     "npmRebuild": false,
     "electronDist": "node_modules/electron/dist",
     "extraResources": [
+      {
+        "from": "out/licenses",
+        "to": "licenses/components"
+      },
       {
         "from": "../../LICENSE",
         "to": "licenses/Explore-MIT-LICENSE.txt"

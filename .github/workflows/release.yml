@@ -48,6 +48,8 @@ jobs:
       - run: pnpm pack:win
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Validate installation, upgrade and uninstall on the disposable runner
+        run: pnpm --filter @explore/desktop test:installer
       - name: Generate installer checksums
         shell: pwsh
         run: |

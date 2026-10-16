@@ -42,9 +42,15 @@ The workflow does not overwrite an existing release or publish a draft.
 - Compare `SHA256SUMS.txt` against the downloaded installer.
 - Verify the installed application version, Electron runtime and bundled search.
 - Check license files under the application's `resources/licenses` directory.
-  The inventory does not replace required upstream texts for shipped components.
-- Test installation, first launch, upgrade preserving workspaces, and uninstall
-  on a clean Windows machine. Keep user data/fixtures separate from real files.
+  The build collects npm upstream texts plus ripgrep/PCRE2 notices there;
+  Electron/Chromium notices are next to the executable. Review new dependencies
+  when adding runtime code or changing renderer build inputs.
+- The workflow runs `pnpm --filter @explore/desktop test:installer` on its
+  disposable Windows runner. It verifies the pinned 1.0.1 installer hash,
+  installs it, upgrades with isolated sample workspaces/settings preserved,
+  verifies hardened startup and notices, and uninstalls. It refuses to run on
+  the maintainer's ordinary account. Repeat manual acceptance on supported
+  Windows versions as appropriate; one Windows runner is not all hardware/OSes.
 - Exercise copy/move/rename conflicts, locked files, close/save recovery, network
   shares, filename/full-text search, worker loading and trusted plugin behavior.
 - Confirm the release notes distinguish known limitations and fixes from the
