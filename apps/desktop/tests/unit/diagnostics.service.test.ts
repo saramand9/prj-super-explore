@@ -9,7 +9,10 @@ vi.mock('electron', () => ({ app }));
 
 describe('local diagnostics', () => {
   let root: string;
-  beforeEach(async () => { root = await createFixture('logs'); app.getPath.mockReturnValue(root); });
+  beforeEach(async () => {
+    root = await createFixture('logs');
+    app.getPath.mockReturnValue(root);
+  });
   afterEach(async () => removeFixture(root));
 
   it('records errors and produces a useful diagnostic snapshot', async () => {

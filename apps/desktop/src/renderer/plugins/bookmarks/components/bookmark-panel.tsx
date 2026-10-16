@@ -39,13 +39,8 @@ export function BookmarkPanel() {
     <div className="h-full flex flex-col bg-surface">
       {/* Header */}
       <div className="flex-shrink-0 px-3 py-2 border-b border-border flex items-center justify-between">
-        <span className="text-xs font-medium text-text-secondary">
-          BOOKMARKS
-        </span>
-        <button
-          onClick={() => setShowAdd(!showAdd)}
-          className="text-xs text-accent hover:text-accent/80"
-        >
+        <span className="text-xs font-medium text-text-secondary">BOOKMARKS</span>
+        <button onClick={() => setShowAdd(!showAdd)} className="text-xs text-accent hover:text-accent/80">
           {showAdd ? '✕' : '+'}
         </button>
       </div>
@@ -70,11 +65,7 @@ export function BookmarkPanel() {
 
       {/* List */}
       <div className="flex-1 overflow-auto">
-        {loading && (
-          <div className="text-center text-text-muted py-4 text-xs">
-            Loading...
-          </div>
-        )}
+        {loading && <div className="text-center text-text-muted py-4 text-xs">Loading...</div>}
 
         {!loading && bookmarks.length === 0 && (
           <div className="text-center text-text-muted py-8 text-xs">
@@ -95,12 +86,8 @@ export function BookmarkPanel() {
             title={`${bm.name}\n${bm.path}`}
           >
             <span className="text-accent">★</span>
-            <span className="flex-1 truncate text-text-primary">
-              {bm.name}
-            </span>
-            <span className="text-text-muted truncate max-w-[50%] hidden group-hover:inline">
-              {bm.path}
-            </span>
+            <span className="flex-1 truncate text-text-primary">{bm.name}</span>
+            <span className="text-text-muted truncate max-w-[50%] hidden group-hover:inline">{bm.path}</span>
           </div>
         ))}
       </div>

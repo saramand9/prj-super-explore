@@ -95,7 +95,7 @@ export function createPluginContext(): PluginContext {
     panels: {
       openPanel(pluginId, panelId) {
         const layout = useLayoutStore.getState().layout;
-        const targetSide = (layout.id === 'left' || layout.id === 'right') ? layout.id : 'left';
+        const targetSide = layout.id === 'left' || layout.id === 'right' ? layout.id : 'left';
         useLayoutStore.getState().setPanelPlugin(targetSide, pluginId, panelId);
       },
     },

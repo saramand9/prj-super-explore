@@ -24,9 +24,7 @@ describe('SearchService', () => {
   it('parses ripgrep JSON matches from Chinese and space paths', async () => {
     mockRipgrep({
       code: 0,
-      stdoutLines: [
-        rgMatch('D:/tmp/中文 目录/hello file.txt', 3, 'hello needle\n', 6, 12, 'needle'),
-      ],
+      stdoutLines: [rgMatch('D:/tmp/中文 目录/hello file.txt', 3, 'hello needle\n', 6, 12, 'needle')],
     });
 
     const service = createService();
@@ -57,22 +55,24 @@ describe('SearchService', () => {
     });
 
     const [, args] = spawnMock.mock.calls[0];
-    expect(args).toEqual(expect.arrayContaining([
-      '--fixed-strings',
-      '--max-count',
-      '12',
-      '--max-filesize',
-      '2M',
-      '--glob',
-      '*.ts',
-      '--glob',
-      '!**/node_modules/**',
-      '--glob',
-      '!**/custom/**',
-      '--',
-      'query',
-      'D:/repo',
-    ]));
+    expect(args).toEqual(
+      expect.arrayContaining([
+        '--fixed-strings',
+        '--max-count',
+        '12',
+        '--max-filesize',
+        '2M',
+        '--glob',
+        '*.ts',
+        '--glob',
+        '!**/node_modules/**',
+        '--glob',
+        '!**/custom/**',
+        '--',
+        'query',
+        'D:/repo',
+      ]),
+    );
   });
 
   it('returns empty results for empty directories or no matches', async () => {
@@ -129,7 +129,11 @@ describe('SearchService', () => {
   });
 
   it('returns readable matches with a warning when other files are inaccessible', async () => {
-    mockRipgrep({ code: 2, stdoutLines: [rgMatch('D:/repo/readable.txt', 1, 'needle', 0, 6, 'needle')], stderr: 'rg: D:/repo/locked.txt: permission denied' });
+    mockRipgrep({
+      code: 2,
+      stdoutLines: [rgMatch('D:/repo/readable.txt', 1, 'needle', 0, 6, 'needle')],
+      stderr: 'rg: D:/repo/locked.txt: permission denied',
+    });
     const progress = vi.fn();
     const result = await createService().run('D:/repo', 'needle', 'partial', undefined, progress);
     expect(result.matches).toHaveLength(1);
@@ -143,7 +147,10 @@ describe('SearchService', () => {
     const pending = service.run('D:/repo', 'needle', 'partial-cancel');
     proc.stdout.write(rgMatch('D:/repo/one.txt', 1, 'needle', 0, 6, 'needle') + '\n');
     service.cancel('partial-cancel');
-    expect(await pending).toMatchObject({ cancelled: true, matches: [expect.objectContaining({ fileName: 'one.txt' })] });
+    expect(await pending).toMatchObject({
+      cancelled: true,
+      matches: [expect.objectContaining({ fileName: 'one.txt' })],
+    });
   });
 
   it('cancels older searches with the same search id', async () => {
@@ -166,11 +173,13 @@ describe('SearchService', () => {
   it('enforces a global limit across files without waiting for process exit', async () => {
     const proc = mockHangingRipgrep();
     const promise = createService().fulltext('D:/repo', 'needle', 'limited', { maxResults: 2 });
-    proc.stdout.write([
-      rgMatch('D:/repo/one.txt', 1, 'needle\n', 0, 6, 'needle'),
-      rgMatch('D:/repo/two.txt', 1, 'needle\n', 0, 6, 'needle'),
-      rgMatch('D:/repo/three.txt', 1, 'needle\n', 0, 6, 'needle'),
-    ].join('\n') + '\n');
+    proc.stdout.write(
+      [
+        rgMatch('D:/repo/one.txt', 1, 'needle\n', 0, 6, 'needle'),
+        rgMatch('D:/repo/two.txt', 1, 'needle\n', 0, 6, 'needle'),
+        rgMatch('D:/repo/three.txt', 1, 'needle\n', 0, 6, 'needle'),
+      ].join('\n') + '\n',
+    );
     await expect(promise).resolves.toHaveLength(2);
     expect(proc.kill).toHaveBeenCalledOnce();
     proc.close(null as any);
@@ -184,9 +193,14 @@ describe('SearchService', () => {
     proc.stdout.write(data.subarray(0, split));
     proc.stdout.write(data.subarray(split));
     proc.close(0);
-    await expect(promise).resolves.toEqual([expect.objectContaining({
-      fileName: '中文.txt', lineContent: '中文 needle', columnStart: 4, columnEnd: 10,
-    })]);
+    await expect(promise).resolves.toEqual([
+      expect.objectContaining({
+        fileName: '中文.txt',
+        lineContent: '中文 needle',
+        columnStart: 4,
+        columnEnd: 10,
+      }),
+    ]);
   });
 
   it('settles cancellation even if the process has not closed', async () => {

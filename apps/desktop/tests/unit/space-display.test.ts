@@ -16,8 +16,18 @@ function createSpace(): Space {
     name: '中文项目',
     left: {
       tabs: [
-        { path: 'D:\\dev\\products\\desktop', label: 'desktop', initialPath: 'D:\\dev\\products\\desktop', pinned: false },
-        { path: 'D:\\dev\\products\\shared', label: 'shared', initialPath: 'D:\\dev\\products\\shared', pinned: false },
+        {
+          path: 'D:\\dev\\products\\desktop',
+          label: 'desktop',
+          initialPath: 'D:\\dev\\products\\desktop',
+          pinned: false,
+        },
+        {
+          path: 'D:\\dev\\products\\shared',
+          label: 'shared',
+          initialPath: 'D:\\dev\\products\\shared',
+          pinned: false,
+        },
       ],
       activeTabId: null,
       activeTabPath: 'D:\\dev\\products\\desktop',
@@ -25,7 +35,12 @@ function createSpace(): Space {
     },
     right: {
       tabs: [
-        { path: 'D:\\docs\\release-notes', label: 'release-notes', initialPath: 'D:\\docs\\release-notes', pinned: false },
+        {
+          path: 'D:\\docs\\release-notes',
+          label: 'release-notes',
+          initialPath: 'D:\\docs\\release-notes',
+          pinned: false,
+        },
       ],
       activeTabId: null,
       activeTabPath: 'D:\\docs\\release-notes',
@@ -75,7 +90,9 @@ describe('workspace display helpers', () => {
     expect(formatSpacePath('D:\\dev\\products\\desktop')).toBe('D:\\...\\products\\desktop');
     expect(formatSpacePath('/srv/projects/explore/docs')).toBe('/.../explore/docs');
     expect(formatSpacePath('C:\\')).toBe('C:\\');
-    expect(formatSpacePath('\\\\fileserver\\team\\projects\\desktop')).toBe('\\\\fileserver\\...\\projects\\desktop');
+    expect(formatSpacePath('\\\\fileserver\\team\\projects\\desktop')).toBe(
+      '\\\\fileserver\\...\\projects\\desktop',
+    );
     expect(formatSpacePath(null)).toBe('未打开');
   });
 

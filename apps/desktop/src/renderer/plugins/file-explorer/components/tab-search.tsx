@@ -20,7 +20,9 @@ function matchPinyin(text: string, query: string): boolean {
       .join('')
       .toLowerCase();
     if (initials.includes(q)) return true;
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return false;
 }
 
@@ -104,10 +106,7 @@ export function TabSearch({ open, onClose, side }: TabSearchProps) {
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-start justify-center pt-[20vh]"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[20vh]" onClick={onClose}>
       <div
         className="bg-surface-light border border-border rounded-lg shadow-2xl w-[400px] max-h-[400px] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
@@ -143,12 +142,8 @@ export function TabSearch({ open, onClose, side }: TabSearchProps) {
                   onClick={() => handleSelect(tab)}
                   onMouseEnter={() => setSelectedIdx(idx)}
                 >
-                  {tab.pinned && (
-                    <Pin className="w-3 h-3 flex-shrink-0 text-accent/60" />
-                  )}
-                  <span className={`truncate ${isActive ? 'text-accent font-medium' : ''}`}>
-                    {tab.label}
-                  </span>
+                  {tab.pinned && <Pin className="w-3 h-3 flex-shrink-0 text-accent/60" />}
+                  <span className={`truncate ${isActive ? 'text-accent font-medium' : ''}`}>{tab.label}</span>
                   {tab.groupName && (
                     <span className="text-text-muted text-[10px] ml-auto flex-shrink-0">
                       {tab.groupName}/

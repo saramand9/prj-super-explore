@@ -78,7 +78,8 @@ export const useLayoutStore = create<{
     appearanceSaveQueue = appearanceSaveQueue.then(async () => {
       try {
         await ipc.invoke('settings:saveAppearance', appearance);
-        if (version === appearanceSaveVersion) set({ preferenceError: null, preferencesLoaded: true, preferencesDirty: false });
+        if (version === appearanceSaveVersion)
+          set({ preferenceError: null, preferencesLoaded: true, preferencesDirty: false });
         return true;
       } catch (err) {
         set({ preferenceError: getIpcErrorMessage(err, '设置保存失败') });

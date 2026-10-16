@@ -4,7 +4,12 @@ import { CloseCoordinator } from '../../src/main/services/close-coordinator';
 describe('close save coordination', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
-  const actions = () => ({ requestSave: vi.fn(), cancelSave: vi.fn(), close: vi.fn(), askTimeout: vi.fn().mockResolvedValue('cancel') });
+  const actions = () => ({
+    requestSave: vi.fn(),
+    cancelSave: vi.fn(),
+    close: vi.fn(),
+    askTimeout: vi.fn().mockResolvedValue('cancel'),
+  });
 
   it('waits for the matching save and clears its timeout', async () => {
     const calls = actions();

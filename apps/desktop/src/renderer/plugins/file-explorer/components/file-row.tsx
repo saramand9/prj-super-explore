@@ -4,8 +4,18 @@ import { highlightMatches } from '../store';
 import { getFileTypeLabel } from '../utils/file-entry-type';
 import { getFileDropEffect } from '../utils/file-drag';
 import {
-  Folder, File, FileCode, FileJson, FileText, FileImage,
-  FileArchive, Cog, Palette, Globe, EyeOff, Lock,
+  Folder,
+  File,
+  FileCode,
+  FileJson,
+  FileText,
+  FileImage,
+  FileArchive,
+  Cog,
+  Palette,
+  Globe,
+  EyeOff,
+  Lock,
 } from 'lucide-react';
 
 interface FileRowProps {
@@ -94,10 +104,42 @@ export const FileRow = memo(function FileRow({
       onDoubleClick={() => onDoubleClick(entry, index)}
       onContextMenu={(e) => onContextMenu(entry, index, e)}
       onDragStart={handleDragStart}
-      onDragOver={entry.isDirectory ? (e) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = getFileDropEffect(e); } : undefined}
-      onDragEnter={entry.isDirectory ? (e) => { e.preventDefault(); e.stopPropagation(); onDragEnterRow?.(entry, index); } : undefined}
-      onDragLeave={entry.isDirectory ? (e) => { e.preventDefault(); e.stopPropagation(); onDragLeaveRow?.(); } : undefined}
-      onDrop={entry.isDirectory ? (e) => { e.stopPropagation(); e.preventDefault(); onDrop(entry, index, e); } : undefined}
+      onDragOver={
+        entry.isDirectory
+          ? (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              e.dataTransfer.dropEffect = getFileDropEffect(e);
+            }
+          : undefined
+      }
+      onDragEnter={
+        entry.isDirectory
+          ? (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onDragEnterRow?.(entry, index);
+            }
+          : undefined
+      }
+      onDragLeave={
+        entry.isDirectory
+          ? (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onDragLeaveRow?.();
+            }
+          : undefined
+      }
+      onDrop={
+        entry.isDirectory
+          ? (e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onDrop(entry, index, e);
+            }
+          : undefined
+      }
       draggable
       role="row"
       style={{ contain: 'layout paint style' }}
@@ -132,15 +174,17 @@ export const FileRow = memo(function FileRow({
           : typeLabel}
       </span>
       <span className="file-table-size text-right text-text-secondary tabular-nums">
-        {entry.isDirectory
-          ? (dirSize === undefined
-            ? <span className="text-text-muted/40">...</span>
-            : (
-              <span title={dirSize.partial ? '目录大小仍在后台统计中' : undefined}>
-                {dirSize.partial ? `~${sizeStr}` : sizeStr}
-              </span>
-            ))
-          : sizeStr}
+        {entry.isDirectory ? (
+          dirSize === undefined ? (
+            <span className="text-text-muted/40">...</span>
+          ) : (
+            <span title={dirSize.partial ? '目录大小仍在后台统计中' : undefined}>
+              {dirSize.partial ? `~${sizeStr}` : sizeStr}
+            </span>
+          )
+        ) : (
+          sizeStr
+        )}
       </span>
       <span className="file-table-date text-right text-text-secondary tabular-nums" title={modifiedAt}>
         <span className="file-table-date-full">{modifiedAt}</span>
@@ -151,20 +195,38 @@ export const FileRow = memo(function FileRow({
 });
 
 const FILE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  '.ts': FileCode, '.tsx': FileCode, '.js': FileCode, '.jsx': FileCode,
+  '.ts': FileCode,
+  '.tsx': FileCode,
+  '.js': FileCode,
+  '.jsx': FileCode,
   '.json': FileJson,
   '.md': FileText,
   '.css': Palette,
-  '.html': Globe, '.htm': Globe,
-  '.png': FileImage, '.jpg': FileImage, '.jpeg': FileImage,
-  '.gif': FileImage, '.svg': FileImage, '.webp': FileImage,
+  '.html': Globe,
+  '.htm': Globe,
+  '.png': FileImage,
+  '.jpg': FileImage,
+  '.jpeg': FileImage,
+  '.gif': FileImage,
+  '.svg': FileImage,
+  '.webp': FileImage,
   '.pdf': FileText,
-  '.zip': FileArchive, '.gz': FileArchive, '.tar': FileArchive,
-  '.rar': FileArchive, '.7z': FileArchive,
-  '.exe': Cog, '.dll': Cog, '.so': Cog,
-  '.py': FileCode, '.rs': FileCode, '.go': FileCode,
-  '.java': FileCode, '.rb': FileCode, '.php': FileCode,
-  '.gitignore': EyeOff, '.env': Lock,
+  '.zip': FileArchive,
+  '.gz': FileArchive,
+  '.tar': FileArchive,
+  '.rar': FileArchive,
+  '.7z': FileArchive,
+  '.exe': Cog,
+  '.dll': Cog,
+  '.so': Cog,
+  '.py': FileCode,
+  '.rs': FileCode,
+  '.go': FileCode,
+  '.java': FileCode,
+  '.rb': FileCode,
+  '.php': FileCode,
+  '.gitignore': EyeOff,
+  '.env': Lock,
 };
 
 function getFileIcon(name: string): React.ComponentType<{ className?: string }> {
@@ -176,8 +238,7 @@ function formatSize(bytes: number): string {
   if (bytes === 0) return '';
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024)
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 

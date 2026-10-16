@@ -60,7 +60,9 @@ export class IndexService implements Service {
       for (const path of paths) {
         if (controller.signal.aborted) break;
         await walkDirectory(path, {
-          signal: controller.signal, maxDepth: 3, excludePatterns: this.excludePatterns,
+          signal: controller.signal,
+          maxDepth: 3,
+          excludePatterns: this.excludePatterns,
           onBatch: (batch) => {
             if (controller.signal.aborted) return;
             for (const entry of batch) {
@@ -77,7 +79,10 @@ export class IndexService implements Service {
       }
       return entries.length;
     } finally {
-      if (this.controller === controller) { this.controller = null; this.indexing = false; }
+      if (this.controller === controller) {
+        this.controller = null;
+        this.indexing = false;
+      }
     }
   }
 
@@ -98,5 +103,4 @@ export class IndexService implements Service {
     }
     return pi === pattern.length;
   }
-
 }

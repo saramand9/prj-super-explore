@@ -18,7 +18,9 @@ test.describe('task progress and recovery', () => {
     page = await application.firstWindow();
     await expect(page.getByTestId('workspace-menu-trigger')).toBeVisible();
   };
-  test.beforeEach(async () => { root = await createFixture('recovery'); });
+  test.beforeEach(async () => {
+    root = await createFixture('recovery');
+  });
   test.afterEach(async () => {
     if (child && child.exitCode === null && child.signalCode === null) {
       const exited = once(child, 'exit');
@@ -33,17 +35,42 @@ test.describe('task progress and recovery', () => {
     // Hold the IPC response to model a slow drive without depending on disk speed.
     await application.evaluate(({ ipcMain }) => {
       let pending: { scanId: string; resolve: (value: unknown) => void } | undefined;
-      const summary = { scanned: 1, directories: 1, skipped: 0, cancelled: false, truncated: false, warnings: [] };
+      const summary = {
+        scanned: 1,
+        directories: 1,
+        skipped: 0,
+        cancelled: false,
+        truncated: false,
+        warnings: [],
+      };
       ipcMain.removeHandler('file:scan');
-      ipcMain.handle('file:scan', (event, { path, scanId }) => new Promise((resolve) => {
-        pending = { scanId, resolve };
-        event.sender.send('file:scanProgress', { ...summary, scanId, entries: [{
-          path: `${path}/streamed-fixture.txt`, name: 'streamed-fixture.txt', isDirectory: false, isSymlink: false, size: 0, modifiedAt: 0,
-        }] });
-      }));
+      ipcMain.handle(
+        'file:scan',
+        (event, { path, scanId }) =>
+          new Promise((resolve) => {
+            pending = { scanId, resolve };
+            event.sender.send('file:scanProgress', {
+              ...summary,
+              scanId,
+              entries: [
+                {
+                  path: `${path}/streamed-fixture.txt`,
+                  name: 'streamed-fixture.txt',
+                  isDirectory: false,
+                  isSymlink: false,
+                  size: 0,
+                  modifiedAt: 0,
+                },
+              ],
+            });
+          }),
+      );
       ipcMain.removeHandler('file:cancelScan');
       ipcMain.handle('file:cancelScan', (_event, { scanId }) => {
-        if (pending?.scanId === scanId) { pending.resolve({ ...summary, cancelled: true }); pending = undefined; }
+        if (pending && pending.scanId === scanId) {
+          pending.resolve({ ...summary, cancelled: true });
+          pending = undefined;
+        }
       });
     });
     await page.keyboard.press('Control+f');
@@ -81,27 +108,38 @@ test.describe('task progress and recovery', () => {
     const pluginDir = join(root, '.profile/plugins/recovery-fixture');
     await mkdir(pluginDir, { recursive: true });
     const manifest = {
-      id: 'recovery-fixture', name: 'Recovery fixture', version: '1.0.0', main: 'main.js', engines: { explore: '*' },
+      id: 'recovery-fixture',
+      name: 'Recovery fixture',
+      version: '1.0.0',
+      main: 'main.js',
+      engines: { explore: '*' },
       contributes: { panels: [{ id: 'panel', title: 'Recovery fixture', icon: 'folder' }] },
     };
     await writeFile(join(pluginDir, 'manifest.json'), JSON.stringify(manifest));
-    await writeFile(join(pluginDir, 'main.js'), `
+    await writeFile(
+      join(pluginDir, 'main.js'),
+      `
       export function createPlugin() {
         return { manifest: ${JSON.stringify(manifest)}, activate() {}, components: { panel() {
           if (!window.__recoveryReady) throw new Error('recovery-fixture-crash');
           return window.__EXPLORE__.React.createElement('div', null, 'Recovered fixture');
         } } };
       }
-    `);
+    `,
+    );
     await launch();
     await page.getByTitle('Recovery fixture', { exact: true }).click();
     const boundary = page.getByTestId('panel-error');
     await expect(boundary).toBeVisible();
     await boundary.getByRole('button', { name: '复制诊断信息', exact: true }).click();
     await expect(boundary).toContainText('已复制诊断信息');
-    expect(await application.evaluate(({ clipboard }) => clipboard.readText())).toContain('recovery-fixture-crash');
+    expect(await application.evaluate(({ clipboard }) => clipboard.readText())).toContain(
+      'recovery-fixture-crash',
+    );
     expect(await readFile(join(root, '.profile/logs/app.log'), 'utf8')).toContain('recovery-fixture-crash');
-    await page.evaluate(() => { (window as any).__recoveryReady = true; });
+    await page.evaluate(() => {
+      (window as any).__recoveryReady = true;
+    });
     await boundary.getByRole('button', { name: '重新加载', exact: true }).click();
     await expect(page.getByText('Recovered fixture', { exact: true })).toBeVisible();
     await expect(boundary).toHaveCount(0);
@@ -109,21 +147,37 @@ test.describe('task progress and recovery', () => {
 
   test('stays open after a close timeout and ignores a late save completion', async () => {
     await launch();
-    await expect.poll(() => readFile(join(root, '.profile/config/spaces.json'), 'utf8').catch(() => '')).toContain('Default');
+    await expect
+      .poll(() => readFile(join(root, '.profile/config/spaces.json'), 'utf8').catch(() => ''))
+      .toContain('Default');
     await application.evaluate(({ ipcMain, dialog }) => {
       ipcMain.removeHandler('space:save');
-      ipcMain.handle('space:save', () => new Promise((resolve) => { (globalThis as any).__finishSave = resolve; }));
+      ipcMain.handle(
+        'space:save',
+        () =>
+          new Promise((resolve) => {
+            (globalThis as any).__finishSave = resolve;
+          }),
+      );
       dialog.showMessageBox = (async (_window: unknown, options: unknown) => {
         (globalThis as any).__timeoutOptions = options;
         return { response: 0, checkboxChecked: false };
       }) as typeof dialog.showMessageBox;
     });
     await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].close());
-    await expect.poll(() => application.evaluate(() => (globalThis as any).__timeoutOptions?.title), { timeout: 12_000 }).toBe('保存仍未完成');
-    await application.evaluate(() => { (globalThis as any).__finishSave(); });
+    await expect
+      .poll(() => application.evaluate(() => (globalThis as any).__timeoutOptions?.title), {
+        timeout: 12_000,
+      })
+      .toBe('保存仍未完成');
+    await application.evaluate(() => {
+      (globalThis as any).__finishSave();
+    });
     // A round trip through the renderer and main process confirms it remains usable after the late reply.
     await page.getByTitle('主题', { exact: true }).selectOption('linear');
-    await expect.poll(() => application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
+    await expect
+      .poll(() => application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length))
+      .toBe(1);
     expect(await readFile(join(root, '.profile/logs/app.log'), 'utf8')).toContain('close-timeout');
   });
 
@@ -134,14 +188,22 @@ test.describe('task progress and recovery', () => {
     const env: NodeJS.ProcessEnv = { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: 'true' };
     delete env.ELECTRON_RUN_AS_NODE;
     const second = spawn(executable, [join(root, '.launch-explore.mjs')], {
-      cwd: process.cwd(), windowsHide: true, stdio: 'ignore',
+      cwd: process.cwd(),
+      windowsHide: true,
+      stdio: 'ignore',
       env,
     });
     try {
       const [code] = await once(second, 'exit');
       expect(code).toBe(0);
-      await expect.poll(() => application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isMinimized())).toBe(false);
+      await expect
+        .poll(() =>
+          application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isMinimized()),
+        )
+        .toBe(false);
       await expect(page.getByTestId('workspace-menu-trigger')).toBeVisible();
-    } finally { if (second.exitCode === null) second.kill(); }
+    } finally {
+      if (second.exitCode === null) second.kill();
+    }
   });
 });

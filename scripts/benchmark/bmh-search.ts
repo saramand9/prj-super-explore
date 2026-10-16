@@ -110,7 +110,8 @@ export function bmhSearchBuffer(content: string, query: string): Match[] {
   // 构建换行索引（只做一次）
   const lineStarts: number[] = [0];
   for (let i = 0; i < n; i++) {
-    if (buf[i] === 0x0a) { // '\n'
+    if (buf[i] === 0x0a) {
+      // '\n'
       lineStarts.push(i + 1);
     }
   }

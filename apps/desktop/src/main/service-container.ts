@@ -39,7 +39,11 @@ export class ServiceContainer {
     const errors: unknown[] = [];
     for (const token of [...this.factoryOrder].reverse()) {
       const svc = this.services.get(token) as Service;
-      try { if (svc?.dispose) await svc.dispose(); } catch (error) { errors.push(error); }
+      try {
+        if (svc?.dispose) await svc.dispose();
+      } catch (error) {
+        errors.push(error);
+      }
     }
     this.services.clear();
     this.factoryOrder = [];

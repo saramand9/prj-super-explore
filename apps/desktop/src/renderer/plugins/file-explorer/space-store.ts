@@ -43,7 +43,11 @@ function buildTabs(snap: Space['left']): { tabs: Tab[]; activeTabId: string | nu
     }
   }
 
-  if (Number.isInteger(snap.activeTabIndex) && snap.activeTabIndex! >= 0 && snap.activeTabIndex! < tabs.length) {
+  if (
+    Number.isInteger(snap.activeTabIndex) &&
+    snap.activeTabIndex! >= 0 &&
+    snap.activeTabIndex! < tabs.length
+  ) {
     activeTabId = tabs[snap.activeTabIndex!].id;
   }
 
@@ -98,10 +102,11 @@ export function initAutoSave(): () => void {
   const unsubscribe = useFileStore.subscribe((state, previous) => {
     const spaces = useSpaceStore.getState();
     if (!spaces.loaded || spaces.restoring) return;
-    const changed = (['left', 'right'] as const).some((side) =>
-      state[side].tabs !== previous[side].tabs
-      || state[side].activeTabId !== previous[side].activeTabId
-      || state[side].path !== previous[side].path,
+    const changed = (['left', 'right'] as const).some(
+      (side) =>
+        state[side].tabs !== previous[side].tabs ||
+        state[side].activeTabId !== previous[side].activeTabId ||
+        state[side].path !== previous[side].path,
     );
     if (!changed) return;
     cancelAutoSave();
@@ -110,7 +115,10 @@ export function initAutoSave(): () => void {
       void useSpaceStore.getState().saveCurrentSpace();
     }, 500);
   });
-  return () => { unsubscribe(); cancelAutoSave(); };
+  return () => {
+    unsubscribe();
+    cancelAutoSave();
+  };
 }
 
 export const useSpaceStore = create<{
@@ -146,9 +154,9 @@ export const useSpaceStore = create<{
     // During a transition the saved destination snapshot is complete; the panels may still be loading.
     if (!restoring) {
       set({
-        spaces: spaces.map((s) => s.id === activeSpaceId
-          ? { ...s, left: snapshotState('left'), right: snapshotState('right') }
-          : s),
+        spaces: spaces.map((s) =>
+          s.id === activeSpaceId ? { ...s, left: snapshotState('left'), right: snapshotState('right') } : s,
+        ),
       });
     }
     return get().persistSpaces();
@@ -219,9 +227,7 @@ export const useSpaceStore = create<{
 
   toggleSpacePinned: (id) => {
     set((s) => ({
-      spaces: s.spaces.map((space) =>
-        space.id === id ? { ...space, pinned: !space.pinned } : space,
-      ),
+      spaces: s.spaces.map((space) => (space.id === id ? { ...space, pinned: !space.pinned } : space)),
     }));
     get().persistSpaces();
   },
@@ -295,7 +301,14 @@ export function initializeWorkspaces(): Promise<void> {
         const right = snapshotState('right');
         const home = left.tabs.length ? null : await ipc.invoke('app:getHomeDir', undefined);
         if (home) {
-          left.tabs = [{ path: home, initialPath: home, label: home.split(/[/\\]/).filter(Boolean).pop() || home, pinned: false }];
+          left.tabs = [
+            {
+              path: home,
+              initialPath: home,
+              label: home.split(/[/\\]/).filter(Boolean).pop() || home,
+              pinned: false,
+            },
+          ];
           left.path = home;
         }
         await Promise.all([restoreState('left', left), restoreState('right', right)]);
@@ -305,6 +318,8 @@ export function initializeWorkspaces(): Promise<void> {
     } finally {
       useSpaceStore.setState({ restoring: false });
     }
-  })().finally(() => { initialization = null; });
+  })().finally(() => {
+    initialization = null;
+  });
   return initialization;
 }

@@ -16,8 +16,13 @@ vi.mock('../../src/renderer/framework/plugin-system', () => ({
 }));
 
 const match = {
-  filePath: 'D:/project/Makefile', fileName: 'Makefile', lineNumber: 9,
-  lineContent: 'build: app', matchText: 'build', columnStart: 1, columnEnd: 6,
+  filePath: 'D:/project/Makefile',
+  fileName: 'Makefile',
+  lineNumber: 9,
+  lineContent: 'build: app',
+  matchText: 'build',
+  columnStart: 1,
+  columnEnd: 6,
 };
 
 describe('search result preview', () => {
@@ -29,27 +34,37 @@ describe('search result preview', () => {
     useSearchStore.setState(useSearchStore.getInitialState());
   });
 
-  it.each(['left', 'right'] as const)('keeps the %s search panel and previews opposite it regardless of the active panel', async (side) => {
-    const target = side === 'left' ? 'right' : 'left';
-    useLayoutStore.getState().setPanelPlugin(side, 'fulltext-search', 'search');
-    useLayoutStore.getState().setPanelPath(side, 'D:/project');
-    useLayoutStore.getState().setActivePanel(target);
-    useSearchStore.setState({ results: [match], query: 'build', error: '部分目录读取失败' });
+  it.each(['left', 'right'] as const)(
+    'keeps the %s search panel and previews opposite it regardless of the active panel',
+    async (side) => {
+      const target = side === 'left' ? 'right' : 'left';
+      useLayoutStore.getState().setPanelPlugin(side, 'fulltext-search', 'search');
+      useLayoutStore.getState().setPanelPath(side, 'D:/project');
+      useLayoutStore.getState().setActivePanel(target);
+      useSearchStore.setState({ results: [match], query: 'build', error: '部分目录读取失败' });
 
-    await useSearchStore.getState().openFile(match, side);
+      await useSearchStore.getState().openFile(match, side);
 
-    expect(useLayoutStore.getState().layout[side]).toMatchObject({
-      pluginId: 'fulltext-search', path: 'D:/project',
-    });
-    expect(useLayoutStore.getState().layout[target]).toMatchObject({
-      pluginId: 'viewer', panelId: 'text-viewer', path: match.filePath,
-    });
-    expect(useViewerStore.getState()[target].searchHighlight).toEqual({
-      filePath: match.filePath, lineNumber: 9, columnStart: 1, columnEnd: 6, text: 'build',
-    });
-    expect(useSearchStore.getState()).toMatchObject({ results: [match], error: '部分目录读取失败' });
-    expect(ipc.invoke).not.toHaveBeenCalledWith('file:open', expect.anything());
-  });
+      expect(useLayoutStore.getState().layout[side]).toMatchObject({
+        pluginId: 'fulltext-search',
+        path: 'D:/project',
+      });
+      expect(useLayoutStore.getState().layout[target]).toMatchObject({
+        pluginId: 'viewer',
+        panelId: 'text-viewer',
+        path: match.filePath,
+      });
+      expect(useViewerStore.getState()[target].searchHighlight).toEqual({
+        filePath: match.filePath,
+        lineNumber: 9,
+        columnStart: 1,
+        columnEnd: 6,
+        text: 'build',
+      });
+      expect(useSearchStore.getState()).toMatchObject({ results: [match], error: '部分目录读取失败' });
+      expect(ipc.invoke).not.toHaveBeenCalledWith('file:open', expect.anything());
+    },
+  );
 
   it('makes the opposite preview visible when starting from a single panel', async () => {
     useLayoutStore.setState((state) => ({ layout: { ...state.layout, mode: 'single' } }));
@@ -60,14 +75,20 @@ describe('search result preview', () => {
 
   it('keeps filename-only fallback failures visible to the caller', async () => {
     vi.mocked(ipc.invoke).mockRejectedValueOnce(new Error('无法找到默认打开程序'));
-    await expect(previewSearchResult('left', 'D:/project/picture.png'))
-      .rejects.toThrow('无法找到默认打开程序');
+    await expect(previewSearchResult('left', 'D:/project/picture.png')).rejects.toThrow(
+      '无法找到默认打开程序',
+    );
     expect(useLayoutStore.getState().layout.right.pluginId).toBe('file-explorer');
   });
 
   it('clears an old content highlight when previewing a filename-only result', async () => {
-    vi.mocked(pluginManager.getFileHandlerForExtension).mockReturnValue({ pluginId: 'viewer', panelId: 'text-viewer' });
-    useViewerStore.getState().setSearchHighlight('right', { filePath: 'D:/project/readme.md', lineNumber: 2, text: 'old' });
+    vi.mocked(pluginManager.getFileHandlerForExtension).mockReturnValue({
+      pluginId: 'viewer',
+      panelId: 'text-viewer',
+    });
+    useViewerStore
+      .getState()
+      .setSearchHighlight('right', { filePath: 'D:/project/readme.md', lineNumber: 2, text: 'old' });
     await previewSearchResult('left', 'D:/project/readme.md');
     expect(useLayoutStore.getState().layout.right.path).toBe('D:/project/readme.md');
     expect(useViewerStore.getState().right.searchHighlight).toBeNull();

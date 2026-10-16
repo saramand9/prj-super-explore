@@ -10,7 +10,7 @@ retain their own licenses and are not relicensed by that choice.
 The installed dependency metadata reviewed on October 17, 2026 identifies:
 
 - `@lvce-editor/ripgrep` 4.1.0: MIT; a wrapper that downloads and bundles ripgrep.
-- `dompurify` 3.4.13: MPL-2.0 OR Apache-2.0.
+- `dompurify` 3.4.17: MPL-2.0 OR Apache-2.0.
 - `highlight.js` 11.11.1: BSD-3-Clause.
 - `marked` 18.0.4: MIT.
 - `pinyin-pro` 3.28.1: MIT.
@@ -41,12 +41,12 @@ prove that all bundled code and native binaries have been covered.
 
 The repository includes raster icons under
 `apps/desktop/src/renderer/assets/icons/prism/` and an installer icon under
-`apps/desktop/build/icons/`. Their original authorship, source and redistribution
-permission are not documented in the baseline. The maintainer must establish
-that provenance, or replace the assets with originals or appropriately licensed
-alternatives, before including them in the project's MIT license grant. These
-unverified raster assets are excluded from the MIT license representation;
-their presence is not a grant of redistribution permission.
+`apps/desktop/build/icons/`. The maintainer reports creating these assets with
+AI tools. The generator, applicable terms and any reference-image permissions
+still need to be recorded before including the assets in the project's MIT
+license representation. They remain excluded pending that documentation; this
+is not a finding that the assets infringe anyone's rights. Preserve generation
+records and document any attribution or redistribution conditions.
 
 `docs/assets/dual-pane.webp` is a privacy-reviewed screenshot of Explore using
 synthetic files in a dedicated demo directory. It is not evidence of third-party

@@ -73,7 +73,15 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     const searchId = `${SEARCH_ID}:${version}`;
     activeSearchId = searchId;
 
-    set({ searching: true, results: [], error: null, previewError: null, warnings: [], cancelled: false, selectedIdx: 0 });
+    set({
+      searching: true,
+      results: [],
+      error: null,
+      previewError: null,
+      warnings: [],
+      cancelled: false,
+      selectedIdx: 0,
+    });
     const off = ipc.on('search:progress', (progress) => {
       if (version !== searchVersion || progress.searchId !== searchId) return;
       set((state) => ({ results: [...state.results, ...progress.matches] }));
@@ -87,7 +95,13 @@ export const useSearchStore = create<SearchState>((set, get) => ({
         maxResults: FULLTEXT_RESULT_LIMIT,
       });
       if (version !== searchVersion) return;
-      set({ results: result.matches, warnings: result.warnings, cancelled: result.cancelled, searching: false, error: null });
+      set({
+        results: result.matches,
+        warnings: result.warnings,
+        cancelled: result.cancelled,
+        searching: false,
+        error: null,
+      });
     } catch (err) {
       if (version !== searchVersion) return;
       set({ searching: false, error: getIpcErrorMessage(err, '全文搜索失败') });
@@ -98,7 +112,15 @@ export const useSearchStore = create<SearchState>((set, get) => ({
 
   clearResults: () => {
     get().cancelSearch();
-    set({ results: [], error: null, previewError: null, warnings: [], cancelled: false, selectedIdx: 0, query: '' });
+    set({
+      results: [],
+      error: null,
+      previewError: null,
+      warnings: [],
+      cancelled: false,
+      selectedIdx: 0,
+      query: '',
+    });
   },
 
   moveSelection: (dir) => {

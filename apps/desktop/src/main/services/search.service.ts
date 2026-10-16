@@ -56,7 +56,11 @@ export class SearchService implements Service {
     return result.cancelled ? [] : result.matches;
   }
 
-  async run(dir: string, query: string, searchId: string, opts?: SearchOptions,
+  async run(
+    dir: string,
+    query: string,
+    searchId: string,
+    opts?: SearchOptions,
     onMatches?: (matches: FulltextMatch[], total: number) => void,
   ): Promise<SearchResult> {
     this.cancel(searchId);
@@ -105,7 +109,8 @@ export class SearchService implements Service {
       const flush = () => {
         clearTimeout(flushTimer);
         flushTimer = undefined;
-        if (entry.results.length > emitted) entry.onMatches?.(entry.results.slice(emitted), entry.results.length);
+        if (entry.results.length > emitted)
+          entry.onMatches?.(entry.results.slice(emitted), entry.results.length);
         emitted = entry.results.length;
       };
 
@@ -120,7 +125,12 @@ export class SearchService implements Service {
         flush();
         settled = true;
         deletePending();
-        resolve({ matches: results, cancelled: entry.cancelled, truncated: results.length >= maxResults, warnings: entry.warnings });
+        resolve({
+          matches: results,
+          cancelled: entry.cancelled,
+          truncated: results.length >= maxResults,
+          warnings: entry.warnings,
+        });
       };
       const fail = (error: Error) => {
         if (settled) return;
@@ -180,7 +190,9 @@ export class SearchService implements Service {
             finish(entry.results);
             return;
           }
-          const err = new Error(detail ? `ripgrep exited with code ${code}: ${detail}` : `ripgrep exited with code ${code}`);
+          const err = new Error(
+            detail ? `ripgrep exited with code ${code}: ${detail}` : `ripgrep exited with code ${code}`,
+          );
           (err as any).code = 'PROCESS_FAILED';
           fail(err);
           return;
@@ -197,10 +209,12 @@ export class SearchService implements Service {
         }
         if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
           fallbackStarted = true;
-          entry.onMatches = (matches, total) => { emitted = total; onMatches?.(matches, total); };
+          entry.onMatches = (matches, total) => {
+            emitted = total;
+            onMatches?.(matches, total);
+          };
           entry.warnings.push('搜索组件不可用，已使用基础搜索；忽略规则可能与原生搜索不同');
-          this.searchWithJs(dir, query, opts, maxResults, entry)
-            .then(finish, fail);
+          this.searchWithJs(dir, query, opts, maxResults, entry).then(finish, fail);
           return;
         }
         (err as any).code = 'PROCESS_FAILED';
@@ -239,7 +253,15 @@ export class SearchService implements Service {
     // spawn cannot execute an app.asar virtual path, even when the entry is unpacked.
     if (process.resourcesPath) {
       candidates.push(
-        join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', '@lvce-editor', 'ripgrep', 'bin', executable),
+        join(
+          process.resourcesPath,
+          'app.asar.unpacked',
+          'node_modules',
+          '@lvce-editor',
+          'ripgrep',
+          'bin',
+          executable,
+        ),
         join(process.resourcesPath, 'node_modules', '@lvce-editor', 'ripgrep', 'bin', executable),
       );
     }
@@ -256,7 +278,9 @@ export class SearchService implements Service {
     }
 
     candidates.push(join(process.cwd(), 'node_modules', '@lvce-editor', 'ripgrep', 'bin', executable));
-    candidates.push(join(process.cwd(), 'node_modules', '@lvce-editor', '.ignored_ripgrep', 'bin', executable));
+    candidates.push(
+      join(process.cwd(), 'node_modules', '@lvce-editor', '.ignored_ripgrep', 'bin', executable),
+    );
 
     for (const candidate of candidates) {
       if (existsSync(candidate)) return candidate;
@@ -279,21 +303,33 @@ export class SearchService implements Service {
     dir: string,
     query: string,
     searchId: string,
-    opts: {
-      filePattern?: string;
-      excludePatterns?: string[];
-      maxResults?: number;
-      maxFileSize?: string;
-    } | undefined,
+    opts:
+      | {
+          filePattern?: string;
+          excludePatterns?: string[];
+          maxResults?: number;
+          maxFileSize?: string;
+        }
+      | undefined,
     maxResults: number,
     onMatches?: (matches: FulltextMatch[], total: number) => void,
   ): Promise<SearchResult> {
-    const entry: PendingSearch = { results: [], cancelled: false, warnings: ['搜索组件不可用，已使用基础搜索；忽略规则可能与原生搜索不同'], onMatches };
+    const entry: PendingSearch = {
+      results: [],
+      cancelled: false,
+      warnings: ['搜索组件不可用，已使用基础搜索；忽略规则可能与原生搜索不同'],
+      onMatches,
+    };
     this.pending.set(searchId, entry);
     return new Promise((resolve, reject) => {
       const finish = () => {
         if (this.pending.get(searchId) === entry) this.pending.delete(searchId);
-        resolve({ matches: [...entry.results], cancelled: entry.cancelled, truncated: entry.results.length >= maxResults, warnings: [...entry.warnings] });
+        resolve({
+          matches: [...entry.results],
+          cancelled: entry.cancelled,
+          truncated: entry.results.length >= maxResults,
+          warnings: [...entry.warnings],
+        });
       };
       entry.onCancel = finish;
       this.searchWithJs(dir, query, opts, maxResults, entry).then(finish, (error) => {
@@ -306,12 +342,14 @@ export class SearchService implements Service {
   private async searchWithJs(
     dir: string,
     query: string,
-    opts: {
-      filePattern?: string;
-      excludePatterns?: string[];
-      maxResults?: number;
-      maxFileSize?: string;
-    } | undefined,
+    opts:
+      | {
+          filePattern?: string;
+          excludePatterns?: string[];
+          maxResults?: number;
+          maxFileSize?: string;
+        }
+      | undefined,
     maxResults: number,
     entry: PendingSearch,
   ): Promise<FulltextMatch[]> {
@@ -326,7 +364,7 @@ export class SearchService implements Service {
       if (entry.cancelled || results.length >= maxResults) return;
       let dirents: Dirent[];
       try {
-        dirents = await readdir(currentDir, { withFileTypes: true }) as Dirent[];
+        dirents = (await readdir(currentDir, { withFileTypes: true })) as Dirent[];
       } catch (error) {
         if (currentDir === dir) throw error;
         if (entry.warnings.length < 20) entry.warnings.push(`${currentDir}: ${(error as Error).message}`);
@@ -399,11 +437,15 @@ export class SearchService implements Service {
     const amount = Number(match[1]);
     const unit = match[2].toLowerCase();
     const multiplier =
-      unit === 't' ? 1024 ** 4 :
-      unit === 'g' ? 1024 ** 3 :
-      unit === 'm' ? 1024 ** 2 :
-      unit === 'k' ? 1024 :
-      1;
+      unit === 't'
+        ? 1024 ** 4
+        : unit === 'g'
+          ? 1024 ** 3
+          : unit === 'm'
+            ? 1024 ** 2
+            : unit === 'k'
+              ? 1024
+              : 1;
     return Math.floor(amount * multiplier);
   }
 
@@ -421,7 +463,11 @@ export class SearchService implements Service {
       const normalizedPattern = pattern.replace(/\\/g, '/');
       if (normalizedPattern.startsWith('**/') && normalizedPattern.endsWith('/**')) {
         const segment = normalizedPattern.slice(3, -3);
-        return normalized === segment || normalized.startsWith(`${segment}/`) || normalized.includes(`/${segment}/`);
+        return (
+          normalized === segment ||
+          normalized.startsWith(`${segment}/`) ||
+          normalized.includes(`/${segment}/`)
+        );
       }
       return this.globToRegExp(normalizedPattern, false).test(normalized);
     });
@@ -448,31 +494,37 @@ export class SearchService implements Service {
   private parseRgLine(line: string): FulltextMatch | null {
     if (!line.trim()) return null;
     try {
-        const event = JSON.parse(line);
-        if (event.type !== 'match') return null;
+      const event = JSON.parse(line);
+      if (event.type !== 'match') return null;
 
-        const data = event.data;
-        const filePath = data?.path?.text;
-        const lineNumber = data?.line_number;
-        const lineContent = data?.lines?.text;
-        const submatch = data?.submatches?.[0];
-        if (typeof filePath !== 'string' || typeof lineNumber !== 'number' || typeof lineContent !== 'string') {
-          return null;
-        }
+      const data = event.data;
+      const filePath = data?.path?.text;
+      const lineNumber = data?.line_number;
+      const lineContent = data?.lines?.text;
+      const submatch = data?.submatches?.[0];
+      if (typeof filePath !== 'string' || typeof lineNumber !== 'number' || typeof lineContent !== 'string') {
+        return null;
+      }
 
-        // ripgrep reports UTF-8 byte offsets; the viewer slices JavaScript strings.
-        const bytes = Buffer.from(lineContent, 'utf8');
-        const start = typeof submatch?.start === 'number' ? bytes.subarray(0, submatch.start).toString('utf8').length + 1 : 1;
-        const end = typeof submatch?.end === 'number' ? bytes.subarray(0, submatch.end).toString('utf8').length + 1 : start;
-        return {
-          filePath,
-          fileName: filePath.split(/[/\\]/).pop() ?? filePath,
-          lineNumber,
-          columnStart: start,
-          columnEnd: end,
-          lineContent: lineContent.replace(/\r?\n$/, ''),
-          matchText: submatch?.match?.text ?? '',
-        };
+      // ripgrep reports UTF-8 byte offsets; the viewer slices JavaScript strings.
+      const bytes = Buffer.from(lineContent, 'utf8');
+      const start =
+        typeof submatch?.start === 'number'
+          ? bytes.subarray(0, submatch.start).toString('utf8').length + 1
+          : 1;
+      const end =
+        typeof submatch?.end === 'number'
+          ? bytes.subarray(0, submatch.end).toString('utf8').length + 1
+          : start;
+      return {
+        filePath,
+        fileName: filePath.split(/[/\\]/).pop() ?? filePath,
+        lineNumber,
+        columnStart: start,
+        columnEnd: end,
+        lineContent: lineContent.replace(/\r?\n$/, ''),
+        matchText: submatch?.match?.text ?? '',
+      };
     } catch {
       return null;
     }

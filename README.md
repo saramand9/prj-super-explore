@@ -15,7 +15,8 @@ The current interface is primarily Chinese; this README and contributor-facing
 guides are in English.*
 
 > Explore's original code and documentation are licensed under the MIT License.
-> Public launch is still in preparation. See [License](#license) and the
+> This source repository is public. The existing installer predates the latest
+> security hardening; no new binary is implied by source updates. See [License](#license) and the
 > [maintainer readiness review](docs/maintainers/open-source-readiness.md).
 
 ## Why Explore?
@@ -105,11 +106,12 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-The repository is private until the maintainer completes the public-launch
-checklist, so cloning currently requires repository access.
+The repository is public; cloning does not require maintainer-granted access.
 
 ```powershell
 pnpm typecheck
+pnpm lint
+pnpm format:check
 pnpm test:unit
 pnpm test:e2e
 pnpm test:commit-policy
@@ -126,7 +128,8 @@ pnpm test:package
 ```
 
 Artifacts are written to `apps/desktop/dist-electron/`. The CI workflow runs
-Windows checks but does not automatically publish installers.
+Windows checks. Version tags additionally build a draft GitHub Release; a
+maintainer must review and publish it explicitly. See [release procedure](docs/releasing.md).
 See [development and packaging](docs/development.md) for isolated tests,
 ripgrep verification and troubleshooting.
 

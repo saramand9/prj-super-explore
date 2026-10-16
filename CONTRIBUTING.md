@@ -29,8 +29,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-The repository is currently private; cloning requires access until the maintainer
-changes its visibility. Do not commit generated installers, local configuration,
+The repository is public. Do not commit generated installers, local configuration,
 recordings, caches or unrelated deployment experiments.
 
 ## Changes and validation
@@ -42,6 +41,8 @@ recordings, caches or unrelated deployment experiments.
 
 ```powershell
 pnpm typecheck
+pnpm lint
+pnpm format:check
 pnpm test:unit
 pnpm test:e2e
 pnpm test:commit-policy
@@ -52,10 +53,11 @@ For packaging or runtime dependency changes, also run `pnpm test:package`.
 `pnpm benchmark:scan` writes large temporary fixtures and is an explicit,
 separate benchmark, not a normal unit test.
 
-The legacy `pnpm lint` and `pnpm format` scripts reference Biome, but Biome is
-not installed or configured in the baseline. They are not passing quality gates.
-Until that tooling is established, follow nearby code, `.editorconfig` and the
-TypeScript/test checks above. Do not claim that linting ran successfully.
+Biome is pinned in the workspace. `pnpm lint` checks an explicit baseline of
+correctness and security rules; it does not enable every opinionated rule.
+`pnpm format:check` checks formatting, while `pnpm format` applies it. Generated
+files and local ignored data are excluded. A one-time formatting baseline was
+introduced with this tooling; future changes should avoid unrelated formatting.
 
 ## Commit messages
 
@@ -99,8 +101,11 @@ and test failures rather than hiding them. Never attach real user files,
 credentials, personal paths or unreviewed diagnostics.
 
 Use a Conventional Commit title so a future squash merge can use it directly.
-Squash merging focused pull requests is recommended; repository merge settings
-and branch protections still need to be configured by the maintainer.
+Use a pull request for master. Branch protection requires the Windows `validate`
+and `english-conventional-commits` checks, an up-to-date branch and resolved
+conversations, including for administrators. Force pushes and deletion are
+disabled. The current single-maintainer setup requires no additional reviewer;
+increase that requirement when another maintainer joins.
 
 ## Architecture and safety
 

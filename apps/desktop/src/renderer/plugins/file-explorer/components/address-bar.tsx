@@ -56,8 +56,11 @@ export function AddressBar({ side, pathOverride, onNavigate }: AddressBarProps) 
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'l'
-        && useLayoutStore.getState().layout.id === side) {
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        event.key.toLowerCase() === 'l' &&
+        useLayoutStore.getState().layout.id === side
+      ) {
         event.preventDefault();
         startEdit();
       }
@@ -141,24 +144,21 @@ export function AddressBar({ side, pathOverride, onNavigate }: AddressBarProps) 
     [handleNavigate],
   );
 
-  const handleToggleExpand = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      setExpanded(true);
-      // 下一帧注册折叠监听，避免同一点击事件触发
-      requestAnimationFrame(() => {
-        const collapse = (ev: MouseEvent) => {
-          if (containerRef.current && !containerRef.current.contains(ev.target as HTMLElement)) {
-            setExpanded(false);
-            document.removeEventListener('mousedown', collapse);
-          }
-        };
-        document.addEventListener('mousedown', collapse);
-      });
-    },
-    [],
-  );
-  const initialName = initialPath ? (initialPath.split(/[/\\]/).pop() || initialPath) : null;
+  const handleToggleExpand = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpanded(true);
+    // 下一帧注册折叠监听，避免同一点击事件触发
+    requestAnimationFrame(() => {
+      const collapse = (ev: MouseEvent) => {
+        if (containerRef.current && !containerRef.current.contains(ev.target as HTMLElement)) {
+          setExpanded(false);
+          document.removeEventListener('mousedown', collapse);
+        }
+      };
+      document.addEventListener('mousedown', collapse);
+    });
+  }, []);
+  const initialName = initialPath ? initialPath.split(/[/\\]/).pop() || initialPath : null;
 
   if (!path) return null;
 
@@ -171,7 +171,9 @@ export function AddressBar({ side, pathOverride, onNavigate }: AddressBarProps) 
           onClick={() => handleNavigate(initialPath)}
           title={`起点: ${initialPath}`}
         >
-          <span><Home className="w-3.5 h-3.5" /></span>
+          <span>
+            <Home className="w-3.5 h-3.5" />
+          </span>
           <span className="truncate max-w-[100px]">{naturalName(initialPath)}</span>
         </button>
       )}
@@ -191,20 +193,15 @@ export function AddressBar({ side, pathOverride, onNavigate }: AddressBarProps) 
           className="flex-1 bg-surface-lighter border border-accent rounded px-2 py-0.5 text-sm text-text-primary outline-none min-w-0"
           spellCheck={false}
         />
-      ) : (() => {
+      ) : (
+        (() => {
           const lastParts = displayParts.slice(-KEEP_LAST);
           const prefixParts = displayParts.slice(0, -KEEP_LAST);
 
           // 渲染单个面包屑段
-          const renderSegment = (
-            part: { label: string; fullPath: string },
-            idx: number,
-            isLast: boolean,
-          ) => (
+          const renderSegment = (part: { label: string; fullPath: string }, idx: number, isLast: boolean) => (
             <span key={part.fullPath} className="flex items-center gap-0.5 min-w-0 overflow-hidden">
-              {idx > 0 && (
-                <span className="text-text-muted/40 shrink-0">{sep}</span>
-              )}
+              {idx > 0 && <span className="text-text-muted/40 shrink-0">{sep}</span>}
               <span
                 className={`hover:text-accent hover:bg-accent/10 rounded px-0.5 cursor-pointer ${
                   isLast
@@ -223,92 +220,87 @@ export function AddressBar({ side, pathOverride, onNavigate }: AddressBarProps) 
           );
 
           return (
-        <div
-          ref={containerRef}
-          data-testid={`address-bar-${side}`}
-          className="flex items-center gap-0.5 cursor-text flex-1 min-w-0 overflow-x-auto overflow-y-hidden whitespace-nowrap scrollbar-none"
-          onClick={startEdit}
-          title="点击编辑路径"
-        >
-          {expanded ? (
-            /* 展开模式 — 所有段自然换行 */
-            <div className="flex items-center gap-0.5 flex-wrap min-w-0 overflow-x-auto overflow-y-hidden scrollbar-none">
-              {displayParts.map((part, i) =>
-                renderSegment(part, i, i === displayParts.length - 1),
-              )}
-            </div>
-          ) : (
-            /* 正常模式：前缀和末段都可压缩，避免窄栏时文字挤出工具栏 */
-            <>
-              {prefixParts.map((part, i) => (
-                <span key={part.fullPath} className="flex items-center gap-0.5 min-w-0 overflow-hidden">
-                  {i > 0 && (
-                    <span className="text-text-muted/40 shrink-0">{sep}</span>
-                  )}
-                  <span
-                    className="text-text-secondary hover:text-accent hover:bg-accent/10 rounded px-0.5 cursor-pointer shrink min-w-0 max-w-[120px] truncate"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSegmentClick(part.fullPath);
-                    }}
-                    title={part.fullPath}
-                  >
-                    {part.label}
-                  </span>
-                </span>
-              ))}
-
-              {/* 折叠省略号 — 在前缀段和末段之间，始终可见 */}
-              {isCollapsed && (
-                <span className="shrink-0 flex items-center gap-0.5">
-                  <span className="text-text-muted/40 shrink-0">{sep}</span>
-                  <span
-                    className="text-xs text-accent hover:bg-accent/20 rounded px-0.5 cursor-pointer"
-                    onClick={handleToggleExpand}
-                    title="展开完整路径"
-                  >
-                    ...
-                  </span>
-                </span>
-              )}
-
-              {/* 末 KEEP_LAST 段 */}
-              {lastParts.map((part, i) => {
-                // 不需要前导分隔符：是第一个末段 且 前面没有任何段（无前缀 + 未折叠）
-                const skipSep = i === 0 && prefixParts.length === 0 && !isCollapsed;
-                return (
-                  <span
-                    key={part.fullPath}
-                    className={`flex items-center gap-0.5 ${
-                      i === lastParts.length - 1 ? 'shrink-0' : 'min-w-0 overflow-hidden'
-                    }`}
-                  >
-                    {!skipSep && (
-                      <span className="text-text-muted/40 shrink-0">{sep}</span>
-                    )}
-                    <span
-                      className={`hover:text-accent hover:bg-accent/10 rounded px-0.5 cursor-pointer inline-block ${
-                        i === lastParts.length - 1
-                          ? 'text-text-primary font-medium shrink-0 whitespace-nowrap'
-                          : 'text-text-secondary shrink min-w-0 truncate max-w-[120px]'
-                      }`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSegmentClick(part.fullPath);
-                      }}
-                      title={part.fullPath}
-                    >
-                      {part.label}
+            <div
+              ref={containerRef}
+              data-testid={`address-bar-${side}`}
+              className="flex items-center gap-0.5 cursor-text flex-1 min-w-0 overflow-x-auto overflow-y-hidden whitespace-nowrap scrollbar-none"
+              onClick={startEdit}
+              title="点击编辑路径"
+            >
+              {expanded ? (
+                /* 展开模式 — 所有段自然换行 */
+                <div className="flex items-center gap-0.5 flex-wrap min-w-0 overflow-x-auto overflow-y-hidden scrollbar-none">
+                  {displayParts.map((part, i) => renderSegment(part, i, i === displayParts.length - 1))}
+                </div>
+              ) : (
+                /* 正常模式：前缀和末段都可压缩，避免窄栏时文字挤出工具栏 */
+                <>
+                  {prefixParts.map((part, i) => (
+                    <span key={part.fullPath} className="flex items-center gap-0.5 min-w-0 overflow-hidden">
+                      {i > 0 && <span className="text-text-muted/40 shrink-0">{sep}</span>}
+                      <span
+                        className="text-text-secondary hover:text-accent hover:bg-accent/10 rounded px-0.5 cursor-pointer shrink min-w-0 max-w-[120px] truncate"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSegmentClick(part.fullPath);
+                        }}
+                        title={part.fullPath}
+                      >
+                        {part.label}
+                      </span>
                     </span>
-                  </span>
-                );
-              })}
-            </>
-          )}
-          <span className="w-1 shrink-0" />
-        </div>
+                  ))}
+
+                  {/* 折叠省略号 — 在前缀段和末段之间，始终可见 */}
+                  {isCollapsed && (
+                    <span className="shrink-0 flex items-center gap-0.5">
+                      <span className="text-text-muted/40 shrink-0">{sep}</span>
+                      <span
+                        className="text-xs text-accent hover:bg-accent/20 rounded px-0.5 cursor-pointer"
+                        onClick={handleToggleExpand}
+                        title="展开完整路径"
+                      >
+                        ...
+                      </span>
+                    </span>
+                  )}
+
+                  {/* 末 KEEP_LAST 段 */}
+                  {lastParts.map((part, i) => {
+                    // 不需要前导分隔符：是第一个末段 且 前面没有任何段（无前缀 + 未折叠）
+                    const skipSep = i === 0 && prefixParts.length === 0 && !isCollapsed;
+                    return (
+                      <span
+                        key={part.fullPath}
+                        className={`flex items-center gap-0.5 ${
+                          i === lastParts.length - 1 ? 'shrink-0' : 'min-w-0 overflow-hidden'
+                        }`}
+                      >
+                        {!skipSep && <span className="text-text-muted/40 shrink-0">{sep}</span>}
+                        <span
+                          className={`hover:text-accent hover:bg-accent/10 rounded px-0.5 cursor-pointer inline-block ${
+                            i === lastParts.length - 1
+                              ? 'text-text-primary font-medium shrink-0 whitespace-nowrap'
+                              : 'text-text-secondary shrink min-w-0 truncate max-w-[120px]'
+                          }`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSegmentClick(part.fullPath);
+                          }}
+                          title={part.fullPath}
+                        >
+                          {part.label}
+                        </span>
+                      </span>
+                    );
+                  })}
+                </>
+              )}
+              <span className="w-1 shrink-0" />
+            </div>
           );
-        })()}
+        })()
+      )}
 
       {/* 在资源管理器中打开 */}
       <button

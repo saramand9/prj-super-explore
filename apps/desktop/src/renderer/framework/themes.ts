@@ -1,4 +1,14 @@
-export type ThemeName = 'linear' | 'vscode' | 'mono' | 'sakura' | 'glass' | 'neon' | 'aurora' | 'mecha' | 'quantum' | 'grafana';
+export type ThemeName =
+  | 'linear'
+  | 'vscode'
+  | 'mono'
+  | 'sakura'
+  | 'glass'
+  | 'neon'
+  | 'aurora'
+  | 'mecha'
+  | 'quantum'
+  | 'grafana';
 
 export interface ThemeVars {
   '--bg-app': string;

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": {
+    "ignoreUnknown": true,
+    "includes": [
+      "**",
+      "!!**/node_modules",
+      "!!**/out",
+      "!!**/dist",
+      "!!**/dist-electron",
+      "!!**/test-results",
+      "!!**/playwright-report",
+      "!!pnpm-lock.yaml"
+    ]
+  },
+  "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 110 },
+  "javascript": {
+    "formatter": { "quoteStyle": "single", "jsxQuoteStyle": "double", "trailingCommas": "all" }
+  },
+  "css": { "parser": { "tailwindDirectives": true }, "linter": { "enabled": false } },
+  "assist": { "enabled": false },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "none",
+      "correctness": {
+        "noUnreachable": "error",
+        "noUnreachableSuper": "error",
+        "noUnusedLabels": "error",
+        "noUnsafeFinally": "error",
+        "useValidTypeof": "error"
+      },
+      "suspicious": {
+        "noDoubleEquals": "error",
+        "noDuplicateCase": "error",
+        "noDuplicateClassMembers": "error",
+        "noDuplicateObjectKeys": "error",
+        "noDuplicateParameters": "error",
+        "noDebugger": "error",
+        "noSparseArray": "error",
+        "noUnsafeNegation": "error"
+      },
+      "security": { "noGlobalEval": "error" }
+    }
+  }
+}

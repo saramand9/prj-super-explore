@@ -134,10 +134,7 @@ export function TabBar({ side, keepEmpty = false, onTabClick }: TabBarProps) {
   const layout = useMemo(() => {
     const groups = computeGroups(tabs);
     const groupedTabIds = new Set(groups.flatMap((g) => g.tabIds));
-    const items: Array<
-      | { kind: 'tab'; tab: Tab; grouped: boolean }
-      | { kind: 'group'; group: TabGroup }
-    > = [];
+    const items: Array<{ kind: 'tab'; tab: Tab; grouped: boolean } | { kind: 'group'; group: TabGroup }> = [];
     const renderedTabs = new Set<string>();
     for (const tab of tabs) {
       if (renderedTabs.has(tab.id)) continue;
@@ -190,30 +187,28 @@ export function TabBar({ side, keepEmpty = false, onTabClick }: TabBarProps) {
         }}
         onMouseLeave={() => setHoveredTabId(null)}
       >
-        {isPinned && (
-          <Pin className="w-3 h-3 flex-shrink-0 text-accent/60" />
-        )}
+        {isPinned && <Pin className="w-3 h-3 flex-shrink-0 text-accent/60" />}
         {editingTabId === tab.id ? (
           <>
-          <span
-            ref={sizerRef}
-            className="px-1.5 py-0 text-xs whitespace-pre invisible fixed"
-            aria-hidden="true"
-          >
-            {editValue || ' '}
-          </span>
-          <input
-            ref={editInputRef}
-            className="bg-surface-lighter border border-accent/50 rounded px-1.5 py-0 text-xs text-text-primary outline-none w-[80px]"
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            onBlur={confirmRename}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') confirmRename();
-              if (e.key === 'Escape') setEditingTabId(null);
-            }}
-            onClick={(e) => e.stopPropagation()}
-          />
+            <span
+              ref={sizerRef}
+              className="px-1.5 py-0 text-xs whitespace-pre invisible fixed"
+              aria-hidden="true"
+            >
+              {editValue || ' '}
+            </span>
+            <input
+              ref={editInputRef}
+              className="bg-surface-lighter border border-accent/50 rounded px-1.5 py-0 text-xs text-text-primary outline-none w-[80px]"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onBlur={confirmRename}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') confirmRename();
+                if (e.key === 'Escape') setEditingTabId(null);
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
           </>
         ) : (
           <span className="truncate min-w-0">{tab.label}</span>
@@ -236,9 +231,7 @@ export function TabBar({ side, keepEmpty = false, onTabClick }: TabBarProps) {
 
   const toggleGroupCollapse = (groupPath: string) => {
     setCollapsedGroups((prev) =>
-      prev.includes(groupPath)
-        ? prev.filter((p) => p !== groupPath)
-        : [...prev, groupPath],
+      prev.includes(groupPath) ? prev.filter((p) => p !== groupPath) : [...prev, groupPath],
     );
   };
 
@@ -256,7 +249,11 @@ export function TabBar({ side, keepEmpty = false, onTabClick }: TabBarProps) {
         onClick={() => toggleGroupCollapse(group.path)}
         title={`${group.path} (${group.tabIds.length} 个标签)`}
       >
-        {isCollapsed ? <ChevronRight className="w-3 h-3 flex-shrink-0" /> : <ChevronDown className="w-3 h-3 flex-shrink-0" />}
+        {isCollapsed ? (
+          <ChevronRight className="w-3 h-3 flex-shrink-0" />
+        ) : (
+          <ChevronDown className="w-3 h-3 flex-shrink-0" />
+        )}
         <Folder className="w-3 h-3 flex-shrink-0 text-accent/60" />
         <span className="truncate max-w-[120px]">{group.name}</span>
         <span className="text-text-muted/50">· {group.tabIds.length}</span>
@@ -265,17 +262,17 @@ export function TabBar({ side, keepEmpty = false, onTabClick }: TabBarProps) {
   };
 
   return (
-    <div ref={containerRef} className="flex items-center overflow-x-auto scrollbar-none px-1 flex-shrink-0 gap-0.5 h-8">
+    <div
+      ref={containerRef}
+      className="flex items-center overflow-x-auto scrollbar-none px-1 flex-shrink-0 gap-0.5 h-8"
+    >
       {layout.map((item) => {
         if (item.kind === 'group') return renderGroupHeader(item.group);
         return renderTab(item.tab, item.grouped);
       })}
 
       {hoveredTabId && tooltipPos && (
-        <div
-          className="fixed z-50 pointer-events-none"
-          style={{ left: tooltipPos.x, top: tooltipPos.y }}
-        >
+        <div className="fixed z-50 pointer-events-none" style={{ left: tooltipPos.x, top: tooltipPos.y }}>
           <div className="bg-surface-light border border-border/50 rounded-md shadow-lg px-3 py-1.5 text-xs text-text-primary whitespace-nowrap">
             {tabs.find((t) => t.id === hoveredTabId)?.path}
           </div>

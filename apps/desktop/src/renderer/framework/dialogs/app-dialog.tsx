@@ -162,18 +162,29 @@ export function AppDialogHost() {
             >
               取消
             </button>
-            <button className="px-4 py-1 text-xs bg-accent text-white rounded" onClick={() => closeConfirm(true)}>
+            <button
+              className="px-4 py-1 text-xs bg-accent text-white rounded"
+              onClick={() => closeConfirm(true)}
+            >
               确定
             </button>
           </div>
         )}
 
         {dialog.kind === 'choice' && (
-          <div className="grid gap-2 mt-4" style={{ gridTemplateColumns: `repeat(${dialog.buttons.length}, minmax(0, 1fr))` }}>
+          <div
+            className="grid gap-2 mt-4"
+            style={{ gridTemplateColumns: `repeat(${dialog.buttons.length}, minmax(0, 1fr))` }}
+          >
             {dialog.buttons.map((button) => (
               <button
                 key={button.id}
-                className={getChoiceButtonClass(button.id, dialog.defaultId, dialog.cancelId, hoveredChoiceId)}
+                className={getChoiceButtonClass(
+                  button.id,
+                  dialog.defaultId,
+                  dialog.cancelId,
+                  hoveredChoiceId,
+                )}
                 onMouseEnter={() => setHoveredChoiceId(button.id)}
                 onMouseLeave={() => setHoveredChoiceId(null)}
                 onFocus={() => setHoveredChoiceId(button.id)}
@@ -198,7 +209,12 @@ function getDefaultTitle(dialog: ActiveDialog): string {
   return '提示';
 }
 
-function getChoiceButtonClass(id: string, defaultId?: string, cancelId?: string, hoveredId?: string | null): string {
+function getChoiceButtonClass(
+  id: string,
+  defaultId?: string,
+  cancelId?: string,
+  hoveredId?: string | null,
+): string {
   if (hoveredId === id) {
     if (id === 'overwrite' || id === 'delete' || id === 'permanent-delete') {
       return 'px-4 py-1 text-xs bg-red-600/80 border border-red-500/80 text-white rounded';

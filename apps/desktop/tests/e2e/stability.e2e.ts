@@ -75,11 +75,17 @@ test.describe('data safety and persistence', () => {
     await expect(banner).toContainText('自动保存已暂停');
     expect(await readFile(spacesPath, 'utf8')).toBe('{broken');
 
-    await writeFile(spacesPath, JSON.stringify([{
-      id: 'repaired', name: '恢复的工作区',
-      left: { tabs: [{ path: root, label: 'root' }], activeTabId: null, path: root },
-      right: { tabs: [], activeTabId: null, path: null },
-    }]));
+    await writeFile(
+      spacesPath,
+      JSON.stringify([
+        {
+          id: 'repaired',
+          name: '恢复的工作区',
+          left: { tabs: [{ path: root, label: 'root' }], activeTabId: null, path: root },
+          right: { tabs: [], activeTabId: null, path: null },
+        },
+      ]),
+    );
     await banner.getByRole('button', { name: '重试', exact: true }).click();
     await expect(banner).toBeHidden();
     await expect(page.getByTestId('workspace-menu-trigger')).toContainText('恢复的工作区');

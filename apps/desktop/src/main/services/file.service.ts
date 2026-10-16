@@ -1,4 +1,18 @@
-import { readdir, stat, lstat, realpath, readlink, symlink, copyFile, rename, unlink, rm, mkdir, access, writeFile } from 'fs/promises';
+import {
+  readdir,
+  stat,
+  lstat,
+  realpath,
+  readlink,
+  symlink,
+  copyFile,
+  rename,
+  unlink,
+  rm,
+  mkdir,
+  access,
+  writeFile,
+} from 'fs/promises';
 import { constants, watch } from 'fs';
 import { join, dirname, basename, extname, parse, resolve, relative, isAbsolute, sep } from 'path';
 import { shell } from 'electron';
@@ -64,12 +78,14 @@ export class FileService {
     };
 
     const workerCount = Math.min(DIR_SIZE_CONCURRENCY, queue.length);
-    await Promise.all(Array.from({ length: workerCount }, async () => {
-      while (cursor < queue.length) {
-        const dirPath = queue[cursor++];
-        await runOne(dirPath);
-      }
-    }));
+    await Promise.all(
+      Array.from({ length: workerCount }, async () => {
+        while (cursor < queue.length) {
+          const dirPath = queue[cursor++];
+          await runOne(dirPath);
+        }
+      }),
+    );
     return result;
   }
 
@@ -86,7 +102,10 @@ export class FileService {
     const timedOut = () => timeout > 0 && Date.now() - start > timeout;
 
     async function walk(d: string, depth: number): Promise<number> {
-      if (depth > 8) { partial = true; return 0; }
+      if (depth > 8) {
+        partial = true;
+        return 0;
+      }
       try {
         const names = await readdir(d);
         let total = 0;
@@ -105,7 +124,9 @@ export class FileService {
             } else {
               total += st.size;
             }
-          } catch { partial = true; }
+          } catch {
+            partial = true;
+          }
         }
         return total;
       } catch {
@@ -129,33 +150,31 @@ export class FileService {
     }
   }
 
-  async readDir(
-    dirPath: string,
-    sort?: SortConfig,
-    showHidden = false,
-  ): Promise<FileEntry[]> {
+  async readDir(dirPath: string, sort?: SortConfig, showHidden = false): Promise<FileEntry[]> {
     const names = await readdir(dirPath);
     const entries: FileEntry[] = [];
 
     for (let offset = 0; offset < names.length; offset += 16) {
-      await Promise.all(names.slice(offset, offset + 16).map(async (name) => {
-        if (!showHidden && name.startsWith('.')) return;
-        try {
-          const fullPath = join(dirPath, name);
-          const info = await lstat(fullPath);
-          const st = info.isSymbolicLink() ? await stat(fullPath).catch(() => info) : info;
-          entries.push({
-            name,
-            path: fullPath,
-            isDirectory: st.isDirectory(),
-            isSymlink: info.isSymbolicLink(),
-            size: st.size,
-            modifiedAt: st.mtimeMs,
-          });
-        } catch {
-          // 跳过无权限的文件
-        }
-      }));
+      await Promise.all(
+        names.slice(offset, offset + 16).map(async (name) => {
+          if (!showHidden && name.startsWith('.')) return;
+          try {
+            const fullPath = join(dirPath, name);
+            const info = await lstat(fullPath);
+            const st = info.isSymbolicLink() ? await stat(fullPath).catch(() => info) : info;
+            entries.push({
+              name,
+              path: fullPath,
+              isDirectory: st.isDirectory(),
+              isSymlink: info.isSymbolicLink(),
+              size: st.size,
+              modifiedAt: st.mtimeMs,
+            });
+          } catch {
+            // 跳过无权限的文件
+          }
+        }),
+      );
     }
 
     if (sort) {
@@ -346,9 +365,11 @@ export class FileService {
         throw err;
       });
       // Windows allows changing only the case of the existing item's name.
-      const caseOnly = process.platform === 'win32'
-        && resolve(filePath).toLowerCase() === resolve(newPath).toLowerCase()
-        && target?.dev === source.dev && target?.ino === source.ino;
+      const caseOnly =
+        process.platform === 'win32' &&
+        resolve(filePath).toLowerCase() === resolve(newPath).toLowerCase() &&
+        target?.dev === source.dev &&
+        target?.ino === source.ino;
       if (target && !caseOnly) {
         return { success: false, error: '目标名称已存在，请使用其他名称' };
       }
@@ -376,7 +397,10 @@ export class FileService {
 
   // ── File watching (tail -f) ──
 
-  private fileWatchers = new Map<string, { watcher: ReturnType<typeof watch>; timer: ReturnType<typeof setTimeout> | null; cb: () => void }>();
+  private fileWatchers = new Map<
+    string,
+    { watcher: ReturnType<typeof watch>; timer: ReturnType<typeof setTimeout> | null; cb: () => void }
+  >();
 
   watchFile(filePath: string, onChange: () => void, onError?: (err: Error) => void): void {
     this.unwatchFile(filePath);
@@ -452,15 +476,25 @@ export class FileService {
   // ── private ──
 
   private validateName(name: string): void {
-    if (typeof name !== 'string' || !name.trim() || name === '.' || name === '..'
-      || /[\\/\0]/.test(name)
-      || (process.platform === 'win32' && (/[<>:"|?*\x01-\x1f]/.test(name)
-        || /[. ]$/.test(name) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name)))) {
+    if (
+      typeof name !== 'string' ||
+      !name.trim() ||
+      name === '.' ||
+      name === '..' ||
+      /[\\/\0]/.test(name) ||
+      (process.platform === 'win32' &&
+        (/[<>:"|?*\x01-\x1f]/.test(name) ||
+          /[. ]$/.test(name) ||
+          /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name)))
+    ) {
       throw new Error('请输入有效的文件名称，不能包含路径或系统保留字符');
     }
   }
 
-  private createOpResult(): Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed' | 'replaced'>> & Pick<FileOpResult, 'cancelled'> {
+  private createOpResult(): Required<
+    Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed' | 'replaced'>
+  > &
+    Pick<FileOpResult, 'cancelled'> {
     return {
       skipped: [],
       completed: [],
@@ -472,7 +506,8 @@ export class FileService {
   }
 
   private finalizeOpResult(
-    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed' | 'replaced'>> & Pick<FileOpResult, 'cancelled'>,
+    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed' | 'replaced'>> &
+      Pick<FileOpResult, 'cancelled'>,
   ): FileOpResult {
     const skipped = result.skipped;
     const failures = result.failures;
@@ -490,7 +525,8 @@ export class FileService {
   }
 
   private summarizeOpError(
-    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed' | 'replaced'>> & Pick<FileOpResult, 'cancelled'>,
+    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed' | 'replaced'>> &
+      Pick<FileOpResult, 'cancelled'>,
   ): string {
     const parts: string[] = [];
     if (result.cancelled) parts.push('已取消');
@@ -501,7 +537,8 @@ export class FileService {
   }
 
   private addFailure(
-    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed' | 'replaced'>> & Pick<FileOpResult, 'cancelled'>,
+    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed' | 'replaced'>> &
+      Pick<FileOpResult, 'cancelled'>,
     path: string,
     dest: string | undefined,
     reason: string,
@@ -528,7 +565,8 @@ export class FileService {
     src: string,
     destDir: string,
     strategy: FileConflictStrategy,
-    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed' | 'replaced'>> & Pick<FileOpResult, 'cancelled'>,
+    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed' | 'replaced'>> &
+      Pick<FileOpResult, 'cancelled'>,
   ): Promise<{ dest: string } | null> {
     const dest = join(destDir, basename(src));
     if (resolve(src) === resolve(dest)) {
@@ -588,9 +626,15 @@ export class FileService {
     const info = await lstat(src);
     if (info.isSymbolicLink()) {
       const target = await readlink(src);
-      const directory = await stat(src).then((value) => value.isDirectory()).catch(() => false);
+      const directory = await stat(src)
+        .then((value) => value.isDirectory())
+        .catch(() => false);
       const junction = directory && process.platform === 'win32';
-      await symlink(junction ? resolve(dirname(src), target) : target, dest, directory ? (junction ? 'junction' : 'dir') : 'file');
+      await symlink(
+        junction ? resolve(dirname(src), target) : target,
+        dest,
+        directory ? (junction ? 'junction' : 'dir') : 'file',
+      );
     } else if (info.isDirectory()) {
       await this.copyDir(src, dest, operationId);
     } else {
@@ -606,7 +650,8 @@ export class FileService {
   }
 
   private markCancelledIfNeeded(
-    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed' | 'replaced'>> & Pick<FileOpResult, 'cancelled'>,
+    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed' | 'replaced'>> &
+      Pick<FileOpResult, 'cancelled'>,
     operationId: string | undefined,
     remaining: string[],
   ): boolean {
@@ -617,7 +662,8 @@ export class FileService {
   }
 
   private handleCancellation(
-    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed' | 'replaced'>> & Pick<FileOpResult, 'cancelled'>,
+    result: Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed' | 'replaced'>> &
+      Pick<FileOpResult, 'cancelled'>,
     err: any,
     remaining: string[],
   ): boolean {

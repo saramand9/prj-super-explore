@@ -12,9 +12,7 @@ function escapeHtml(text: string): string {
 self.onmessage = (e: MessageEvent<{ content: string; lang?: string; version: number }>) => {
   const { content, lang, version } = e.data;
   try {
-    const result = lang
-      ? hljs.highlight(content, { language: lang })
-      : hljs.highlightAuto(content);
+    const result = lang ? hljs.highlight(content, { language: lang }) : hljs.highlightAuto(content);
     self.postMessage({ lines: result.value.split('\n'), version });
   } catch {
     self.postMessage({ lines: escapeHtml(content).split('\n'), version });

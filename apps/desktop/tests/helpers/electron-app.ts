@@ -19,23 +19,32 @@ export async function launchTestApp(root: string): Promise<ElectronApplication> 
   const userData = join(root, '.profile');
   await mkdir(userData, { recursive: true });
   const bootstrap = join(root, '.launch-explore.mjs');
-  await writeFile(bootstrap, [
-    "import { app } from 'electron';",
-    `app.setPath('userData', ${JSON.stringify(userData)});`,
-    ...['home', 'desktop', 'documents', 'downloads', 'appData', 'sessionData'].map(
-      (key) => `app.setPath(${JSON.stringify(key)}, ${JSON.stringify(key === 'sessionData' ? userData : root)});`,
-    ),
-    `await import(${JSON.stringify(pathToFileURL(join(appRoot, 'out/main/index.js')).href)});`,
-  ].join('\n'), 'utf8');
+  await writeFile(
+    bootstrap,
+    [
+      "import { app } from 'electron';",
+      `app.setPath('userData', ${JSON.stringify(userData)});`,
+      ...['home', 'desktop', 'documents', 'downloads', 'appData', 'sessionData'].map(
+        (key) =>
+          `app.setPath(${JSON.stringify(key)}, ${JSON.stringify(key === 'sessionData' ? userData : root)});`,
+      ),
+      `await import(${JSON.stringify(pathToFileURL(join(appRoot, 'out/main/index.js')).href)});`,
+    ].join('\n'),
+    'utf8',
+  );
   const application = await electron.launch({
     args: [bootstrap],
     cwd: appRoot,
-    env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: 'true' },
+    env: Object.fromEntries(
+      Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+    ),
   });
   const child = application.process();
   children.set(application, child);
   let startupOutput = '';
-  const capture = (data: Buffer) => { startupOutput = `${startupOutput}${data}`.slice(-8000); };
+  const capture = (data: Buffer) => {
+    startupOutput = `${startupOutput}${data}`.slice(-8000);
+  };
   child.stdout?.on('data', capture);
   child.stderr?.on('data', capture);
   let actualUserData: string;
@@ -44,9 +53,12 @@ export async function launchTestApp(root: string): Promise<ElectronApplication> 
     const page = await application.firstWindow();
     await page.waitForLoadState('domcontentloaded');
     actualUserData = await application.evaluate(({ app }) => app.getPath('userData'));
+  } catch (error) {
+    throw new Error(`Electron startup failed: ${startupOutput}`, { cause: error });
+  } finally {
+    child.stdout?.off('data', capture);
+    child.stderr?.off('data', capture);
   }
-  catch (error) { throw new Error(`Electron startup failed: ${startupOutput}`, { cause: error }); }
-  finally { child.stdout?.off('data', capture); child.stderr?.off('data', capture); }
   if (resolve(actualUserData) !== resolve(userData)) {
     await application.close();
     throw new Error('Electron did not use the isolated test profile');

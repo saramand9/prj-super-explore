@@ -10,7 +10,8 @@ vi.mock('electron', () => electronMock);
 
 function savedSpace(id = 'saved'): Space {
   return {
-    id, name: id,
+    id,
+    name: id,
     left: { tabs: [], path: null, activeTabId: null },
     right: { tabs: [], path: null, activeTabId: null },
   };
@@ -26,7 +27,8 @@ describe('configuration recovery', () => {
     electronMock.app.getPath.mockReturnValue(root);
   });
   afterEach(async () => {
-    if (dirname(resolve(root)) !== resolve(tmpdir()) || !root.includes('explore-config-')) throw new Error('Unsafe fixture path');
+    if (dirname(resolve(root)) !== resolve(tmpdir()) || !root.includes('explore-config-'))
+      throw new Error('Unsafe fixture path');
     await rm(root, { recursive: true, force: true });
   });
 
@@ -34,7 +36,12 @@ describe('configuration recovery', () => {
     await writeFile(join(configDir, 'config.json'), JSON.stringify({ indexPaths: [], theme: 'linear' }));
     const config = new ConfigService();
     config.init();
-    expect(config.getSettings()).toMatchObject({ indexPaths: [], theme: 'linear', fontScale: 130, layoutMode: 'dual' });
+    expect(config.getSettings()).toMatchObject({
+      indexPaths: [],
+      theme: 'linear',
+      fontScale: 130,
+      layoutMode: 'dual',
+    });
     expect(config.getSettings().excludePatterns).toContain('node_modules');
   });
 
@@ -50,13 +57,18 @@ describe('configuration recovery', () => {
   it('rejects invalid appearance values without changing saved settings', async () => {
     const config = new ConfigService();
     config.init();
-    await expect(config.saveAppearance({ theme: 'linear', fontScale: Infinity, layoutMode: 'dual' })).rejects.toThrow('无效');
+    await expect(
+      config.saveAppearance({ theme: 'linear', fontScale: Infinity, layoutMode: 'dual' }),
+    ).rejects.toThrow('无效');
     expect(config.getSettings().fontScale).toBe(130);
   });
 
   it('recovers a damaged workspace from the newest valid backup', async () => {
     await mkdir(join(configDir, 'backups'));
-    await writeFile(join(configDir, 'backups', 'spaces.json.2025.autosave.bak'), JSON.stringify([savedSpace()]));
+    await writeFile(
+      join(configDir, 'backups', 'spaces.json.2025.autosave.bak'),
+      JSON.stringify([savedSpace()]),
+    );
     await writeFile(join(configDir, 'spaces.json'), '[null]');
     const config = new ConfigService();
     config.init();
@@ -77,17 +89,20 @@ describe('configuration recovery', () => {
     expect(config.getSpaces()[0].id).toBe('repaired');
   });
 
-  it.each(['tabs', 'activeTabPath', 'pinned', 'lastOpenedAt'] as const)('rejects malformed %s before touching the saved file', async (field) => {
-    const config = new ConfigService();
-    config.init();
-    config.saveSpaces([savedSpace()]);
-    const malformed = savedSpace();
-    if (field === 'tabs') malformed.left.tabs = [null as any];
-    else if (field === 'activeTabPath') malformed.left.activeTabPath = {} as any;
-    else (malformed as any)[field] = 'invalid';
-    expect(() => config.saveSpaces([malformed])).toThrow('Invalid');
-    expect(JSON.parse(await readFile(join(configDir, 'spaces.json'), 'utf8'))).toEqual([savedSpace()]);
-  });
+  it.each(['tabs', 'activeTabPath', 'pinned', 'lastOpenedAt'] as const)(
+    'rejects malformed %s before touching the saved file',
+    async (field) => {
+      const config = new ConfigService();
+      config.init();
+      config.saveSpaces([savedSpace()]);
+      const malformed = savedSpace();
+      if (field === 'tabs') malformed.left.tabs = [null as any];
+      else if (field === 'activeTabPath') malformed.left.activeTabPath = {} as any;
+      else (malformed as any)[field] = 'invalid';
+      expect(() => config.saveSpaces([malformed])).toThrow('Invalid');
+      expect(JSON.parse(await readFile(join(configDir, 'spaces.json'), 'utf8'))).toEqual([savedSpace()]);
+    },
+  );
 
   it('keeps the previous in-memory state and cleans its temp file after a failed write', async () => {
     const config = new ConfigService();
@@ -95,7 +110,9 @@ describe('configuration recovery', () => {
     config.saveSpaces([savedSpace()]);
     const previous = config.getAppearance();
     await mkdir(join(configDir, 'config.json'));
-    await expect(config.saveAppearance({ theme: 'linear', fontScale: 160, layoutMode: 'single' })).rejects.toThrow();
+    await expect(
+      config.saveAppearance({ theme: 'linear', fontScale: 160, layoutMode: 'single' }),
+    ).rejects.toThrow();
     expect(config.getAppearance()).toEqual(previous);
     expect((await readdir(configDir)).filter((name) => name.endsWith('.tmp'))).toEqual([]);
   });

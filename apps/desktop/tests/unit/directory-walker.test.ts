@@ -8,15 +8,21 @@ import { createFixture, removeFixture } from '../helpers/fixture';
 const fault = vi.hoisted(() => ({ denied: '' }));
 vi.mock('fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs/promises')>();
-  return { ...actual, opendir: (path: string, options?: any) => path === fault.denied
-    ? Promise.reject(Object.assign(new Error('permission denied'), { code: 'EACCES' }))
-    : actual.opendir(path, options),
+  return {
+    ...actual,
+    opendir: (path: string, options?: any) =>
+      path === fault.denied
+        ? Promise.reject(Object.assign(new Error('permission denied'), { code: 'EACCES' }))
+        : actual.opendir(path, options),
   };
 });
 
 describe('bounded directory scanning', () => {
   let root: string;
-  beforeEach(async () => { root = await createFixture('walk'); fault.denied = ''; });
+  beforeEach(async () => {
+    root = await createFixture('walk');
+    fault.denied = '';
+  });
   afterEach(async () => removeFixture(root));
 
   it('lists links without following a parent cycle or scanning an external target', async () => {
@@ -29,22 +35,36 @@ describe('bounded directory scanning', () => {
     await symlink(source, join(source, 'loop'), 'junction');
     await symlink(outside, join(source, 'external'), 'junction');
     const entries: FileEntry[] = [];
-    const result = await walkDirectory(source, { onBatch: (batch) => { entries.push(...batch); } });
+    const result = await walkDirectory(source, {
+      onBatch: (batch) => {
+        entries.push(...batch);
+      },
+    });
     expect(result).toMatchObject({ scanned: 3, directories: 1, cancelled: false });
-    expect(entries.filter((entry) => entry.isSymlink).map((entry) => entry.name).sort()).toEqual(['external', 'loop']);
+    expect(
+      entries
+        .filter((entry) => entry.isSymlink)
+        .map((entry) => entry.name)
+        .sort(),
+    ).toEqual(['external', 'loop']);
     expect(entries.some((entry) => entry.name === 'private.txt')).toBe(false);
   });
 
   it('stops between batches and preserves the batch already delivered', async () => {
     for (let offset = 0; offset < 600; offset += 50) {
-      await Promise.all(Array.from({ length: 50 }, (_, i) => writeFile(join(root, `entry-${offset + i}.txt`), '')));
+      await Promise.all(
+        Array.from({ length: 50 }, (_, i) => writeFile(join(root, `entry-${offset + i}.txt`), '')),
+      );
     }
     const controller = new AbortController();
     const entries: FileEntry[] = [];
-    const result = await walkDirectory(root, { signal: controller.signal, onBatch: (batch) => {
-      entries.push(...batch);
-      if (batch.length) controller.abort();
-    } });
+    const result = await walkDirectory(root, {
+      signal: controller.signal,
+      onBatch: (batch) => {
+        entries.push(...batch);
+        if (batch.length) controller.abort();
+      },
+    });
     expect(result.cancelled).toBe(true);
     expect(entries.length).toBeGreaterThan(0);
     expect(entries.length).toBeLessThanOrEqual(256);
@@ -56,7 +76,11 @@ describe('bounded directory scanning', () => {
     await mkdir(fault.denied);
     await writeFile(join(root, 'readable.txt'), 'readable');
     const entries: FileEntry[] = [];
-    const result = await walkDirectory(root, { onBatch: (batch) => { entries.push(...batch); } });
+    const result = await walkDirectory(root, {
+      onBatch: (batch) => {
+        entries.push(...batch);
+      },
+    });
     expect(entries.some((entry) => entry.name === 'readable.txt')).toBe(true);
     expect(result.skipped).toBeGreaterThan(0);
     expect(result.warnings[0]).toContain('protected');
@@ -67,7 +91,13 @@ describe('bounded directory scanning', () => {
     await mkdir(join(root, 'ignore-me'));
     await Promise.all(Array.from({ length: 30 }, (_, i) => writeFile(join(root, `file-${i}.txt`), '')));
     const entries: FileEntry[] = [];
-    const result = await walkDirectory(root, { maxEntries: 10, excludePatterns: ['ignore-*'], onBatch: (batch) => { entries.push(...batch); } });
+    const result = await walkDirectory(root, {
+      maxEntries: 10,
+      excludePatterns: ['ignore-*'],
+      onBatch: (batch) => {
+        entries.push(...batch);
+      },
+    });
     expect(result).toMatchObject({ scanned: 10, truncated: true });
     expect(entries).toHaveLength(10);
     expect(entries.every((entry) => !entry.isDirectory)).toBe(true);
@@ -76,6 +106,8 @@ describe('bounded directory scanning', () => {
   it('cancels before touching an unavailable directory', async () => {
     const controller = new AbortController();
     controller.abort();
-    await expect(walkDirectory(join(root, 'missing'), { signal: controller.signal, onBatch: () => {} })).resolves.toMatchObject({ cancelled: true, scanned: 0 });
+    await expect(
+      walkDirectory(join(root, 'missing'), { signal: controller.signal, onBatch: () => {} }),
+    ).resolves.toMatchObject({ cancelled: true, scanned: 0 });
   });
 });

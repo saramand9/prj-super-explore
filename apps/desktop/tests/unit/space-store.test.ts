@@ -2,8 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Space } from '@explore/shared';
 import { ipc } from '../../src/renderer/framework/bridge/ipc-client';
 import { useFileStore } from '../../src/renderer/plugins/file-explorer/store';
-import { initAutoSave, initializeWorkspaces, restoreState, useSpaceStore } from '../../src/renderer/plugins/file-explorer/space-store';
+import {
+  initAutoSave,
+  initializeWorkspaces,
+  restoreState,
+  useSpaceStore,
+} from '../../src/renderer/plugins/file-explorer/space-store';
 import { useLayoutStore } from '../../src/renderer/framework/store/layout-store';
+import { fixtureFile } from '../helpers/file-entry';
 
 vi.mock('../../src/renderer/framework/bridge/ipc-client', () => ({
   ipc: { invoke: vi.fn() },
@@ -14,7 +20,8 @@ vi.mock('../../src/renderer/framework/bridge/ipc-client', () => ({
 function space(id: string, path: string | null): Space {
   const panel = () => ({
     tabs: path ? [{ path, initialPath: path, label: id, pinned: false }] : [],
-    activeTabId: null, path,
+    activeTabId: null,
+    path,
   });
   return { id, name: id, left: panel(), right: panel() };
 }
@@ -30,11 +37,16 @@ describe('workspace persistence', () => {
   afterEach(() => vi.useRealTimers());
 
   it('clears file and layout state when restoring an empty panel', async () => {
-    vi.mocked(ipc.invoke).mockResolvedValueOnce([{ name: 'old.txt' }]);
+    vi.mocked(ipc.invoke).mockResolvedValueOnce([fixtureFile('old.txt')]);
     await useFileStore.getState().navigateTo('right', 'D:/old');
     useLayoutStore.getState().setPanelPath('right', 'D:/old');
     await restoreState('right', space('empty', null).right);
-    expect(useFileStore.getState().right).toMatchObject({ path: null, entries: [], tabs: [], loading: false });
+    expect(useFileStore.getState().right).toMatchObject({
+      path: null,
+      entries: [],
+      tabs: [],
+      loading: false,
+    });
     expect(useLayoutStore.getState().layout.right.path).toBeNull();
   });
 
@@ -53,19 +65,26 @@ describe('workspace persistence', () => {
     const pending: Array<() => void> = [];
     vi.mocked(ipc.invoke).mockImplementation(((channel: string, payload: any) => {
       if (channel === 'file:readDir') {
-        if (payload.path === 'D:/slow') return new Promise((resolve) => pending.push(() => resolve([{ name: 'slow.txt' }])));
+        if (payload.path === 'D:/slow')
+          return new Promise((resolve) => pending.push(() => resolve([{ name: 'slow.txt' }])));
         return Promise.resolve([{ name: 'fast.txt' }]);
       }
       return Promise.resolve();
     }) as any);
-    useSpaceStore.setState({ spaces: [space('a', null), space('b', 'D:/slow'), space('c', 'D:/fast')], activeSpaceId: 'a' });
+    useSpaceStore.setState({
+      spaces: [space('a', null), space('b', 'D:/slow'), space('c', 'D:/fast')],
+      activeSpaceId: 'a',
+    });
     const older = useSpaceStore.getState().switchSpace('b');
     await useSpaceStore.getState().switchSpace('c');
     for (const resolve of pending) resolve();
     await older;
     expect(useSpaceStore.getState().activeSpaceId).toBe('c');
     for (const side of ['left', 'right'] as const) {
-      expect(useFileStore.getState()[side]).toMatchObject({ path: 'D:/fast', entries: [{ name: 'fast.txt' }] });
+      expect(useFileStore.getState()[side]).toMatchObject({
+        path: 'D:/fast',
+        entries: [{ name: 'fast.txt' }],
+      });
       expect(useLayoutStore.getState().layout[side].path).toBe('D:/fast');
     }
     expect(useSpaceStore.getState().spaces.find((item) => item.id === 'b')?.right.path).toBe('D:/slow');
@@ -91,7 +110,9 @@ describe('workspace persistence', () => {
     useSpaceStore.setState({ spaces: [space('a', null), space('b', 'D:/slow')], activeSpaceId: 'a' });
     const switching = useSpaceStore.getState().switchSpace('b');
     await useSpaceStore.getState().saveCurrentSpace();
-    const payload = vi.mocked(ipc.invoke).mock.calls.find(([channel]) => channel === 'space:save')?.[1] as { spaces: Space[] };
+    const payload = vi.mocked(ipc.invoke).mock.calls.find(([channel]) => channel === 'space:save')?.[1] as {
+      spaces: Space[];
+    };
     expect(payload.spaces[1].lastOpenedAt).toBeGreaterThan(payload.spaces[0].lastOpenedAt ?? 0);
     expect(payload.spaces[1].left.path).toBe('D:/slow');
     for (const finish of pending) finish();
@@ -109,7 +130,12 @@ describe('workspace persistence', () => {
 
   it('serializes saves so a delayed older snapshot cannot overwrite a newer name', async () => {
     let finish!: () => void;
-    vi.mocked(ipc.invoke).mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
+    vi.mocked(ipc.invoke).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
     useSpaceStore.setState({ spaces: [space('saved', null)], activeSpaceId: 'saved' });
     const first = useSpaceStore.getState().persistSpaces();
     await Promise.resolve();

@@ -26,10 +26,7 @@ export async function previewSearchResult(
 
   const layout = useLayoutStore.getState();
   if (layout.layout.mode === 'single') layout.setMode('dual');
-  useViewerStore.getState().setSearchHighlight(
-    targetSide,
-    highlight ? { filePath, ...highlight } : null,
-  );
+  useViewerStore.getState().setSearchHighlight(targetSide, highlight ? { filePath, ...highlight } : null);
   layout.setPanelPath(targetSide, filePath);
   layout.setPanelPlugin(targetSide, handler.pluginId, handler.panelId);
 }

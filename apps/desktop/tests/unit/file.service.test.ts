@@ -1,5 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdtemp, mkdir, readFile, rm, rmdir, stat, lstat, symlink, writeFile, rename, copyFile } from 'fs/promises';
+import {
+  mkdtemp,
+  mkdir,
+  readFile,
+  rm,
+  rmdir,
+  stat,
+  lstat,
+  symlink,
+  writeFile,
+  rename,
+  copyFile,
+} from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -44,12 +56,7 @@ describe('FileService file operations', () => {
 
     const entries = await service.readDir(root, { key: 'name', direction: 'desc' });
 
-    expect(entries.map((entry) => entry.name)).toEqual([
-      'z-folder',
-      'a-folder',
-      'z-file.txt',
-      'a-file.txt',
-    ]);
+    expect(entries.map((entry) => entry.name)).toEqual(['z-folder', 'a-folder', 'z-file.txt', 'a-file.txt']);
   });
 
   it('copies files and directories with Chinese and space paths', async () => {
@@ -94,7 +101,9 @@ describe('FileService file operations', () => {
     await expect(readFile(dest, 'utf8')).resolves.toBe('new');
 
     await writeFile(dest, 'old again', 'utf8');
-    electronMocks.shell.trashItem.mockRejectedValueOnce(Object.assign(new Error('access denied'), { code: 'EPERM' }));
+    electronMocks.shell.trashItem.mockRejectedValueOnce(
+      Object.assign(new Error('access denied'), { code: 'EPERM' }),
+    );
     const denied = await service.copyFiles([source], destDir, 'overwrite');
     expect(denied.success).toBe(false);
     expect(denied.failures?.[0].code).toBe('EPERM');
@@ -132,7 +141,9 @@ describe('FileService file operations', () => {
     expect(trashResult.success).toBe(true);
     expect(electronMocks.shell.trashItem).toHaveBeenCalledWith(trashed);
 
-    electronMocks.shell.trashItem.mockRejectedValueOnce(Object.assign(new Error('permission denied'), { code: 'EPERM' }));
+    electronMocks.shell.trashItem.mockRejectedValueOnce(
+      Object.assign(new Error('permission denied'), { code: 'EPERM' }),
+    );
     const deniedResult = await service.deleteFiles([denied], false);
     expect(deniedResult.success).toBe(false);
     expect(deniedResult.failures?.[0].code).toBe('EPERM');
@@ -192,7 +203,10 @@ describe('FileService file operations', () => {
     expect(result.success).toBe(true);
     expect((await lstat(join(destination, 'source/loop'))).isSymbolicLink()).toBe(true);
     expect(await readFile(join(source, 'keep.txt'), 'utf8')).toBe('keep');
-    expect((await service.readDir(source)).find((entry) => entry.name === 'loop')).toMatchObject({ isDirectory: true, isSymlink: true });
+    expect((await service.readDir(source)).find((entry) => entry.name === 'loop')).toMatchObject({
+      isDirectory: true,
+      isSymlink: true,
+    });
     expect(await service.getStat(join(source, 'loop'))).toMatchObject({ isDirectory: true, isSymlink: true });
     expect((await service.getDirSizes([source]))[source].size).toBe(4);
   });

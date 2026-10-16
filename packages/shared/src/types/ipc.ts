@@ -20,6 +20,7 @@ export type IpcErrorCode =
   | 'WATCH_FAILED'
   | 'PROCESS_FAILED'
   | 'IPC_BRIDGE_MISSING'
+  | 'INVALID_REQUEST'
   | 'UNKNOWN';
 
 export interface IpcErrorInfo {
@@ -53,11 +54,21 @@ export interface IpcChannels {
     res: FileStat | null;
   };
   'file:copy': {
-    req: { sources: string[]; destDir: string; conflictStrategy?: FileConflictStrategy; operationId?: string };
+    req: {
+      sources: string[];
+      destDir: string;
+      conflictStrategy?: FileConflictStrategy;
+      operationId?: string;
+    };
     res: FileOpResult;
   };
   'file:move': {
-    req: { sources: string[]; destDir: string; conflictStrategy?: FileConflictStrategy; operationId?: string };
+    req: {
+      sources: string[];
+      destDir: string;
+      conflictStrategy?: FileConflictStrategy;
+      operationId?: string;
+    };
     res: FileOpResult;
   };
   'file:delete': {
@@ -198,7 +209,10 @@ export interface IpcChannels {
   // Pinned tabs persistence
   'tabs:load': {
     req: void;
-    res: { left: { path: string; label: string; initialPath: string }[]; right: { path: string; label: string; initialPath: string }[] };
+    res: {
+      left: { path: string; label: string; initialPath: string }[];
+      right: { path: string; label: string; initialPath: string }[];
+    };
   };
   'tabs:save': {
     req: { side: 'left' | 'right'; tabs: { path: string; label: string; initialPath: string }[] };
@@ -216,14 +230,6 @@ export interface IpcChannels {
   };
 
   // Plugins
-  'plugin:getRegistered': {
-    req: void;
-    res: PluginInfo[];
-  };
-  'plugin:loadManifest': {
-    req: { pluginPath: string };
-    res: PluginManifest | null;
-  };
   'plugin:scanExternal': {
     req: void;
     res: { pluginId: string; pluginPath: string }[];

@@ -3,11 +3,7 @@
  * 封装 window.explore 调用，提供类型安全的 API。
  */
 
-import type {
-  IpcChannels,
-  IpcErrorInfo,
-  IpcEvents,
-} from '@explore/shared';
+import type { IpcChannels, IpcErrorInfo, IpcEvents } from '@explore/shared';
 
 type ExploreApi = Window['explore'];
 const IPC_ERROR_PREFIX = '__EXPLORE_IPC_ERROR__';
@@ -55,31 +51,28 @@ export const ipc = {
       });
     }
     try {
-      return await api.invoke(channel, payload);
+      return await api.requests[channel](payload);
     } catch (err) {
       throw normalizeIpcError(channel, err);
     }
   },
 
-  on<C extends keyof IpcEvents>(
-    channel: C,
-    callback: (payload: IpcEvents[C]) => void,
-  ): () => void {
+  on<C extends keyof IpcEvents>(channel: C, callback: (payload: IpcEvents[C]) => void): () => void {
     const api = getApi();
     if (!api) {
       console.error('[IPC] bridge not available, cannot listen to', channel);
       return () => {};
     }
-    return api.on(channel, callback);
+    return api.events[channel](callback);
   },
 
-  once<C extends keyof IpcEvents>(
-    channel: C,
-    callback: (payload: IpcEvents[C]) => void,
-  ): void {
+  once<C extends keyof IpcEvents>(channel: C, callback: (payload: IpcEvents[C]) => void): void {
     const api = getApi();
     if (!api) return;
-    api.once(channel, callback);
+    const unsubscribe = api.events[channel]((payload) => {
+      unsubscribe();
+      callback(payload);
+    });
   },
 };
 

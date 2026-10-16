@@ -17,12 +17,8 @@ const manifest = {
         defaultSize: { minWidth: 250, minHeight: 200 },
       },
     ],
-    commands: [
-      { id: 'fulltext-search.search', title: 'Search in Files', category: 'Search' },
-    ],
-    keybindings: [
-      { command: 'fulltext-search.search', key: 'Ctrl+Shift+F' },
-    ],
+    commands: [{ id: 'fulltext-search.search', title: 'Search in Files', category: 'Search' }],
+    keybindings: [{ command: 'fulltext-search.search', key: 'Ctrl+Shift+F' }],
   },
 };
 

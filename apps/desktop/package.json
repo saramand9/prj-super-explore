@@ -20,13 +20,24 @@
     "test:package": "pnpm pack:dir && playwright test -c playwright.package.config.ts",
     "benchmark:scan": "vitest run -c vitest.benchmark.config.ts",
     "verify:search": "node scripts/verify-search.mjs",
-    "pack:dir": "pnpm build && pnpm verify:search && electron-builder --win --x64 --dir && node scripts/verify-search.mjs --packaged",
-    "pack": "pnpm build && pnpm verify:search && electron-builder --win --x64 && node scripts/verify-search.mjs --packaged"
+    "pack:dir": "pnpm build && pnpm verify:search && electron-builder --win --x64 --dir --publish never && node scripts/verify-search.mjs --packaged",
+    "pack": "pnpm build && pnpm verify:search && electron-builder --win --x64 --publish never && node scripts/verify-search.mjs --packaged"
   },
   "build": {
     "appId": "com.explore.app",
     "productName": "Explore",
     "npmRebuild": false,
+    "electronDist": "node_modules/electron/dist",
+    "extraResources": [
+      {
+        "from": "../../LICENSE",
+        "to": "licenses/Explore-MIT-LICENSE.txt"
+      },
+      {
+        "from": "../../THIRD_PARTY_NOTICES.md",
+        "to": "licenses/THIRD_PARTY_NOTICES.md"
+      }
+    ],
     "directories": {
       "output": "dist-electron"
     },
@@ -49,15 +60,15 @@
   },
   "dependencies": {
     "@lvce-editor/ripgrep": "^4.1.0",
-    "dompurify": "^3.4.13",
+    "dompurify": "^3.4.17",
     "highlight.js": "^11.11.1",
     "marked": "^18.0.4",
     "pinyin-pro": "^3.28.1"
   },
   "devDependencies": {
-    "@explore/shared": "workspace:*",
     "@electron-toolkit/preload": "^3.0.0",
     "@electron-toolkit/utils": "^3.0.0",
+    "@explore/shared": "workspace:*",
     "@playwright/test": "^1.60.0",
     "@tanstack/react-virtual": "^3.10.0",
     "@types/node": "^22.0.0",
@@ -67,8 +78,8 @@
     "autoprefixer": "^10.4.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
-    "electron": "^33.0.0",
-    "electron-builder": "^25.0.0",
+    "electron": "^44.8.0",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^2.3.0",
     "lucide-react": "^0.400.0",
     "postcss": "^8.4.0",

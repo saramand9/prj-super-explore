@@ -7,72 +7,116 @@
 /* Keywords */
 .hljs-keyword,
 .hljs-selector-tag,
-.hljs-type { color: #c678dd; }
+.hljs-type {
+  color: #c678dd;
+}
 
 /* Strings */
 .hljs-string,
-.hljs-addition { color: #98c379; }
+.hljs-addition {
+  color: #98c379;
+}
 
 /* Numbers */
 .hljs-number,
-.hljs-literal { color: #d19a66; }
+.hljs-literal {
+  color: #d19a66;
+}
 
 /* Comments */
 .hljs-comment,
-.hljs-quote { color: #5c5f6b; font-style: italic; }
+.hljs-quote {
+  color: #5c5f6b;
+  font-style: italic;
+}
 
 /* Functions / titles */
 .hljs-title.function_,
-.hljs-title.class_ { color: #61afef; }
+.hljs-title.class_ {
+  color: #61afef;
+}
 
 /* Variables / params */
 .hljs-params,
-.hljs-attr { color: #e3e5e9; }
+.hljs-attr {
+  color: #e3e5e9;
+}
 
 /* Built-ins */
-.hljs-built_in { color: #e5c07b; }
+.hljs-built_in {
+  color: #e5c07b;
+}
 
 /* Regex */
-.hljs-regexp { color: #56b6c2; }
+.hljs-regexp {
+  color: #56b6c2;
+}
 
 /* Template expressions */
-.hljs-template-expression { color: #e06c75; }
+.hljs-template-expression {
+  color: #e06c75;
+}
 
 /* Tags / names */
 .hljs-tag,
-.hljs-name { color: #e06c75; }
+.hljs-name {
+  color: #e06c75;
+}
 
 /* Attributes */
-.hljs-attribute { color: #d19a66; }
+.hljs-attribute {
+  color: #d19a66;
+}
 
 /* Selectors */
 .hljs-selector-class,
-.hljs-selector-id { color: #61afef; }
+.hljs-selector-id {
+  color: #61afef;
+}
 
 /* Meta */
-.hljs-meta { color: #c678dd; }
+.hljs-meta {
+  color: #c678dd;
+}
 
 /* Deletion / diff */
-.hljs-deletion { color: #e06c75; }
+.hljs-deletion {
+  color: #e06c75;
+}
 
 /* Emphasis */
-.hljs-emphasis { font-style: italic; }
-.hljs-strong { font-weight: bold; }
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: bold;
+}
 
 /* Punctuation */
-.hljs-punctuation { color: #abb2bf; }
+.hljs-punctuation {
+  color: #abb2bf;
+}
 
 /* Property */
-.hljs-property { color: #e3e5e9; }
+.hljs-property {
+  color: #e3e5e9;
+}
 
 /* Symbol */
-.hljs-symbol { color: #56b6c2; }
+.hljs-symbol {
+  color: #56b6c2;
+}
 
 /* Link */
-.hljs-link { color: #61afef; text-decoration: underline; }
+.hljs-link {
+  color: #61afef;
+  text-decoration: underline;
+}
 
 /* Operator */
-.hljs-operator { color: #abb2bf; }
+.hljs-operator {
+  color: #abb2bf;
+}
 
 /* ── Markdown Preview ── */
 
@@ -89,10 +133,22 @@
   color: #e3e5e9;
 }
 
-.markdown-body h1 { font-size: 1.6em; border-bottom: 1px solid #2a2d36; padding-bottom: 0.3em; }
-.markdown-body h2 { font-size: 1.4em; border-bottom: 1px solid #2a2d36; padding-bottom: 0.25em; }
-.markdown-body h3 { font-size: 1.2em; }
-.markdown-body h4 { font-size: 1.1em; }
+.markdown-body h1 {
+  font-size: 1.6em;
+  border-bottom: 1px solid #2a2d36;
+  padding-bottom: 0.3em;
+}
+.markdown-body h2 {
+  font-size: 1.4em;
+  border-bottom: 1px solid #2a2d36;
+  padding-bottom: 0.25em;
+}
+.markdown-body h3 {
+  font-size: 1.2em;
+}
+.markdown-body h4 {
+  font-size: 1.1em;
+}
 
 .markdown-body p {
   margin-bottom: 1em;
@@ -113,7 +169,7 @@
   padding: 0.5em 1em;
   border-left: 3px solid #5b8def;
   color: #989ba4;
-  background: rgba(91,141,239,0.06);
+  background: rgba(91, 141, 239, 0.06);
   border-radius: 0 4px 4px 0;
 }
 
@@ -122,7 +178,7 @@
   padding: 0.15em 0.4em;
   border-radius: 3px;
   font-size: 0.9em;
-  font-family: 'SF Mono', 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: "SF Mono", "JetBrains Mono", "Fira Code", "Consolas", monospace;
   color: #e5c07b;
 }
 
@@ -165,7 +221,7 @@
 }
 
 .markdown-body tr:nth-child(even) {
-  background: rgba(30,32,41,0.4);
+  background: rgba(30, 32, 41, 0.4);
 }
 
 .markdown-body hr {

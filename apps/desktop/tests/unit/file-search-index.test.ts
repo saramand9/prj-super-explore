@@ -80,7 +80,9 @@ describe('FileSearchIndex', () => {
 
   it('keeps the best bounded matches when earlier entries have worse positions', () => {
     const index = new FileSearchIndex();
-    const entries = ['long-needle.txt', 'xneedle.txt', 'needle-a.txt', 'needle-b.txt', 'needle-c.txt'].map(entry);
+    const entries = ['long-needle.txt', 'xneedle.txt', 'needle-a.txt', 'needle-b.txt', 'needle-c.txt'].map(
+      entry,
+    );
     index.build(entries);
     expect(index.search('needle', 2)).toEqual(entries.slice(2, 4));
     expect(index.search('needle', 4)).toEqual([entries[2], entries[3], entries[4], entries[1]]);

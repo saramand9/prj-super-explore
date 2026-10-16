@@ -54,10 +54,16 @@ test.describe('Ctrl+F file search', () => {
     await page.getByText('unsafe-preview.md', { exact: true }).dblclick();
     const preview = page.locator('.markdown-body');
     await expect(preview).toContainText('Safe heading');
-    await expect(preview.locator('script, form, [onerror], [onfocus], [autofocus], [formaction], [style]')).toHaveCount(0);
-    await expect.poll(() => page.evaluate(
-      () => (window as Window & { __exploreMarkdownExecuted?: boolean }).__exploreMarkdownExecuted,
-    )).toBe(false);
+    await expect(
+      preview.locator('script, form, [onerror], [onfocus], [autofocus], [formaction], [style]'),
+    ).toHaveCount(0);
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => (window as Window & { __exploreMarkdownExecuted?: boolean }).__exploreMarkdownExecuted,
+        ),
+      )
+      .toBe(false);
   });
 });
 
@@ -76,7 +82,9 @@ async function createFixture(root: string): Promise<void> {
   await mkdir(join(root, 'node_modules', 'pkg'), { recursive: true });
   await mkdir(join(root, 'empty dir'), { recursive: true });
   await mkdir(join(root, 'many files'), { recursive: true });
-  await mkdir(join(root, 'level-1', 'level-2', 'level-3', 'level-4', 'level-5', 'level-6'), { recursive: true });
+  await mkdir(join(root, 'level-1', 'level-2', 'level-3', 'level-4', 'level-5', 'level-6'), {
+    recursive: true,
+  });
 
   await writeFile(join(root, '中文 文件.txt'), 'hello 中文', 'utf8');
   await writeFile(
@@ -91,10 +99,18 @@ async function createFixture(root: string): Promise<void> {
     'utf8',
   );
   await writeFile(join(root, 'space dir', 'target file.txt'), 'target', 'utf8');
-  await writeFile(join(root, 'level-1', 'level-2', 'level-3', 'level-4', 'level-5', 'level-6', 'deep-target.txt'), 'deep', 'utf8');
+  await writeFile(
+    join(root, 'level-1', 'level-2', 'level-3', 'level-4', 'level-5', 'level-6', 'deep-target.txt'),
+    'deep',
+    'utf8',
+  );
   await writeFile(join(root, 'node_modules', 'pkg', 'excluded.txt'), 'excluded', 'utf8');
 
   for (let i = 0; i < 60; i++) {
-    await writeFile(join(root, 'many files', `entry-${String(i).padStart(2, '0')}.txt`), `entry ${i}`, 'utf8');
+    await writeFile(
+      join(root, 'many files', `entry-${String(i).padStart(2, '0')}.txt`),
+      `entry ${i}`,
+      'utf8',
+    );
   }
 }

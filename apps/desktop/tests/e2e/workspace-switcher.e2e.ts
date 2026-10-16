@@ -43,21 +43,27 @@ test.describe('workspace switcher at scale', () => {
     await expect(dropdown).toBeVisible();
     await expect(dropdown.getByTestId('workspace-dropdown-item')).toHaveCount(40);
     await expect(dropdown.getByTestId('workspace-preview')).toBeVisible();
-    await expect(dropdown.getByTestId('workspace-section-current').getByTestId('workspace-dropdown-item')).toHaveCount(1);
-    await expect(dropdown.getByTestId('workspace-section-pinned').getByTestId('workspace-dropdown-item')).toHaveCount(3);
-    await expect(dropdown.getByTestId('workspace-section-recent').getByTestId('workspace-dropdown-item')).toHaveCount(5);
-    await expect(dropdown.getByTestId('workspace-section-other').getByTestId('workspace-dropdown-item')).toHaveCount(31);
+    await expect(
+      dropdown.getByTestId('workspace-section-current').getByTestId('workspace-dropdown-item'),
+    ).toHaveCount(1);
+    await expect(
+      dropdown.getByTestId('workspace-section-pinned').getByTestId('workspace-dropdown-item'),
+    ).toHaveCount(3);
+    await expect(
+      dropdown.getByTestId('workspace-section-recent').getByTestId('workspace-dropdown-item'),
+    ).toHaveCount(5);
+    await expect(
+      dropdown.getByTestId('workspace-section-other').getByTestId('workspace-dropdown-item'),
+    ).toHaveCount(31);
 
-    const rowHeights = await dropdown.getByTestId('workspace-dropdown-item').evaluateAll((rows) =>
-      rows.slice(0, 12).map((row) => row.getBoundingClientRect().height),
-    );
+    const rowHeights = await dropdown
+      .getByTestId('workspace-dropdown-item')
+      .evaluateAll((rows) => rows.slice(0, 12).map((row) => row.getBoundingClientRect().height));
     expect(rowHeights).toHaveLength(12);
     expect(rowHeights[0]).toBeGreaterThanOrEqual(48);
     expect(rowHeights).toEqual(new Array(12).fill(rowHeights[0]));
 
-    const archiveRow = dropdown
-      .getByTestId('workspace-dropdown-item')
-      .filter({ hasText: 'Archive' });
+    const archiveRow = dropdown.getByTestId('workspace-dropdown-item').filter({ hasText: 'Archive' });
     await archiveRow.hover();
     await expect(dropdown.getByTestId('workspace-preview')).toContainText('Archive');
 

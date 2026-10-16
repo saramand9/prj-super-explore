@@ -66,9 +66,9 @@ test.describe('right button navigation gesture', () => {
     await page.getByText('root.txt', { exact: true }).click();
     await expect(page.getByText(/项已选中/)).toHaveCount(0);
     await expect(page.getByText('1 项已选中', { exact: true })).toBeVisible({ timeout: 1000 });
-    const actionBarBackground = await page.getByTestId('selection-action-bar').evaluate(
-      (element) => getComputedStyle(element).backgroundColor,
-    );
+    const actionBarBackground = await page
+      .getByTestId('selection-action-bar')
+      .evaluate((element) => getComputedStyle(element).backgroundColor);
     expect(actionBarBackground).not.toBe('rgba(0, 0, 0, 0)');
     expect(actionBarBackground).not.toBe('transparent');
 
@@ -129,17 +129,22 @@ async function getPanelPoint(page: Page, side: 'left' | 'right'): Promise<{ x: n
 
 async function dispatchMouseButton(page: Page, side: 'left' | 'right', button: number): Promise<void> {
   const point = await getPanelPoint(page, side);
-  await page.evaluate(({ x, y, button }) => {
-    const target = document.elementFromPoint(x, y) ?? document.body;
-    target.dispatchEvent(new MouseEvent('mouseup', {
-      bubbles: true,
-      cancelable: true,
-      button,
-      buttons: 0,
-      clientX: x,
-      clientY: y,
-    }));
-  }, { ...point, button });
+  await page.evaluate(
+    ({ x, y, button }) => {
+      const target = document.elementFromPoint(x, y) ?? document.body;
+      target.dispatchEvent(
+        new MouseEvent('mouseup', {
+          bubbles: true,
+          cancelable: true,
+          button,
+          buttons: 0,
+          clientX: x,
+          clientY: y,
+        }),
+      );
+    },
+    { ...point, button },
+  );
 }
 
 async function wheelOnPanel(page: Page, side: 'left' | 'right', deltaX: number): Promise<void> {
@@ -167,17 +172,22 @@ async function rightButtonSwipe(
   await page.mouse.move(startX, startY);
   await page.mouse.down({ button: 'right' });
   if (options.contextMenuBeforeMove) {
-    await page.evaluate(({ x, y }) => {
-      const target = document.elementFromPoint(x, y) ?? document.body;
-      target.dispatchEvent(new MouseEvent('contextmenu', {
-        bubbles: true,
-        cancelable: true,
-        button: 2,
-        buttons: 2,
-        clientX: x,
-        clientY: y,
-      }));
-    }, { x: startX, y: startY });
+    await page.evaluate(
+      ({ x, y }) => {
+        const target = document.elementFromPoint(x, y) ?? document.body;
+        target.dispatchEvent(
+          new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            button: 2,
+            buttons: 2,
+            clientX: x,
+            clientY: y,
+          }),
+        );
+      },
+      { x: startX, y: startY },
+    );
   }
   await page.mouse.move(startX + deltaX, startY + 2, { steps: 8 });
   await page.mouse.up({ button: 'right' });

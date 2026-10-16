@@ -27,7 +27,9 @@ test.describe('product usability', () => {
     application = await launchTestApp(root);
     page = await application.firstWindow();
     await navigate('left', source);
-    await expect(page.locator('[data-panel-side="left"] .file-table-name').filter({ hasText: 'README.md' })).toBeVisible();
+    await expect(
+      page.locator('[data-panel-side="left"] .file-table-name').filter({ hasText: 'README.md' }),
+    ).toBeVisible();
   });
 
   test.afterEach(async () => {
@@ -36,12 +38,15 @@ test.describe('product usability', () => {
   });
 
   async function navigate(side: 'left' | 'right', path: string) {
-    if (await page.getByTestId(`edit-path-${side}`).count() === 0) {
+    if ((await page.getByTestId(`edit-path-${side}`).count()) === 0) {
       await application.evaluate(({ ipcMain }, folder) => {
         ipcMain.removeHandler('dialog:openFolder');
         ipcMain.handle('dialog:openFolder', () => folder);
       }, path);
-      await page.locator(`[data-panel-side="${side}"]`).getByTitle('打开文件夹 (Ctrl+O)', { exact: true }).click();
+      await page
+        .locator(`[data-panel-side="${side}"]`)
+        .getByTitle('打开文件夹 (Ctrl+O)', { exact: true })
+        .click();
       await expect(page.getByTestId(`edit-path-${side}`)).toBeVisible();
       return;
     }
@@ -128,20 +133,29 @@ test.describe('product usability', () => {
     await expect(page.locator('[data-panel-side="right"] .markdown-body')).toBeVisible();
     await left.locator('.file-table-name').filter({ hasText: 'copy-check.txt' }).click();
     await page.keyboard.press('F5');
-    await expect.poll(async () => readFile(join(target, 'copy-check.txt'), 'utf8').catch(() => '')).toBe('file transfer fixture');
+    await expect
+      .poll(async () => readFile(join(target, 'copy-check.txt'), 'utf8').catch(() => ''))
+      .toBe('file transfer fixture');
     expect(await readFile(join(source, 'copy-check.txt'), 'utf8')).toBe('file transfer fixture');
   });
 
   test('drag modifiers and destinations agree while the target pane previews another folder', async () => {
-    await expect(page.locator('[data-panel-side="left"] .file-table-name').filter({ hasText: 'drag-default.txt' })).toBeVisible();
+    await expect(
+      page.locator('[data-panel-side="left"] .file-table-name').filter({ hasText: 'drag-default.txt' }),
+    ).toBeVisible();
     await navigate('right', target);
-    await page.locator('[data-panel-side="left"] .file-table-name').filter({ hasText: 'README.md' }).dblclick();
+    await page
+      .locator('[data-panel-side="left"] .file-table-name')
+      .filter({ hasText: 'README.md' })
+      .dblclick();
     await expect(page.locator('[data-panel-side="right"] .markdown-body')).toBeVisible();
     for (const modifier of ['default', 'ctrl', 'shift']) {
       const file = join(source, `drag-${modifier}.txt`);
       const destination = join(target, `drag-${modifier}.txt`);
       const content = page.getByTestId('panel-content-right');
-      const row = page.locator('[data-panel-side="left"] .file-table-row').filter({ hasText: `drag-${modifier}.txt` });
+      const row = page
+        .locator('[data-panel-side="left"] .file-table-row')
+        .filter({ hasText: `drag-${modifier}.txt` });
       if (modifier === 'ctrl') await page.keyboard.down('Control');
       try {
         if (modifier === 'shift') {
@@ -167,7 +181,14 @@ test.describe('product usability', () => {
         await page.keyboard.up('Shift');
       }
       await expect.poll(() => readFile(destination, 'utf8').catch(() => '')).toBe(modifier);
-      await expect.poll(() => stat(file).then(() => true, () => false)).toBe(modifier !== 'shift');
+      await expect
+        .poll(() =>
+          stat(file).then(
+            () => true,
+            () => false,
+          ),
+        )
+        .toBe(modifier !== 'shift');
     }
   });
 

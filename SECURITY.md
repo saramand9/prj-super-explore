@@ -5,12 +5,12 @@
 Do not publish exploit details, credentials, private paths or sensitive logs in
 issues or pull requests.
 
-Private vulnerability reporting is not yet available for this private repository.
-Before public launch, the maintainer must configure a private reporting channel
-and verify it with an external account. Once enabled, use GitHub's
+This repository is public and GitHub private vulnerability reporting is enabled.
+Use GitHub's
 [private vulnerability reporting form](https://github.com/saramand9/prj-super-explore/security/advisories/new).
-Until then, request a private contact method from the maintainer without posting
-vulnerability details. No response-time or supported-version SLA is promised.
+It requires a GitHub account. Do not disclose details in public issues if the
+form is unavailable; ask the maintainer for a private channel instead.
+No response-time or supported-version SLA is promised.
 
 A useful private report includes the affected version, Windows version,
 reproduction steps using synthetic files, expected and actual behavior, and
@@ -27,14 +27,21 @@ External plugins execute trusted local code with application-level capabilities.
 They are not sandboxed and have no permission-isolation guarantee. Only install
 plugins whose source and origin you trust.
 
-Markdown previews are sanitized, but sanitization does not replace a hardened
-Electron boundary. The current baseline still needs a production CSP,
-restricted preload channels, runtime IPC/sender validation, navigation controls
-and review of explicitly disabled renderer sandboxing. Do not treat this policy
-as a claim that those controls have already been implemented.
+The source enables sandboxing, context isolation and web security, and explicitly
+disables renderer Node.js integration. A bundled CommonJS preload exposes fixed
+request/event functions, not arbitrary IPC invocation. Main-process handlers
+validate request schemas and accept only the owned window's trusted main frame.
+Production CSP blocks inline scripts, embedded frames, remote connections and
+objects. Popups, foreign navigation, webviews and permission requests are denied.
 
-Runtime and build-tool dependencies need security updates before a new public
-binary release. See the dated, scoped findings in
+Trusted external plugins still execute Blob modules with application-level file
+capabilities. CSP therefore permits Blob scripts/workers and inline CSS needed
+by the UI, but not inline JavaScript or unsafe-eval. This is hardening, not a
+claim that trusted plugins are isolated or that every attack has been ruled out.
+
+Electron and DOMPurify are updated in the hardened source. Other runtime/build
+dependency advisories still require triage before a new public binary release.
+See the dated, scoped findings in
 [the readiness review](docs/maintainers/open-source-readiness.md). An advisory
 match is not itself proof that a specific Explore workflow is exploitable.
 

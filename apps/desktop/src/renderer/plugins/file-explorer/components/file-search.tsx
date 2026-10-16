@@ -6,7 +6,10 @@ import { TaskWarnings } from '../../../components/task-warnings';
 import { getIpcErrorMessage, ipc } from '../../../framework/bridge/ipc-client';
 import { useLayoutStore } from '../../../framework/store/layout-store';
 import { useFileStore } from '../store';
-import { previewSearchResult, type SearchResultHighlight } from '../../fulltext-search/utils/preview-search-result';
+import {
+  previewSearchResult,
+  type SearchResultHighlight,
+} from '../../fulltext-search/utils/preview-search-result';
 
 type SearchMode = 'files' | 'content';
 
@@ -211,30 +214,33 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
   );
 
   // 切换模式时清空结果
-  const handleModeSwitch = useCallback((newMode: SearchMode) => {
-    if (contentTimerRef.current) clearTimeout(contentTimerRef.current);
-    contentTimerRef.current = null;
-    setMode(newMode);
-    setSelectedIdx(0);
-    if (newMode === 'files') {
-      contentSearchSeqRef.current += 1;
-      ipc.invoke('search:cancel', { searchId: contentSearchIdRef.current }).catch(() => {});
-      setContentResults([]);
-      setContentError(null);
-      setContentSearching(false);
-      doFileSearch(query);
-    } else {
-      setResults([]);
-      if (query) {
-        if (contentTimerRef.current) clearTimeout(contentTimerRef.current);
-        contentTimerRef.current = setTimeout(() => {
-          doContentSearch(query);
-        }, 300);
+  const handleModeSwitch = useCallback(
+    (newMode: SearchMode) => {
+      if (contentTimerRef.current) clearTimeout(contentTimerRef.current);
+      contentTimerRef.current = null;
+      setMode(newMode);
+      setSelectedIdx(0);
+      if (newMode === 'files') {
+        contentSearchSeqRef.current += 1;
+        ipc.invoke('search:cancel', { searchId: contentSearchIdRef.current }).catch(() => {});
+        setContentResults([]);
+        setContentError(null);
+        setContentSearching(false);
+        doFileSearch(query);
+      } else {
+        setResults([]);
+        if (query) {
+          if (contentTimerRef.current) clearTimeout(contentTimerRef.current);
+          contentTimerRef.current = setTimeout(() => {
+            doContentSearch(query);
+          }, 300);
+        }
       }
-    }
-    // 切模式后重新聚焦
-    setTimeout(() => inputRef.current?.focus(), 0);
-  }, [query, doFileSearch, doContentSearch]);
+      // 切模式后重新聚焦
+      setTimeout(() => inputRef.current?.focus(), 0);
+    },
+    [query, doFileSearch, doContentSearch],
+  );
 
   // Cancel pending work when the popup closes, even though its component stays mounted.
   useEffect(() => {
@@ -264,19 +270,13 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
   }, [contentResults]);
 
   // 内容结果扁平化（用于键盘导航）
-  const flatContentResults = useMemo(
-    () => contentResults,
-    [contentResults],
-  );
+  const flatContentResults = useMemo(() => contentResults, [contentResults]);
 
   // ── 键盘导航 ──
   const totalItems = mode === 'files' ? results.length : flatContentResults.length;
 
   const revealAndOpenFile = useCallback(
-    async (
-      filePath: string,
-      highlight?: SearchResultHighlight,
-    ) => {
+    async (filePath: string, highlight?: SearchResultHighlight) => {
       setOpenError(null);
       try {
         const dir = parentDir(filePath);
@@ -346,7 +346,18 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
         handleModeSwitch(mode === 'files' ? 'content' : 'files');
       }
     },
-    [results, flatContentResults, selectedIdx, mode, totalItems, query, revealAndOpenFile, openDirectoryResult, handleModeSwitch, onClose],
+    [
+      results,
+      flatContentResults,
+      selectedIdx,
+      mode,
+      totalItems,
+      query,
+      revealAndOpenFile,
+      openDirectoryResult,
+      handleModeSwitch,
+      onClose,
+    ],
   );
 
   // 选中项自动滚入视野
@@ -365,10 +376,7 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
   const searchDir = useLayoutStore.getState().layout[side].path || '';
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-start justify-center pt-[20vh]"
-      onClick={onClose}
-      >
+    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[20vh]" onClick={onClose}>
       <div
         className="bg-surface-light border border-border rounded-lg shadow-2xl w-[880px] max-w-[92vw] max-h-[70vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
@@ -428,10 +436,7 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
         </div>
 
         {/* ── 搜索结果 ── */}
-        <div
-          ref={resultsContainerRef}
-          className="max-h-[calc(70vh-104px)] overflow-auto py-1"
-        >
+        <div ref={resultsContainerRef} className="max-h-[calc(70vh-104px)] overflow-auto py-1">
           {openError && (
             <div role="alert" className="px-3 py-2 text-red-400 text-xs whitespace-pre-wrap break-words">
               {openError}
@@ -439,48 +444,69 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
           )}
           {/* Files 模式 loading */}
           {mode === 'files' && building && (
-            <div data-testid="scan-progress" className="px-3 py-2 text-text-muted text-xs flex items-center justify-between">
+            <div
+              data-testid="scan-progress"
+              className="px-3 py-2 text-text-muted text-xs flex items-center justify-between"
+            >
               <span>正在扫描，已索引 {scan.count} 项</span>
-              <button className="text-accent" onClick={scan.stop}>停止扫描</button>
+              <button className="text-accent" onClick={scan.stop}>
+                停止扫描
+              </button>
             </div>
           )}
           {mode === 'files' && !building && (
-            <div data-testid="scan-status" className="px-3 py-2 text-text-muted text-xs flex items-center justify-between">
-              <span>{scan.summary?.cancelled ? '已停止扫描，保留已索引内容' : `已索引 ${scan.count} 项`}{scan.summary?.truncated && '，已达扫描上限，请缩小范围'}</span>
-              <button className="text-accent" onClick={scan.retry}>重新扫描</button>
+            <div
+              data-testid="scan-status"
+              className="px-3 py-2 text-text-muted text-xs flex items-center justify-between"
+            >
+              <span>
+                {scan.summary?.cancelled ? '已停止扫描，保留已索引内容' : `已索引 ${scan.count} 项`}
+                {scan.summary?.truncated && '，已达扫描上限，请缩小范围'}
+              </span>
+              <button className="text-accent" onClick={scan.retry}>
+                重新扫描
+              </button>
             </div>
           )}
           {mode === 'files' && <TaskWarnings warnings={scan.summary?.warnings ?? []} />}
 
           {mode === 'files' && fileError && (
-            <div className="px-3 py-2 text-red-400 text-xs whitespace-pre-wrap break-words">
-              {fileError}
-            </div>
+            <div className="px-3 py-2 text-red-400 text-xs whitespace-pre-wrap break-words">{fileError}</div>
           )}
 
           {/* Content 模式 loading */}
           {mode === 'content' && contentSearching && (
             <div className="px-3 py-2 text-text-muted text-xs flex items-center justify-between">
               <span>正在搜索，已找到 {contentResults.length} 个匹配</span>
-              <button className="text-accent" onClick={stopContentSearch}>停止搜索</button>
+              <button className="text-accent" onClick={stopContentSearch}>
+                停止搜索
+              </button>
             </div>
           )}
           {mode === 'content' && <TaskWarnings warnings={contentWarnings} />}
-          {mode === 'content' && contentStopped && <div className="px-3 py-2 text-text-muted text-xs">已停止搜索，保留已找到的结果</div>}
+          {mode === 'content' && contentStopped && (
+            <div className="px-3 py-2 text-text-muted text-xs">已停止搜索，保留已找到的结果</div>
+          )}
 
           {mode === 'content' && contentError && (
-            <div className="px-3 py-2 text-red-400 text-xs break-words">
-              {contentError}
-            </div>
+            <div className="px-3 py-2 text-red-400 text-xs break-words">{contentError}</div>
           )}
 
           {/* 无结果 */}
-          {mode === 'files' && !building && !fileError && !scan.summary?.cancelled && query && results.length === 0 && (
-            <div className="px-3 py-2 text-text-muted text-xs">未找到文件</div>
-          )}
-          {mode === 'content' && !contentSearching && !contentError && !contentStopped && query && flatContentResults.length === 0 && (
-            <div className="px-3 py-2 text-text-muted text-xs">未找到内容匹配</div>
-          )}
+          {mode === 'files' &&
+            !building &&
+            !fileError &&
+            !scan.summary?.cancelled &&
+            query &&
+            results.length === 0 && <div className="px-3 py-2 text-text-muted text-xs">未找到文件</div>}
+          {mode === 'content' &&
+            !contentSearching &&
+            !contentError &&
+            !contentStopped &&
+            query &&
+            flatContentResults.length === 0 && (
+              <div className="px-3 py-2 text-text-muted text-xs">未找到内容匹配</div>
+            )}
 
           {/* ── Files 结果列表 ── */}
           {mode === 'files' &&
@@ -504,10 +530,17 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
                   onMouseEnter={() => setSelectedIdx(idx)}
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    {entry.isDirectory ? <Folder className="w-4 h-4 flex-shrink-0" /> : <FileText className="w-4 h-4 flex-shrink-0" />}
+                    {entry.isDirectory ? (
+                      <Folder className="w-4 h-4 flex-shrink-0" />
+                    ) : (
+                      <FileText className="w-4 h-4 flex-shrink-0" />
+                    )}
                     <span className="truncate min-w-0 font-medium">{highlightMatch(entry.name, query)}</span>
                   </div>
-                  <div className="mt-0.5 pl-6 text-text-muted text-xs leading-snug break-all whitespace-normal" title={entry.path}>
+                  <div
+                    className="mt-0.5 pl-6 text-text-muted text-xs leading-snug break-all whitespace-normal"
+                    title={entry.path}
+                  >
                     {entry.path}
                   </div>
                 </div>
@@ -526,7 +559,10 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
                       {group.fileName}
                     </span>
                   </div>
-                  <div className="mt-0.5 pl-5 text-text-muted leading-snug break-all whitespace-normal" title={group.filePath}>
+                  <div
+                    className="mt-0.5 pl-5 text-text-muted leading-snug break-all whitespace-normal"
+                    title={group.filePath}
+                  >
                     {group.filePath}
                   </div>
                 </div>
@@ -556,9 +592,7 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
                       <span className="text-text-muted/50 flex-shrink-0 text-right w-8 tabular-nums">
                         {match.lineNumber}
                       </span>
-                      <span className="truncate">
-                        {highlightMatch(match.lineContent, query, false)}
-                      </span>
+                      <span className="truncate">{highlightMatch(match.lineContent, query, false)}</span>
                     </div>
                   );
                 })}
@@ -569,7 +603,11 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
         {/* ── Footer ── */}
         <div className="px-3 py-2 border-t border-border/40 text-xs text-text-muted flex flex-wrap gap-x-3 gap-y-1">
           <span>↑↓ 切换</span>
-          <span>{mode === 'content' ? `↵ 定位文件并在${side === 'left' ? '右侧' : '左侧'}预览` : '↵ 打开文件夹 / 定位并打开文件'}</span>
+          <span>
+            {mode === 'content'
+              ? `↵ 定位文件并在${side === 'left' ? '右侧' : '左侧'}预览`
+              : '↵ 打开文件夹 / 定位并打开文件'}
+          </span>
           <span>Tab 切换搜索方式</span>
           <span>Esc 关闭</span>
           {mode === 'content' && (

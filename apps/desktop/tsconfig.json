@@ -12,5 +12,5 @@
       "@/*": ["./src/renderer/*"]
     }
   },
-  "include": ["src/renderer/**/*", "src/main/**/*"]
+  "include": ["src/**/*", "tests/**/*", "*.ts"]
 }

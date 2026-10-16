@@ -1,0 +1,33 @@
+# Changelog
+
+## Unreleased
+
+### Security
+
+- Upgrade Electron to 44.8.0 and DOMPurify to 3.4.17.
+- Enable renderer sandboxing, context isolation and web security; disable Node integration.
+- Replace the generic preload IPC bridge with fixed request and event capabilities.
+- Validate all request payloads and restrict IPC to owned windows and trusted main frames.
+- Block foreign navigation, popups, embedded frames, webviews and permission requests.
+- Add production CSP while preserving explicitly trusted local plugin Blob modules.
+- Validate plugin IDs and canonical paths; require confirmation before installation.
+
+### Development and releases
+
+- Add pinned Biome lint/format tooling and a one-time formatting baseline.
+- Include preload, tests and tool configurations in strict type checks.
+- Add negative security regression tests and release-version validation.
+- Add a tag-triggered, tested Windows installer workflow that creates drafts only.
+- Fix Windows packaging to run the desktop build script, not pnpm's source-tarball command.
+- Bundle the project license and third-party inventory with the application.
+- Synchronize public-repository, private-reporting and protected-branch documentation.
+
+These source changes have not yet been distributed in a new public installer.
+
+## 1.0.1 - 2026-10-16
+
+- Existing unsigned Windows x64 installer distributed from the maintainer's download host.
+- Includes dual-pane browsing, workspaces, pinyin filename search, previews and full-text search.
+
+The existing binary predates the Unreleased changes. This entry does not imply
+that a GitHub Release or a new installer has been published retroactively.

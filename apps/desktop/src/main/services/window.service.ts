@@ -6,6 +6,10 @@ import { is } from '@electron-toolkit/utils';
 import type { Service } from '../service-container';
 import { CloseCoordinator } from './close-coordinator';
 import type { DiagnosticsService } from './diagnostics.service';
+import type { IpcMainInvokeEvent } from 'electron';
+import { pathToFileURL } from 'node:url';
+import { isTrustedRendererUrl } from '../security/renderer-policy';
+import { secureWindow } from '../security/window-security';
 
 function getAppIconPath(): string | undefined {
   const iconPath = join(__dirname, '../../build/icons/prism_app.ico');
@@ -30,25 +34,36 @@ export class WindowService implements Service {
       backgroundColor: '#1a1a2e',
       autoHideMenuBar: true,
       webPreferences: {
-        preload: join(__dirname, '../preload/index.mjs'),
-        sandbox: false,
+        preload: join(__dirname, '../preload/index.cjs'),
+        sandbox: true,
+        nodeIntegration: false,
+        contextIsolation: true,
+        webSecurity: true,
+        webviewTag: false,
       },
     });
 
     const window = this.mainWindow;
+    secureWindow(window, this.rendererEntry);
     const coordinator = new CloseCoordinator({
       requestSave: (requestId) => window.webContents.send('window:beforeClose', { requestId }),
       cancelSave: (requestId) => {
         this.diagnostics?.log('close-timeout', 'Window did not finish saving within 8 seconds');
         if (!window.isDestroyed()) window.webContents.send('window:closeCancelled', { requestId });
       },
-      close: () => { if (!window.isDestroyed()) window.close(); },
+      close: () => {
+        if (!window.isDestroyed()) window.close();
+      },
       askTimeout: async () => {
         const result = await dialog.showMessageBox(window, {
-          type: 'warning', title: '保存仍未完成',
+          type: 'warning',
+          title: '保存仍未完成',
           message: '窗口保存超时，可能正在等待磁盘或窗口响应。',
           detail: '可以返回窗口或重新等待保存。不保存退出可能丢失本次未保存的更改。',
-          buttons: ['返回窗口', '重新等待保存', '不保存并退出'], defaultId: 0, cancelId: 0, noLink: true,
+          buttons: ['返回窗口', '重新等待保存', '不保存并退出'],
+          defaultId: 0,
+          cancelId: 0,
+          noLink: true,
         });
         return result.response === 1 ? 'retry' : result.response === 2 ? 'discard' : 'cancel';
       },
@@ -76,11 +91,8 @@ export class WindowService implements Service {
     });
 
     this.mainWindow.on('app-command', (event, command) => {
-      const action = command === 'browser-backward'
-        ? 'back'
-        : command === 'browser-forward'
-          ? 'forward'
-          : null;
+      const action =
+        command === 'browser-backward' ? 'back' : command === 'browser-forward' ? 'forward' : null;
       if (!action) return;
 
       event.preventDefault();
@@ -97,15 +109,26 @@ export class WindowService implements Service {
       recoveryPending = true;
       try {
         const result = await dialog.showMessageBox(window, {
-          type: 'error', title: '窗口无法正常显示', message,
+          type: 'error',
+          title: '窗口无法正常显示',
+          message,
           detail: '重新加载会恢复已保存的工作空间，未保存的界面状态可能丢失。',
-          buttons: ['重新加载', '关闭窗口'], defaultId: 0, cancelId: 1, noLink: true,
+          buttons: ['重新加载', '关闭窗口'],
+          defaultId: 0,
+          cancelId: 1,
+          noLink: true,
         });
         if (window.isDestroyed()) return;
         if (result.response === 0) window.webContents.reload();
-        else { guard.ready = false; window.close(); }
-      } catch (error) { this.diagnostics?.log('window-recovery', error); }
-      finally { recoveryPending = false; }
+        else {
+          guard.ready = false;
+          window.close();
+        }
+      } catch (error) {
+        this.diagnostics?.log('window-recovery', error);
+      } finally {
+        recoveryPending = false;
+      }
     };
     this.mainWindow.webContents.on('render-process-gone', (_event, details) => {
       void recover(`界面进程已退出（${details.reason}）`);
@@ -113,7 +136,9 @@ export class WindowService implements Service {
     this.mainWindow.webContents.on('did-fail-load', (_event, code, description, _url, isMainFrame) => {
       if (isMainFrame && code !== -3) void recover(`界面加载失败：${description}`);
     });
-    this.mainWindow.on('unresponsive', () => this.diagnostics?.log('window-unresponsive', 'Renderer is not responding'));
+    this.mainWindow.on('unresponsive', () =>
+      this.diagnostics?.log('window-unresponsive', 'Renderer is not responding'),
+    );
     if (is.dev) {
       this.mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
         console.log(`[renderer:${level}] ${message} (${sourceId}:${line})`);
@@ -141,8 +166,7 @@ export class WindowService implements Service {
       return this.launcherWindow;
     }
 
-    const { width: screenWidth, height: screenHeight } =
-      screen.getPrimaryDisplay().workAreaSize;
+    const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
 
     const winWidth = 680;
     const winHeight = 420;
@@ -160,11 +184,16 @@ export class WindowService implements Service {
       show: false,
       icon: getAppIconPath(),
       webPreferences: {
-        preload: join(__dirname, '../preload/index.mjs'),
-        sandbox: false,
+        preload: join(__dirname, '../preload/index.cjs'),
+        sandbox: true,
+        nodeIntegration: false,
+        contextIsolation: true,
+        webSecurity: true,
+        webviewTag: false,
       },
     });
 
+    secureWindow(this.launcherWindow, this.rendererEntry);
     this.launcherWindow.on('blur', () => {
       this.hideLauncher();
     });
@@ -210,12 +239,32 @@ export class WindowService implements Service {
     return this.mainWindow;
   }
 
+  private get rendererEntry(): string {
+    return is.dev && process.env.ELECTRON_RENDERER_URL
+      ? process.env.ELECTRON_RENDERER_URL
+      : pathToFileURL(join(__dirname, '../renderer/index.html')).href;
+  }
+
+  isTrustedSender(event: IpcMainInvokeEvent): boolean {
+    const owner = [this.mainWindow, this.launcherWindow].find(
+      (window) => window && !window.isDestroyed() && window.webContents === event.sender,
+    );
+    return (
+      !!owner &&
+      !event.sender.isDestroyed() &&
+      event.senderFrame === event.sender.mainFrame &&
+      !!event.senderFrame &&
+      isTrustedRendererUrl(event.senderFrame.url, this.rendererEntry)
+    );
+  }
+
   readyForClose(senderId: number): void {
     if (this.closeGuard?.window.webContents.id === senderId) this.closeGuard.ready = true;
   }
 
   closePending(senderId: number, requestId: number): void {
-    if (this.closeGuard?.window.webContents.id === senderId) this.closeGuard.coordinator.userIsDeciding(requestId);
+    if (this.closeGuard?.window.webContents.id === senderId)
+      this.closeGuard.coordinator.userIsDeciding(requestId);
   }
 
   resolveClose(senderId: number, allow: boolean, requestId: number): void {
