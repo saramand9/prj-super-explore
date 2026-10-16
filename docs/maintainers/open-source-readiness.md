@@ -7,10 +7,11 @@ test, legal opinion or signed-binary release certification.
 
 ## Publication gates: maintainer decisions
 
-- **Choose and approve a license.** No project license exists in the baseline.
-  Confirm the copyright holder and permission to license contributions, including
-  any work created in an employment context. Do not change GitHub visibility or
-  claim an MIT/Apache grant before that decision.
+- **License selected: MIT.** The maintainer approved MIT on October 17, 2026.
+  [LICENSE](../../LICENSE) and all three package manifests now record that choice.
+  Before publication, still confirm copyright ownership and permission to license
+  contributions, including work created in an employment context. Selecting MIT
+  does not resolve third-party asset rights or authorize a visibility change.
 - **Resolve raster-asset provenance.** The Prism-named icon collection and
   installer icon do not have documented source/license permission. See
   [the asset inventory](../../THIRD_PARTY_NOTICES.md).
@@ -137,8 +138,9 @@ only synthetic files. Old local recordings are not part of the publication.
 - [x] Run Electron end-to-end checks: the first run passed 25/26 with a drag
   modifier timeout; the focused retry passed, followed by a full 26/26 pass.
   Retain the initial failure as an intermittent-test observation.
-- [ ] Confirm the selected project license, author/employer rights and visual
-  asset provenance.
+- [x] Adopt the maintainer-selected MIT License and synchronize package metadata
+  and contributor documentation.
+- [ ] Confirm author/employer rights and visual asset provenance.
 - [ ] Resolve dependency and Electron-hardening findings before promoting a new
   public binary.
 - [ ] Run hosted Windows checks and clean-machine installer/upgrade/uninstall

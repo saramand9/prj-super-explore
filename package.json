@@ -2,6 +2,7 @@
   "name": "explore",
   "private": true,
   "version": "1.0.1",
+  "license": "MIT",
   "description": "A Windows file manager with dual-pane browsing, workspaces, pinyin search and previews.",
   "repository": {
     "type": "git",

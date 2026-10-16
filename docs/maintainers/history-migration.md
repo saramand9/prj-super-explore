@@ -29,8 +29,8 @@ that depend on old IDs; evaluate downstream consumers before publication.
 
 ## Before replacing the remote
 
-1. Complete the license, ownership, privacy and asset-provenance decisions in
-   [the readiness review](open-source-readiness.md).
+1. MIT has been selected. Complete the remaining ownership, privacy and
+   asset-provenance decisions in [the readiness review](open-source-readiness.md).
 2. Coordinate with every collaborator and pause pushes temporarily. Preserve
    their uncommitted work and unpublished branches separately.
 3. Verify the recovery bundle and map, then inspect `git log master` and run
@@ -62,5 +62,6 @@ retain the old checkout and use the commit map to identify the equivalent base;
 reapply only their own changes on the new history. Do not prescribe a destructive
 reset or delete their old checkout before their work is recovered.
 
-The visibility change, remote force-with-lease, author-email remapping and
-project license grant were not performed automatically by this preparation.
+The MIT License was adopted at the maintainer's explicit request. The visibility
+change, remote force-with-lease and author-email remapping were not performed
+automatically by this preparation.

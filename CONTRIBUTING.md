@@ -6,10 +6,11 @@ reports, tests and documentation improvements are welcome.
 ## Before contributing
 
 Read the [README](README.md), [security policy](SECURITY.md) and
-[code of conduct](CODE_OF_CONDUCT.md). The project is preparing for a public
-launch; the maintainer must approve a license before external contributions
-can be accepted under that license. Do not assume a license grant from the
-repository being visible.
+[code of conduct](CODE_OF_CONDUCT.md). Contributions of original code and
+documentation are made under the project's [MIT License](LICENSE). Submit only
+work you have permission to contribute, including any required employer approval.
+Identify third-party material and include its source, license and required
+notices; do not assume the project license overrides upstream terms.
 
 For substantial features, open an issue first to discuss the problem and scope.
 Search existing issues before starting duplicate work. Use English for commit

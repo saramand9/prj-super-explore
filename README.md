@@ -14,8 +14,8 @@ losing your place.
 The current interface is primarily Chinese; this README and contributor-facing
 guides are in English.*
 
-> Public launch is in preparation. A project license has not yet been approved.
-> Visibility alone is not a license grant. See [License](#license) and the
+> Explore's original code and documentation are licensed under the MIT License.
+> Public launch is still in preparation. See [License](#license) and the
 > [maintainer readiness review](docs/maintainers/open-source-readiness.md).
 
 ## Why Explore?
@@ -159,14 +159,18 @@ paths before sharing them. Do not report vulnerabilities publicly; follow
 Commit subjects and bodies use English
 [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 See [CONTRIBUTING.md](CONTRIBUTING.md) for local checks, the optional commit hook,
-pull request expectations and the license approval gate.
+pull request expectations and MIT contribution terms.
 
 ## License
 
-**License selection is pending maintainer approval.** No MIT, Apache-2.0 or
-other project-wide license is implied by this README. Before public launch,
-the maintainer must add the chosen license, confirm contributor/employer rights,
-and resolve the provenance of bundled visual assets.
+Explore's original code and documentation are licensed under the
+[MIT License](LICENSE). Keep the copyright and permission notice when
+redistributing copies or substantial portions of the software.
+
+Bundled raster icons with unresolved provenance are excluded from this MIT
+license representation until their rights are verified. Before public launch,
+the maintainer must still confirm contributor/employer rights and resolve or
+replace those assets.
 
 Third-party packages and bundled components retain their own licenses. See
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). This notice is not a substitute

@@ -1,8 +1,9 @@
 # Third-party notices and asset provenance
 
 This is an attribution inventory, not a substitute for upstream license texts or
-a claim that binary redistribution obligations are complete. The project-wide
-license is pending maintainer approval.
+a claim that binary redistribution obligations are complete. Explore's original
+code and documentation use the [MIT License](LICENSE); third-party components
+retain their own licenses and are not relicensed by that choice.
 
 ## Direct runtime components
 
@@ -43,11 +44,13 @@ The repository includes raster icons under
 `apps/desktop/build/icons/`. Their original authorship, source and redistribution
 permission are not documented in the baseline. The maintainer must establish
 that provenance, or replace the assets with originals or appropriately licensed
-alternatives, before granting a project-wide license over them.
+alternatives, before including them in the project's MIT license grant. These
+unverified raster assets are excluded from the MIT license representation;
+their presence is not a grant of redistribution permission.
 
 `docs/assets/dual-pane.webp` is a privacy-reviewed screenshot of Explore using
 synthetic files in a dedicated demo directory. It is not evidence of third-party
 icon ownership and does not resolve the asset-provenance question above.
 
-Do not claim that every asset is MIT/Apache-licensed simply because a project
-license is later selected.
+Do not claim that every asset is MIT-licensed simply because the project's
+original code uses MIT. Preserve each third-party asset's applicable terms.
