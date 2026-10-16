@@ -2,6 +2,15 @@
   "name": "explore",
   "private": true,
   "version": "1.0.1",
+  "description": "A Windows file manager with dual-pane browsing, workspaces, pinyin search and previews.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saramand9/prj-super-explore.git"
+  },
+  "homepage": "https://github.com/saramand9/prj-super-explore#readme",
+  "bugs": {
+    "url": "https://github.com/saramand9/prj-super-explore/issues"
+  },
   "packageManager": "pnpm@10.31.0",
   "scripts": {
     "dev": "pnpm --filter @explore/desktop dev",

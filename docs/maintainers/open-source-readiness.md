@@ -94,6 +94,9 @@ before release and triage paths, affected features and available fixes.
 - Local caches, recordings and unrelated deployment experiments are ignored,
   not deleted or added to the public source.
 - The stale npm lockfile is removed; pnpm remains the sole package manager.
+- English package descriptions and root repository/homepage/issue metadata are
+  provided. Workspace `private: true` flags intentionally prevent accidental npm
+  publication; they do not control GitHub visibility or a source license.
 
 The root `lint`/`format` scripts still reference missing Biome tooling. This is
 an explicit remaining development-experience issue; no passing lint claim is
@@ -124,8 +127,16 @@ only synthetic files. Old local recordings are not part of the publication.
 
 - [x] Baseline TypeScript checks, 118 unit tests, application build and bundled
   search verification pass locally.
-- [ ] Run final commit-policy and documentation-link checks against the rewritten
-  branch, and verify the old-to-new graph/content mapping.
+- [x] Verify all 108 old-to-new commit pairs (106 original plus two preparation
+  commits), preserve author/committer metadata and parent order, and confirm
+  zero application-blob changes. Only the documented personal-path example
+  replacement is allowed in historical content.
+- [x] Validate English commit policy, all 11 English documents' local links,
+  Git object integrity and the unchanged application source tree. Subsequent
+  preparation commits are validated independently by the same commit policy.
+- [x] Run Electron end-to-end checks: the first run passed 25/26 with a drag
+  modifier timeout; the focused retry passed, followed by a full 26/26 pass.
+  Retain the initial failure as an intermittent-test observation.
 - [ ] Confirm the selected project license, author/employer rights and visual
   asset provenance.
 - [ ] Resolve dependency and Electron-hardening findings before promoting a new
@@ -140,6 +151,34 @@ only synthetic files. Old local recordings are not part of the publication.
   approved, branch-scoped force-with-lease only after rechecking the remote tip.
 - [ ] Change visibility and enable repository/community security settings only
   after approval. No public visibility change was performed by this preparation.
+
+### Local packaging verification limit
+
+The default `pnpm test:package` attempt did not complete because it needed to
+download Electron. A retry using the already installed Electron 33.4.11 then
+failed to extract the Windows resource-editing/signing helper: this Windows
+account could not create its archive's symlinks, and later retries also hit
+GitHub download timeouts. No system privileges or global Windows settings were
+changed to hide that limitation.
+
+A separate directory-package smoke check succeeded with explicit local-only
+overrides:
+
+```powershell
+pnpm --filter @explore/desktop exec electron-builder --win --x64 --dir --config.electronDist=node_modules/electron/dist --config.win.signAndEditExecutable=false
+pnpm --filter @explore/desktop exec node scripts/verify-search.mjs --packaged
+pnpm --filter @explore/desktop exec playwright test -c playwright.package.config.ts
+```
+
+The packaged search verifier and one packaged-app smoke test passed: the actual
+Windows executable launched, searched without development tools and saved on
+close. This deliberately skips signature/resource editing and is not equivalent
+to a clean-machine NSIS install/upgrade/uninstall or a passing default packaging
+pipeline. Do not publish these local verification artifacts as a new release.
+
+The local history publication procedure and collaborator recovery steps are
+documented in [history migration](history-migration.md). The remote master remains
+unchanged until explicit approval for a coordinated force-with-lease replacement.
 
 See [GitHub's open-source launch guidance](https://opensource.guide/starting-a-project/)
 and [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) for

@@ -1,6 +1,7 @@
 {
   "name": "@explore/desktop",
   "version": "1.0.1",
+  "description": "Explore for Windows: dual-pane file browsing, workspaces, search and previews.",
   "author": {
     "name": "大脚工作室"
   },

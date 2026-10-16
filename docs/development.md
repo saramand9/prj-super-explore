@@ -56,6 +56,12 @@ uninstallation, search without development tools, read-only directories,
 disconnected shares and large-directory checks. Current packaging does not
 configure code signing or automatic update publication.
 
+On Windows, the resource-editing/signing helper can fail while extracting
+symlinks if the account lacks the required permissions. Repeated GitHub helper
+downloads can also fail independently of the application build. Resolve the
+environment and retry the standard pipeline; a locally overridden unsigned
+directory build is useful for a smoke check but is not a release certification.
+
 ## Benchmarks
 
 `pnpm benchmark:scan` creates and cleans up 10,000- and 100,000-file fixtures in
