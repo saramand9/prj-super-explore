@@ -13,6 +13,42 @@ const baselineUrl =
   'https://dl.10yyds.cloud/explore/releases/1.0.1/windows-x64/Explore-Setup-1.0.1-windows-x64.exe';
 const baselineHash = '18b358ecbe9e52d14b54258b67caef345e04e441782d78a6c5df66def8258e49';
 
+async function downloadBaseline(): Promise<Buffer> {
+  const size = 85572961;
+  const chunkSize = 1024 * 1024;
+  const output = Buffer.alloc(size);
+  let next = 0;
+  // The original host serves large single responses slowly. Bounded ranges
+  // retain HTTPS, exact Content-Range checks and the full-file SHA-256 pin.
+  console.log('Downloading pinned 1.0.1 baseline with at most 8 concurrent ranges');
+  await Promise.all(
+    Array.from({ length: 8 }, async () => {
+      for (;;) {
+        const start = next;
+        next += chunkSize;
+        if (start >= size) return;
+        const end = Math.min(start + chunkSize, size) - 1;
+        const response = await fetch(baselineUrl, {
+          headers: { Range: `bytes=${start}-${end}` },
+          signal: AbortSignal.timeout(30000),
+        });
+        if (
+          response.status !== 206 ||
+          response.headers.get('content-range') !== `bytes ${start}-${end}/${size}`
+        ) {
+          throw new Error(`Unexpected baseline range response: HTTP ${response.status}`);
+        }
+        const chunk = Buffer.from(await response.arrayBuffer());
+        if (chunk.length !== end - start + 1) throw new Error('Truncated baseline range');
+        chunk.copy(output, start);
+      }
+    }),
+  );
+  expect(createHash('sha256').update(output).digest('hex')).toBe(baselineHash);
+  console.log('Baseline SHA-256 verified');
+  return output;
+}
+
 async function runInstaller(executable: string, args: string[]): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const process = spawn(executable, args, { windowsHide: true, timeout: 120000, stdio: 'ignore' });
@@ -51,10 +87,7 @@ test('installs 1.0.1, upgrades with data preserved, launches securely and uninst
   const config = join(profile, 'config');
   let application: ElectronApplication | undefined;
   try {
-    const response = await fetch(baselineUrl, { signal: AbortSignal.timeout(120000) });
-    if (!response.ok) throw new Error(`Baseline installer download failed: HTTP ${response.status}`);
-    const baseline = Buffer.from(await response.arrayBuffer());
-    expect(createHash('sha256').update(baseline).digest('hex')).toBe(baselineHash);
+    const baseline = await downloadBaseline();
     const oldInstaller = join(root, 'baseline-1.0.1.exe');
     await writeFile(oldInstaller, baseline);
     await mkdir(config, { recursive: true });
@@ -73,6 +106,7 @@ test('installs 1.0.1, upgrades with data preserved, launches securely and uninst
       ]),
     );
 
+    console.log('Installing baseline 1.0.1 in the disposable profile');
     await runInstaller(oldInstaller, ['/S', `/D=${directory}`]);
     await expect.poll(() => existsSync(executable), { timeout: 30000 }).toBe(true);
     application = await launchInstalled(executable, profile);
@@ -83,6 +117,7 @@ test('installs 1.0.1, upgrades with data preserved, launches securely and uninst
     await closeTestApp(application);
     application = undefined;
 
+    console.log(`Upgrading to ${version}`);
     await runInstaller(installer, ['/S', `/D=${directory}`]);
     application = await launchInstalled(executable, profile);
     expect(await application.evaluate(({ app }) => app.getVersion())).toBe(version);
@@ -116,6 +151,7 @@ test('installs 1.0.1, upgrades with data preserved, launches securely and uninst
     expect(existsSync(join(directory, 'LICENSES.chromium.html'))).toBe(true);
     await closeTestApp(application);
     application = undefined;
+    console.log('Verifying uninstall and retained external fixture data');
     await runInstaller(uninstaller, ['/S']);
     await expect.poll(() => existsSync(executable), { timeout: 30000 }).toBe(false);
     expect(JSON.parse(await readFile(join(config, 'config.json'), 'utf8')).theme).toBe('linear');
