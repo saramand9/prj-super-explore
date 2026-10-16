@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { PassThrough } from 'stream';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { spawn } from 'child_process';
 import { SearchService } from '../../src/main/services/search.service';
 
@@ -16,8 +16,10 @@ const spawnMock = vi.mocked(spawn);
 describe('SearchService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.RG_PATH = process.execPath;
+    vi.stubEnv('RG_PATH', process.execPath);
   });
+
+  afterEach(() => vi.unstubAllEnvs());
 
   it('parses ripgrep JSON matches from Chinese and space paths', async () => {
     mockRipgrep({
@@ -56,6 +58,7 @@ describe('SearchService', () => {
 
     const [, args] = spawnMock.mock.calls[0];
     expect(args).toEqual(expect.arrayContaining([
+      '--fixed-strings',
       '--max-count',
       '12',
       '--max-filesize',
@@ -125,6 +128,24 @@ describe('SearchService', () => {
     }
   });
 
+  it('returns readable matches with a warning when other files are inaccessible', async () => {
+    mockRipgrep({ code: 2, stdoutLines: [rgMatch('D:/repo/readable.txt', 1, 'needle', 0, 6, 'needle')], stderr: 'rg: D:/repo/locked.txt: permission denied' });
+    const progress = vi.fn();
+    const result = await createService().run('D:/repo', 'needle', 'partial', undefined, progress);
+    expect(result.matches).toHaveLength(1);
+    expect(result.warnings[0]).toContain('locked.txt');
+    expect(progress).toHaveBeenCalledWith([expect.objectContaining({ fileName: 'readable.txt' })], 1);
+  });
+
+  it('retains already found matches when a streaming search is cancelled', async () => {
+    const proc = mockHangingRipgrep();
+    const service = createService();
+    const pending = service.run('D:/repo', 'needle', 'partial-cancel');
+    proc.stdout.write(rgMatch('D:/repo/one.txt', 1, 'needle', 0, 6, 'needle') + '\n');
+    service.cancel('partial-cancel');
+    expect(await pending).toMatchObject({ cancelled: true, matches: [expect.objectContaining({ fileName: 'one.txt' })] });
+  });
+
   it('cancels older searches with the same search id', async () => {
     const first = mockHangingRipgrep();
     mockRipgrep({
@@ -140,6 +161,49 @@ describe('SearchService', () => {
     await expect(oldSearch).resolves.toEqual([]);
     await expect(newSearch).resolves.toHaveLength(1);
     expect(first.kill).toHaveBeenCalled();
+  });
+
+  it('enforces a global limit across files without waiting for process exit', async () => {
+    const proc = mockHangingRipgrep();
+    const promise = createService().fulltext('D:/repo', 'needle', 'limited', { maxResults: 2 });
+    proc.stdout.write([
+      rgMatch('D:/repo/one.txt', 1, 'needle\n', 0, 6, 'needle'),
+      rgMatch('D:/repo/two.txt', 1, 'needle\n', 0, 6, 'needle'),
+      rgMatch('D:/repo/three.txt', 1, 'needle\n', 0, 6, 'needle'),
+    ].join('\n') + '\n');
+    await expect(promise).resolves.toHaveLength(2);
+    expect(proc.kill).toHaveBeenCalledOnce();
+    proc.close(null as any);
+  });
+
+  it('preserves Chinese text split across chunks and converts byte columns', async () => {
+    const proc = mockHangingRipgrep();
+    const promise = createService().fulltext('D:/repo', 'needle', 'unicode');
+    const data = Buffer.from(rgMatch('D:/repo/中文.txt', 1, '中文 needle\n', 7, 13, 'needle'));
+    const split = data.indexOf(Buffer.from('中')) + 1;
+    proc.stdout.write(data.subarray(0, split));
+    proc.stdout.write(data.subarray(split));
+    proc.close(0);
+    await expect(promise).resolves.toEqual([expect.objectContaining({
+      fileName: '中文.txt', lineContent: '中文 needle', columnStart: 4, columnEnd: 10,
+    })]);
+  });
+
+  it('settles cancellation even if the process has not closed', async () => {
+    const proc = mockHangingRipgrep();
+    const service = createService();
+    const promise = service.fulltext('D:/repo', 'needle', 'cancel-now');
+    service.cancel('cancel-now');
+    await expect(promise).resolves.toEqual([]);
+    expect(proc.kill).toHaveBeenCalledOnce();
+    proc.close(0);
+  });
+
+  it('does not start a process for an empty query or zero limit', async () => {
+    const service = createService();
+    await expect(service.fulltext('D:/repo', '', 'empty')).resolves.toEqual([]);
+    await expect(service.fulltext('D:/repo', 'needle', 'zero', { maxResults: 0 })).resolves.toEqual([]);
+    expect(spawnMock).not.toHaveBeenCalled();
   });
 });
 

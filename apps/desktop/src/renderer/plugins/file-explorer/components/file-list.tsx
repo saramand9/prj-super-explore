@@ -14,6 +14,7 @@ import {
   summarizeFileOpToast,
 } from '../utils/file-op-result';
 import type { FileConflictStrategy, FileOpResult } from '@explore/shared';
+import { getFileDropEffect } from '../utils/file-drag';
 
 interface FileListProps {
   side: 'left' | 'right';
@@ -323,8 +324,9 @@ export function FileList({ side }: FileListProps) {
     const newName = await showPrompt('新名称：', contextMenu.single.name);
     if (!newName || newName === contextMenu.single.name) { closeMenu(); return; }
     try {
-      await ipc.invoke('file:rename', { path: contextMenu.single.path, newName });
-      refresh(side);
+      const result = await ipc.invoke('file:rename', { path: contextMenu.single.path, newName });
+      if (!result.success) throw new Error(result.error || '重命名失败');
+      await refresh(side);
     } catch (err: any) {
       await showAlert(`重命名失败：${err.message}`, 'error');
     }
@@ -335,9 +337,17 @@ export function FileList({ side }: FileListProps) {
     mode: 'copy' | 'move',
     paths: string[],
   ) => {
+    if (paths.length === 0) return;
+    if (useLayoutStore.getState().layout.mode !== 'dual') {
+      await showAlert('请先启用双栏，并在另一侧打开目标文件夹。');
+      return;
+    }
     const other = side === 'left' ? 'right' : 'left';
-    const dest = useLayoutStore.getState().layout[other].path;
-    if (!dest || paths.length === 0) return;
+    const dest = useFileStore.getState()[other].path;
+    if (!dest) {
+      await showAlert(`请先在${other === 'left' ? '左' : '右'}侧打开目标文件夹。`);
+      return;
+    }
     try {
       const conflictStrategy = await chooseConflictStrategy(paths, dest);
       if (!conflictStrategy) return;
@@ -350,6 +360,7 @@ export function FileList({ side }: FileListProps) {
       await reportFileOperationResult(isCopy ? 'Copy' : 'Move', result);
       refresh(side);
       useFileStore.getState().refresh(other);
+      return result;
     } catch (err: any) {
       await showAlert(`${mode === 'copy' ? '复制' : '移动'}失败：${err.message}`, 'error');
     }
@@ -562,8 +573,8 @@ export function FileList({ side }: FileListProps) {
 
   const navigateToPath = useCallback(
     async (newPath: string) => {
-      await navigateTo(side, newPath);
       syncToLayout(newPath);
+      await navigateTo(side, newPath);
     },
     [side, navigateTo, syncToLayout],
   );
@@ -718,6 +729,7 @@ export function FileList({ side }: FileListProps) {
 
   const handleRowDrop = useCallback(
     async (entry: FileEntry, _idx: number, e: React.DragEvent) => {
+      setDragOverPath(null);
       const data = e.dataTransfer.getData('application/x-explore-files');
       if (!data) return;
       const sources: string[] = JSON.parse(data);
@@ -732,7 +744,7 @@ export function FileList({ side }: FileListProps) {
       // 拖到自己子目录 -> 阻止
       if (sources.some((s) => entry.path.startsWith(s + '\\') || entry.path.startsWith(s + '/'))) return;
 
-      const isMove = e.ctrlKey || e.metaKey;
+      const isMove = getFileDropEffect(e) === 'move';
       try {
         const conflictStrategy = await chooseConflictStrategy(sources, entry.path);
         if (!conflictStrategy) return;
@@ -767,6 +779,7 @@ export function FileList({ side }: FileListProps) {
       // 仅在活跃面板处理键盘事件
       const layout = useLayoutStore.getState().layout;
       if (layout.id !== side) return;
+      if (e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
 
       // 忽略在 input 内的输入
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -987,52 +1000,11 @@ export function FileList({ side }: FileListProps) {
           }
           break;
 
-        case 'F5': {
-          const targetSide = side === 'left' ? 'right' : 'left';
-          const targetPath = useLayoutStore.getState().layout[targetSide].path;
-          if (targetPath && state.selected.size > 0) {
-            const conflictStrategy = await chooseConflictStrategy([...state.selected], targetPath);
-            if (!conflictStrategy) break;
-            const result = await runFileOperation(
-              'file:copy',
-              {
-                sources: [...state.selected],
-                destDir: targetPath,
-                conflictStrategy,
-              },
-              '正在复制...',
-            );
-            await reportFileOperationResult('Copy', result);
-            if (result.success) {
-              clearSelection(side);
-              refresh(side);
-              useFileStore.getState().refresh(targetSide);
-            }
-          }
-          break;
-        }
+        case 'F5':
         case 'F6': {
-          const targetSide = side === 'left' ? 'right' : 'left';
-          const targetPath = useLayoutStore.getState().layout[targetSide].path;
-          if (targetPath && state.selected.size > 0) {
-            const conflictStrategy = await chooseConflictStrategy([...state.selected], targetPath);
-            if (!conflictStrategy) break;
-            const result = await runFileOperation(
-              'file:move',
-              {
-                sources: [...state.selected],
-                destDir: targetPath,
-                conflictStrategy,
-              },
-              '正在移动...',
-            );
-            await reportFileOperationResult('Move', result);
-            if (result.success) {
-              clearSelection(side);
-              refresh(side);
-              useFileStore.getState().refresh(targetSide);
-            }
-          }
+          e.preventDefault();
+          const result = await transferToOtherSide(e.key === 'F5' ? 'copy' : 'move', [...state.selected]);
+          if (result?.success) clearSelection(side);
           break;
         }
         case 'F7': {
@@ -1065,7 +1037,7 @@ export function FileList({ side }: FileListProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [side, filterText, path, entries, setFilter, clearSelection, selectAll, selectSingle, selectSingleAtIndex, selectRangeToIndex, navigateToPath, navigateTo, refresh, handleOpenFolder, chooseConflictStrategy, showAlert, runFileOperation, deletePaths, reportFileOperationResult, pinTab, unpinTab, repinTab]);
+  }, [side, filterText, path, entries, setFilter, clearSelection, selectAll, selectSingle, selectSingleAtIndex, selectRangeToIndex, navigateToPath, navigateTo, refresh, handleOpenFolder, showAlert, deletePaths, transferToOtherSide, pinTab, unpinTab, repinTab]);
 
   // 键盘操作后禁 hover，鼠标移动恢复
   useEffect(() => {
@@ -1104,7 +1076,8 @@ export function FileList({ side }: FileListProps) {
 
   // ── 渲染 ──
 
-  if (loading) {
+  // Refreshing or sorting keeps the table mounted, preserving keyboard focus.
+  if (loading && entries.length === 0) {
     return (
       <div className="h-full flex items-center justify-center text-text-muted">
         正在加载...
@@ -1174,18 +1147,26 @@ export function FileList({ side }: FileListProps) {
 
   if (!path) {
     return (
-      <div className="h-full flex items-center justify-center text-text-muted text-sm">
-        <div className="text-center">
+      <div className="h-full flex items-center justify-center px-6 text-sm">
+        <div className="max-w-[20rem] text-center">
           <div className="mx-auto mb-3 flex h-9 w-9 items-center justify-center rounded bg-accent/10 text-accent">
             <FolderOpen className="h-5 w-5" />
           </div>
+          <div className="mb-2 font-medium text-text-primary">
+            {side === 'left' ? '打开工作文件夹' : '在右侧并排工作'}
+          </div>
+          <p className="mb-5 text-xs leading-relaxed text-text-secondary">
+            {side === 'left'
+              ? '浏览项目文件，在另一侧预览内容或整理文件。'
+              : '打开目标文件夹，方便在两侧复制、移动文件；也可以用这里预览左侧文件。'}
+          </p>
           <button
             className="px-3 py-1.5 bg-accent/20 hover:bg-accent/40 text-text-primary rounded text-xs transition-colors"
             onClick={handleOpenFolder}
           >
             打开文件夹
           </button>
-          <div className="mt-2 text-xs text-text-muted">或按 Ctrl+O</div>
+          <div className="mt-3 text-xs text-text-secondary">或按 Ctrl+O</div>
         </div>
       </div>
     );
@@ -1193,7 +1174,7 @@ export function FileList({ side }: FileListProps) {
 
   return (<>
     <div className="relative h-full">
-      <div ref={containerRef} className={`h-full overflow-auto ${selected.size > 0 && selectionActionsVisible ? 'pb-10' : ''}`} onContextMenu={(e) => {
+      <div ref={containerRef} className={`file-table h-full overflow-auto ${selected.size > 0 && selectionActionsVisible ? 'pb-10' : ''}`} onContextMenu={(e) => {
         if (e.target === containerRef.current || (e.target as HTMLElement).classList.contains('relative')) {
           e.preventDefault();
           setContextMenu({ x: e.clientX, y: e.clientY, count: 0 });
@@ -1248,16 +1229,26 @@ export function FileList({ side }: FileListProps) {
         </div>
 
         {entries.length === 0 && !loading && (
-          <div className="text-center text-text-muted mt-8">
-            {filterText ? '未找到匹配' : '空文件夹'}
+          <div className="mx-auto mt-8 max-w-[24rem] px-6 text-center text-sm">
+            <div className="text-text-primary">{filterText ? '未找到匹配' : '空文件夹'}</div>
+            <div className="mt-2 text-xs leading-relaxed text-text-secondary">
+              {filterText ? '试试更短的名称，或清除筛选查看全部文件。' : '从另一侧拖入可复制文件，按住 Shift 拖动可移动。'}
+            </div>
+            {filterText && (
+              <button className="mt-3 rounded px-3 py-1.5 text-xs text-accent hover:bg-accent/10" onClick={() => setFilter(side, '')}>
+                清除筛选
+              </button>
+            )}
           </div>
         )}
       </div>
 
       {selected.size > 0 && selectionActionsVisible && (
-        <div className="absolute bottom-2 left-2 right-2 z-20 flex h-8 items-center gap-2 rounded border border-border/60 bg-surface-light/95 px-2 text-xs shadow-lg">
-          <span className="text-text-primary font-medium">{selected.size} 项已选中</span>
-          <span className="text-text-muted">已准备传输</span>
+        <div
+          data-testid="selection-action-bar"
+          className="selection-action-bar absolute bottom-2 left-2 right-2 z-20 flex h-8 items-center gap-2 rounded border border-border-strong px-2 text-xs shadow-lg"
+        >
+          <span className="whitespace-nowrap text-text-primary font-medium">{selected.size} 项已选中</span>
           <span className="flex-1" />
           <button
             className="inline-flex items-center gap-1 rounded px-2 py-1 text-text-secondary hover:bg-accent/15 hover:text-text-primary transition-colors"
@@ -1287,7 +1278,7 @@ export function FileList({ side }: FileListProps) {
     {/* 内联输入框（代替 prompt()） */}
     {inlinePrompt && (
       <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50" onClick={() => { inlinePrompt.resolve(null); setInlinePrompt(null); }}>
-        <div className="bg-surface-light border border-border rounded-lg shadow-2xl p-4 min-w-[320px]" onClick={(e) => e.stopPropagation()}>
+        <div role="dialog" aria-modal="true" aria-label={inlinePrompt.message} className="bg-surface-light border border-border rounded-lg shadow-2xl p-4 min-w-[320px]" onClick={(e) => e.stopPropagation()}>
           <div className="text-sm text-text-primary mb-3">{inlinePrompt.message}</div>
           <input
             autoFocus
@@ -1507,10 +1498,10 @@ function getConflictChoiceButtonClass(
 // ── 列头排序 ──
 
 const SORT_COLS: { key: import('@explore/shared').SortKey; label: string; className: string }[] = [
-  { key: 'name', label: '名称', className: 'flex-1 ml-1' },
-  { key: 'extension', label: '类型', className: 'w-24 text-left ml-2' },
-  { key: 'size', label: '大小', className: 'w-20 text-right ml-2' },
-  { key: 'modifiedAt', label: '修改时间', className: 'w-36 text-right ml-2' },
+  { key: 'name', label: '名称', className: 'file-table-name text-left' },
+  { key: 'extension', label: '类型', className: 'file-table-type text-left' },
+  { key: 'size', label: '大小', className: 'file-table-size text-right' },
+  { key: 'modifiedAt', label: '修改时间', className: 'file-table-date text-right' },
 ];
 
 function SortHeader({ side }: { side: 'left' | 'right' }) {
@@ -1518,23 +1509,28 @@ function SortHeader({ side }: { side: 'left' | 'right' }) {
   const setSort = useFileStore((s) => s.setSort);
 
   return (
-    <div className="sticky top-0 z-10 flex items-center h-7 px-2 border-b border-border/30 bg-surface text-xs text-text-muted select-none">
-      <span className="w-5 flex-shrink-0" />
+    <div className="file-table-columns sticky top-0 z-10 items-center h-7 px-2 border-b border-border/30 bg-surface text-xs text-text-secondary select-none">
+      <span />
       {SORT_COLS.map((col) => {
         const active = sort.key === col.key;
         return (
-          <span
+          <button
             key={col.key}
-            className={`${col.className} cursor-pointer hover:text-text-primary transition-colors ${
+            type="button"
+            title={`按${col.label}${active && sort.direction === 'asc' ? '降序' : '升序'}排序`}
+            className={`${col.className} min-w-0 whitespace-nowrap cursor-pointer hover:text-text-primary transition-colors ${
               active ? 'text-text-primary font-medium' : ''
             }`}
             onClick={() => setSort(side, col.key)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') event.stopPropagation();
+            }}
           >
             {col.label}
             {active && (
               <span className="ml-0.5">{sort.direction === 'asc' ? '▲' : '▼'}</span>
             )}
-          </span>
+          </button>
         );
       })}
     </div>

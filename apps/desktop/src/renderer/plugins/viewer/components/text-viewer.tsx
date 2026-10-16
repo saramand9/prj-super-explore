@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import DOMPurify from 'dompurify';
 import { marked } from 'marked';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Eye, Code2, ScrollText } from 'lucide-react';
@@ -164,10 +165,14 @@ export function TextViewer({ side }: { side: 'left' | 'right' }) {
 
   useEffect(() => {
     if (!isSearchHighlightForFile || !searchHighlight || sourceLines.length === 0) return;
-    const lineIdx = Math.max(0, Math.min(searchHighlight.lineNumber - 1, sourceLines.length - 1));
-    setActiveLine(lineIdx);
     setTailMode(false);
     setPreview(false);
+    const lineIdx = Math.max(0, searchHighlight.lineNumber - 1);
+    if (lineIdx >= sourceLines.length) {
+      setActiveLine(null);
+      return;
+    }
+    setActiveLine(lineIdx);
     requestAnimationFrame(() => {
       virtualizer.scrollToIndex(lineIdx, { align: 'center' });
     });
@@ -183,7 +188,7 @@ export function TextViewer({ side }: { side: 'left' | 'right' }) {
       const el = containerRef.current;
       if (el) el.scrollTop = el.scrollHeight;
     });
-  }, [content, isSearchHighlightForFile]);
+  }, [content, isSearchHighlightForFile, tailMode]);
 
   // 手动滚动时关掉 tail 模式
   const handleScroll = useCallback(() => {
@@ -196,7 +201,12 @@ export function TextViewer({ side }: { side: 'left' | 'right' }) {
   const previewHtml = useMemo(() => {
     if (!content) return '';
     try {
-      return marked.parse(content) as string;
+      const html = marked.parse(content) as string;
+      return DOMPurify.sanitize(html, {
+        USE_PROFILES: { html: true },
+        FORBID_TAGS: ['style', 'form', 'button', 'textarea', 'select', 'option'],
+        FORBID_ATTR: ['style', 'autofocus', 'formaction'],
+      });
     } catch {
       return escapeHtml(content);
     }
@@ -210,7 +220,7 @@ export function TextViewer({ side }: { side: 'left' | 'right' }) {
   if (!filePath) {
     return (
       <div className="h-full flex items-center justify-center text-text-muted text-sm">
-        No file selected
+        选择文件后在此预览
       </div>
     );
   }
@@ -218,7 +228,7 @@ export function TextViewer({ side }: { side: 'left' | 'right' }) {
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center text-text-muted text-sm">
-        Loading...
+        正在加载文件…
       </div>
     );
   }
@@ -240,6 +250,8 @@ export function TextViewer({ side }: { side: 'left' | 'right' }) {
         <div className="flex-shrink-0 flex items-center justify-between gap-3 border-b border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
           <span className="min-w-0 truncate">
             文件较大，仅加载前 {formatBytes(readInfo.bytesRead)} / {formatBytes(readInfo.size)}。
+            {isSearchHighlightForFile && searchHighlight && searchHighlight.lineNumber > sourceLines.length &&
+              ` 搜索匹配位于第 ${searchHighlight.lineNumber} 行，请继续加载。`}
           </span>
           {readInfo.canContinue && (
             <button
@@ -256,42 +268,55 @@ export function TextViewer({ side }: { side: 'left' | 'right' }) {
           {watchError}
         </div>
       )}
+      <div className="flex-shrink-0 flex items-center justify-between gap-2 px-3 py-1.5 border-b border-border bg-surface-light">
+        <span className="min-w-0 truncate text-xs text-text-secondary" title={filePath}>
+          {isSearchHighlightForFile && searchHighlight
+            ? `搜索匹配 · 第 ${searchHighlight.lineNumber} 行`
+            : filePath.split(/[/\\]/).pop()}
+        </span>
+        <div className="flex flex-shrink-0 gap-1">
+          <button
+            className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+              tailMode
+                ? 'bg-accent/40 text-white'
+                : 'bg-surface-light/90 text-text-muted hover:text-text-primary border border-border/30'
+            }`}
+            onClick={() => {
+              useViewerStore.getState().setSearchHighlight(side, null);
+              setTailMode((v) => !v);
+            }}
+            aria-pressed={tailMode}
+            title={tailMode ? '已开启：内容更新时自动滚动到末尾' : '开启后，内容更新时自动滚动到末尾'}
+          >
+            <ScrollText className="w-3.5 h-3.5" /> 跟随末尾
+          </button>
+          {isMarkdown && (
+            <button
+              className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                showPreview
+                  ? 'bg-accent/40 text-white'
+                  : 'bg-surface-light/90 text-text-muted hover:text-text-primary border border-border/30'
+              }`}
+              onClick={() => {
+                useViewerStore.getState().setSearchHighlight(side, null);
+                setPreview(!showPreview);
+              }}
+              title={showPreview ? '查看 Markdown 源码' : '查看 Markdown 排版预览'}
+            >
+              {showPreview ? (
+                <><Code2 className="w-3.5 h-3.5" /> 源码</>
+              ) : (
+                <><Eye className="w-3.5 h-3.5" /> 排版预览</>
+              )}
+            </button>
+          )}
+        </div>
+      </div>
       <div
         ref={containerRef}
         className="flex-1 overflow-auto relative"
         onScroll={handleScroll}
       >
-        {/* Tail + Markdown toggle — floating */}
-        <div className="absolute top-2 right-2 z-10 flex gap-1">
-          <button
-            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] transition-colors shadow-md ${
-              tailMode
-                ? 'bg-accent/40 text-white'
-                : 'bg-surface-light/90 text-text-muted hover:text-text-primary border border-border/30'
-            }`}
-            onClick={() => { setTailMode((v) => !v); }}
-            title={tailMode ? 'Tail mode on — auto-scroll' : 'Tail mode off'}
-          >
-            <ScrollText className="w-3 h-3" /> Tail
-          </button>
-          {isMarkdown && (
-            <button
-              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] transition-colors shadow-md ${
-                showPreview
-                  ? 'bg-accent/40 text-white'
-                  : 'bg-surface-light/90 text-text-muted hover:text-text-primary border border-border/30'
-              }`}
-              onClick={() => setPreview((v) => !v)}
-              title={showPreview ? 'Show source' : 'Show preview'}
-            >
-              {showPreview ? (
-                <><Code2 className="w-3 h-3" /> Source</>
-              ) : (
-                <><Eye className="w-3 h-3" /> Preview</>
-              )}
-            </button>
-          )}
-        </div>
         {showPreview ? (
           <div
             className="p-6 text-sm text-text-primary select-text leading-relaxed markdown-body"
@@ -389,7 +414,7 @@ function CsvTable({ rows }: { rows: string[][] }) {
       </table>
       {data.length === 0 && (
         <div className="p-6 text-center text-text-muted text-sm">
-          Empty CSV (header only)
+          CSV 仅有表头，暂无数据
         </div>
       )}
     </div>

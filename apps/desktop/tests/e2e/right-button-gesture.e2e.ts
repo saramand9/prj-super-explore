@@ -1,10 +1,8 @@
-import { test, expect, _electron as electron, type ElectronApplication, type Page } from '@playwright/test';
-import { mkdir, rm, writeFile } from 'fs/promises';
-import { join, resolve, dirname } from 'path';
+import { test, expect, type ElectronApplication, type Page } from '@playwright/test';
+import { launchTestApp, removeTestFixture } from '../helpers/electron-app';
+import { mkdir, writeFile } from 'fs/promises';
+import { join } from 'path';
 import { tmpdir } from 'os';
-import { fileURLToPath } from 'url';
-
-const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 test.describe('right button navigation gesture', () => {
   let fixtureRoot: string;
@@ -15,18 +13,7 @@ test.describe('right button navigation gesture', () => {
     fixtureRoot = join(tmpdir(), `explore-gesture-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     await createFixture(fixtureRoot);
 
-    electronApp = await electron.launch({
-      args: [appRoot],
-      cwd: appRoot,
-      env: {
-        ...process.env,
-        HOME: fixtureRoot,
-        USERPROFILE: fixtureRoot,
-        APPDATA: join(fixtureRoot, 'AppData', 'Roaming'),
-        LOCALAPPDATA: join(fixtureRoot, 'AppData', 'Local'),
-        ELECTRON_DISABLE_SECURITY_WARNINGS: 'true',
-      },
-    });
+    electronApp = await launchTestApp(fixtureRoot);
     page = await electronApp.firstWindow();
     await page.waitForLoadState('domcontentloaded');
     await navigateLeftPanelToFixture(page, fixtureRoot);
@@ -34,7 +21,7 @@ test.describe('right button navigation gesture', () => {
 
   test.afterEach(async () => {
     await electronApp?.close();
-    await rm(fixtureRoot, { recursive: true, force: true });
+    await removeTestFixture(fixtureRoot);
   });
 
   test('right-button horizontal swipes navigate backward and forward', async () => {
@@ -72,12 +59,18 @@ test.describe('right button navigation gesture', () => {
 
     await expect(page.getByText('在另一侧打开', { exact: true })).toBeVisible();
   });
+
   test('selection action bar is delayed and suppressed during double click navigation', async () => {
     await expect(page.getByText('root.txt', { exact: true })).toBeVisible({ timeout: 15000 });
 
     await page.getByText('root.txt', { exact: true }).click();
     await expect(page.getByText(/项已选中/)).toHaveCount(0);
     await expect(page.getByText('1 项已选中', { exact: true })).toBeVisible({ timeout: 1000 });
+    const actionBarBackground = await page.getByTestId('selection-action-bar').evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    );
+    expect(actionBarBackground).not.toBe('rgba(0, 0, 0, 0)');
+    expect(actionBarBackground).not.toBe('transparent');
 
     await page.locator('[title="清除选择"]').click();
     await expect(page.getByText(/项已选中/)).toHaveCount(0);
@@ -191,7 +184,7 @@ async function rightButtonSwipe(
 }
 
 async function navigateLeftPanelToFixture(page: Page, targetPath: string): Promise<void> {
-  await page.locator('[title="Click to edit path"]').first().click();
+  await page.getByTestId('edit-path-left').click();
   const pathInput = page.locator('input[spellcheck="false"]').first();
   await expect(pathInput).toBeVisible();
   await pathInput.fill(targetPath);

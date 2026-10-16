@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react';
+import { ArrowRightLeft, Copy, FolderOpen, FolderPlus, Trash2 } from 'lucide-react';
 import { useLayoutStore, useActivePanel } from '../framework/layout';
 import { useFileStore } from '../plugins/file-explorer/store';
+import { SpaceDropdown } from '../plugins/file-explorer/components/space-dropdown';
 import { ipc } from '../framework/bridge/ipc-client';
 import { appDialog } from '../framework/dialogs/app-dialog';
 import { showNotification } from '../framework/plugin-system';
@@ -50,11 +52,13 @@ export function Toolbar() {
     if (result) {
       useFileStore.getState().addTab(activeSide, result);
       useFileStore.getState().navigateTo(activeSide, result, true);
+      useLayoutStore.getState().setPanelPlugin(activeSide, 'file-explorer', 'browser');
       useLayoutStore.getState().setPanelPath(activeSide, result);
     }
   }, [activeSide]);
 
   const handleNewFolder = useCallback(async () => {
+    if (useLayoutStore.getState().layout[activeSide].pluginId !== 'file-explorer') return;
     const currentPath = useFileStore.getState()[activeSide].path;
     if (!currentPath) return;
     const name = await showPrompt('文件夹名称：', '新建文件夹');
@@ -68,9 +72,11 @@ export function Toolbar() {
   }, [activeSide, showPrompt]);
 
   const handleCopy = useCallback(async () => {
+    const layout = useLayoutStore.getState().layout;
+    if (layout.mode !== 'dual' || layout[activeSide].pluginId !== 'file-explorer') return;
     const state = useFileStore.getState()[activeSide];
     const targetSide = activeSide === 'left' ? 'right' : 'left';
-    const targetPath = useLayoutStore.getState().layout[targetSide].path;
+    const targetPath = useFileStore.getState()[targetSide].path;
     if (targetPath && state.selected.size > 0) {
       const sources = [...state.selected];
       const conflictStrategy = await resolveCopyConflictStrategyWithChoice(
@@ -99,9 +105,11 @@ export function Toolbar() {
   }, [activeSide, reportFileOperationResult]);
 
   const handleMove = useCallback(async () => {
+    const layout = useLayoutStore.getState().layout;
+    if (layout.mode !== 'dual' || layout[activeSide].pluginId !== 'file-explorer') return;
     const state = useFileStore.getState()[activeSide];
     const targetSide = activeSide === 'left' ? 'right' : 'left';
-    const targetPath = useLayoutStore.getState().layout[targetSide].path;
+    const targetPath = useFileStore.getState()[targetSide].path;
     if (targetPath && state.selected.size > 0) {
       const sources = [...state.selected];
       const conflictStrategy = await resolveCopyConflictStrategyWithChoice(
@@ -130,6 +138,7 @@ export function Toolbar() {
   }, [activeSide, reportFileOperationResult]);
 
   const handleDelete = useCallback(async () => {
+    if (useLayoutStore.getState().layout[activeSide].pluginId !== 'file-explorer') return;
     const state = useFileStore.getState()[activeSide];
     if (state.selected.size === 0) return;
     const names = [...state.selected].map((p) => p.split(/[/\\]/).pop()).join(', ');
@@ -141,68 +150,79 @@ export function Toolbar() {
     }
   }, [activeSide, reportFileOperationResult]);
 
-  const handlePermanentDelete = useCallback(async () => {
-    const state = useFileStore.getState()[activeSide];
-    if (state.selected.size === 0) return;
-    const paths = [...state.selected];
-    const names = paths.map((p) => p.split(/[/\\]/).pop()).join(', ');
-    const first = await appDialog.confirm({
-      title: '永久删除',
-      message: `确定要永久删除 ${paths.length} 个项目吗？\n这些项目不会进入回收站。\n${names}`,
-    });
-    if (!first) return;
-    const second = await appDialog.confirm({
-      title: '再次确认永久删除',
-      message: '再次确认：永久删除无法从回收站恢复。是否继续？',
-    });
-    if (!second) return;
-    const result = await ipc.invoke('file:delete', { paths, permanent: true });
-    await reportFileOperationResult('PermanentDelete', result);
-    useFileStore.getState().clearSelection(activeSide);
-    useFileStore.getState().refresh(activeSide);
-  }, [activeSide, reportFileOperationResult]);
+  const selectedCount = useFileStore((s) => s[activeSide].selected.size);
+  const currentPath = useFileStore((s) => s[activeSide].path);
+  const targetSide = activeSide === 'left' ? 'right' : 'left';
+  const targetPath = useFileStore((s) => s[targetSide].path);
+  const activePlugin = useLayoutStore((s) => s.layout[activeSide].pluginId);
+  const isFilePanel = activePlugin === 'file-explorer';
+  const dualPanel = useLayoutStore((s) => s.layout.mode === 'dual');
+  const targetLabel = targetSide === 'right' ? '右侧' : '左侧';
+  const targetName = targetPath?.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || targetPath;
+  const transferDisabledReason = !isFilePanel
+    ? '请先在文件列表中选择要操作的项目'
+    : !dualPanel
+      ? '请先切换为双栏，再选择目标文件夹'
+      : !targetPath
+        ? `请先在${targetLabel}打开目标文件夹`
+        : selectedCount === 0
+          ? '请先选择文件或文件夹'
+          : null;
+  const canTransfer = !transferDisabledReason;
+  const canDelete = isFilePanel && selectedCount > 0;
 
   const btn =
-    'px-2 py-0.5 text-xs text-text-secondary hover:text-text-primary hover:bg-surface-lighter rounded transition-colors cursor-pointer flex items-center gap-1';
-  const sep = 'w-px h-4 bg-border/50 mx-0.5';
+    'inline-flex h-7 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded px-2 text-xs text-text-secondary transition-colors hover:bg-surface-lighter hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-text-secondary';
+  const sep = 'w-px h-4 bg-border/50 mx-1';
 
   return (
     <>
-    <div className="flex items-center h-8 px-2 bg-surface-light border-b border-border gap-0.5 flex-shrink-0">
-      <button className={btn} onClick={handleOpenFolder} title="Open folder (Ctrl+O)">
-        📂 Open
+    <div data-testid="global-toolbar" className="flex min-h-10 flex-shrink-0 flex-wrap items-center gap-0.5 border-b border-border bg-surface-light px-2 py-1">
+      <SpaceDropdown />
+      <span className={sep} />
+      <button className={btn} onClick={handleOpenFolder} title="打开文件夹 (Ctrl+O)">
+        <FolderOpen className="h-3.5 w-3.5" />
+        <span>打开</span>
       </button>
 
       <span className={sep} />
 
-      <button className={btn} onClick={handleCopy} title="Copy to other panel (F5)">
-        📋 Copy
+      <button className={btn} onClick={handleCopy} title={transferDisabledReason ?? `复制到${targetLabel}：${targetPath} (F5)`} disabled={!canTransfer}>
+        <Copy className="h-3.5 w-3.5" />
+        <span>复制到{targetLabel}</span>
       </button>
-      <button className={btn} onClick={handleMove} title="Move to other panel (F6)">
-        📦 Move
+      <button className={btn} onClick={handleMove} title={transferDisabledReason ?? `移动到${targetLabel}：${targetPath} (F6)`} disabled={!canTransfer}>
+        <ArrowRightLeft className="h-3.5 w-3.5" />
+        <span>移动到{targetLabel}</span>
       </button>
+      {dualPanel && (
+        <span data-testid="transfer-destination" className="hidden max-w-[150px] truncate px-1 text-xs text-text-secondary xl:block" title={targetPath ? `目标文件夹：${targetPath}` : `${targetLabel}尚未打开目标文件夹`}>
+          → {targetName ?? '未选目标文件夹'}
+        </span>
+      )}
 
       <span className={sep} />
 
-      <button className={btn} onClick={handleNewFolder} title="New folder (F7)">
-        📁 New Folder
+      <button className={btn} onClick={handleNewFolder} title="新建文件夹 (F7)" disabled={!isFilePanel || !currentPath}>
+        <FolderPlus className="h-3.5 w-3.5" />
+        <span>新建文件夹</span>
       </button>
-      <button className={btn} onClick={handleDelete} title="Delete (F8)">
-        🗑 Delete
-      </button>
-      <button className={btn} onClick={handlePermanentDelete} title="Permanent delete (Shift+F8)">
-        ⛔ Permanent
+      <button className={btn} onClick={handleDelete} title="移到回收站 (F8)" disabled={!canDelete}>
+        <Trash2 className="h-3.5 w-3.5" />
+        <span>删除</span>
       </button>
 
       <span className="flex-1" />
 
-      <button className={btn} onClick={handleOpenFolder} title="Open folder (Ctrl+O)">
-        📂
-      </button>
+      <div className="hidden max-w-[34%] truncate text-[11px] text-text-muted lg:block" title={currentPath ?? undefined}>
+        <span className="text-text-secondary">{activeSide === 'left' ? '左侧' : '右侧'}</span>
+        <span className="mx-1 text-text-muted/50">/</span>
+        {!isFilePanel ? (activePlugin === 'fulltext-search' ? '搜索中' : activePlugin === 'viewer' ? '预览中' : '工具面板') : currentPath ? (selectedCount > 0 ? `已选 ${selectedCount} 项` : '未选择') : '未打开文件夹'}
+      </div>
     </div>
     {inlinePrompt && (
       <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50" onClick={() => { inlinePrompt.resolve(null); setInlinePrompt(null); }}>
-        <div className="bg-surface-light border border-border rounded-lg shadow-2xl p-4 min-w-[320px]" onClick={(e) => e.stopPropagation()}>
+        <div role="dialog" aria-modal="true" aria-label={inlinePrompt.message} className="bg-surface-light border border-border rounded-lg shadow-2xl p-4 min-w-[320px]" onClick={(e) => e.stopPropagation()}>
           <div className="text-sm text-text-primary mb-3">{inlinePrompt.message}</div>
           <input
             autoFocus

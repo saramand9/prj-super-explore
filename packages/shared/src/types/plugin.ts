@@ -1,3 +1,5 @@
+import type { ComponentType } from 'react';
+
 // ── Plugin Manifest ──────────────────────────────
 
 export interface PluginManifest {
@@ -107,7 +109,7 @@ export interface PluginModule {
   manifest: PluginManifest;
   activate(ctx: PluginContext): Promise<void> | void;
   deactivate?(): Promise<void> | void;
-  components?: Record<string, React.ComponentType<any>>;
+  components?: Record<string, ComponentType<any>>;
   commandHandlers?: Record<string, (...args: any[]) => any>;
 }
 

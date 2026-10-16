@@ -104,6 +104,13 @@ body.anime-bg::before {
   flex-shrink: 0;
 }
 
+/* Floating controls must stay opaque even when the active theme uses glass surfaces. */
+.solid-elevated-surface,
+.selection-action-bar {
+  background-color: var(--bg-app);
+  background-image: linear-gradient(var(--bg-surface-elevated), var(--bg-surface-elevated));
+}
+
 /* ── Glass Morphism Theme ── */
 
 .theme-glass .\\!bg-surface,
@@ -468,4 +475,60 @@ body.theme-quantum::before {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
   border-radius: 4px;
+}
+
+/* File tables adapt to their panel width, including the user's font scale. */
+.file-table {
+  container: file-table / inline-size;
+  min-width: 0;
+}
+
+.file-table-columns {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr) 5.5rem 4.5rem 9.25rem;
+  column-gap: 0.5rem;
+}
+
+.file-table-size,
+.file-table-date {
+  white-space: nowrap;
+}
+
+.file-table-date-short {
+  display: none;
+}
+
+@container file-table (max-width: 42rem) {
+  .file-table-columns {
+    grid-template-columns: 1.25rem minmax(0, 1fr) 4.5rem 6rem;
+  }
+
+  .file-table-type,
+  .file-table-date-full {
+    display: none;
+  }
+
+  .file-table-date-short {
+    display: inline;
+  }
+}
+
+@container file-table (max-width: 26rem) {
+  .file-table-columns {
+    grid-template-columns: 1.25rem minmax(0, 1fr) 4.5rem;
+  }
+
+  .file-table-date {
+    display: none;
+  }
+}
+
+@container file-table (max-width: 18rem) {
+  .file-table-columns {
+    grid-template-columns: 1.25rem minmax(0, 1fr);
+  }
+
+  .file-table-size {
+    display: none;
+  }
 }

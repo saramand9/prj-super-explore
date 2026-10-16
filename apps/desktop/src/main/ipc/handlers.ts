@@ -1,4 +1,4 @@
-import { ipcMain as electronIpcMain, BrowserWindow, dialog, app } from 'electron';
+import { ipcMain as electronIpcMain, BrowserWindow, dialog, app, clipboard, shell } from 'electron';
 import { readdir, readFile, stat, mkdir, cp, open as openFileHandle } from 'fs/promises';
 import { join, basename, extname } from 'path';
 import type { IpcChannels, IpcEvents, FileEntry, IpcErrorCode, IpcErrorInfo, FileReadResult } from '@explore/shared';
@@ -9,6 +9,8 @@ import type { IndexService } from '../services/index.service';
 import type { ConfigService } from '../services/config.service';
 import type { WindowService } from '../services/window.service';
 import type { WatcherService } from '../services/watcher.service';
+import type { ScanService } from '../services/scan.service';
+import type { DiagnosticsService } from '../services/diagnostics.service';
 
 const IPC_ERROR_PREFIX = '__EXPLORE_IPC_ERROR__';
 const DEFAULT_TEXT_PREVIEW_LIMIT = 1024 * 1024;
@@ -20,6 +22,16 @@ export function registerIpcHandlers(container: ServiceContainer): void {
   const config = container.get<ConfigService>('config');
   const windowSvc = container.get<WindowService>('window');
   const watcher = container.get<WatcherService>('watcher');
+  const scan = container.get<ScanService>('scan');
+  const diagnostics = container.get<DiagnosticsService>('diagnostics');
+  const owners = new Set<number>();
+  const trackOwner = (sender: Electron.WebContents) => {
+    if (owners.has(sender.id)) return;
+    owners.add(sender.id);
+    const cancel = () => { scan.cancelOwner(sender.id); search.cancelOwner(sender.id); };
+    sender.on('did-start-loading', cancel);
+    sender.once('destroyed', () => { cancel(); owners.delete(sender.id); });
+  };
   const ipcMain = {
     handle<C extends keyof IpcChannels>(
       channel: C,
@@ -29,6 +41,7 @@ export function registerIpcHandlers(container: ServiceContainer): void {
         try {
           return await listener(event, payload);
         } catch (err) {
+          diagnostics.log(`ipc:${String(channel)}`, err);
           throw toIpcError(channel, err);
         }
       });
@@ -195,10 +208,26 @@ export function registerIpcHandlers(container: ServiceContainer): void {
 
   ipcMain.handle(
     'file:walkTree',
-    async (_e, payload: IpcChannels['file:walkTree']['req']) => {
-      return walkTree(payload.path, payload.maxDepth, new Set(payload.excludePatterns ?? []));
+    async (event, payload: IpcChannels['file:walkTree']['req']) => {
+      trackOwner(event.sender);
+      const entries: FileEntry[] = [];
+      const summary = await scan.scan(`${event.sender.id}:legacy:${Date.now()}:${Math.random()}`, payload.path, {
+        ...payload, onBatch: (batch) => entries.push(...batch),
+      });
+      if (summary.truncated) throw new Error('扫描条目过多，请缩小搜索范围');
+      return entries;
     },
   );
+  ipcMain.handle('file:scan', async (event, payload) => {
+    trackOwner(event.sender);
+    return scan.scan(`${event.sender.id}:${payload.scanId}`, payload.path, {
+      ...payload,
+      onBatch: (entries, summary) => {
+        if (!event.sender.isDestroyed()) event.sender.send('file:scanProgress', { ...summary, scanId: payload.scanId, entries });
+      },
+    });
+  });
+  ipcMain.handle('file:cancelScan', (event, payload) => scan.cancel(`${event.sender.id}:${payload.scanId}`));
 
   // ── Directory Sizes (batch, with cache) ──
 
@@ -238,8 +267,9 @@ export function registerIpcHandlers(container: ServiceContainer): void {
 
   ipcMain.handle(
     'search:fulltext',
-    (_e, payload: IpcChannels['search:fulltext']['req']) => {
-      const searchId = payload.searchId ?? `${payload.dir}:${payload.query}`;
+    (event, payload: IpcChannels['search:fulltext']['req']) => {
+      trackOwner(event.sender);
+      const searchId = `${event.sender.id}:${payload.searchId ?? `${payload.dir}:${payload.query}`}`;
       return search.fulltext(payload.dir, payload.query, searchId, {
         filePattern: payload.filePattern,
         excludePatterns: payload.excludePatterns,
@@ -251,10 +281,16 @@ export function registerIpcHandlers(container: ServiceContainer): void {
 
   ipcMain.handle(
     'search:cancel',
-    (_e, payload: IpcChannels['search:cancel']['req']) => {
-      search.cancel(payload.searchId);
+    (event, payload: IpcChannels['search:cancel']['req']) => {
+      search.cancel(`${event.sender.id}:${payload.searchId}`);
     },
   );
+  ipcMain.handle('search:run', (event, payload) => {
+    trackOwner(event.sender);
+    return search.run(payload.dir, payload.query, `${event.sender.id}:${payload.searchId}`, payload, (matches, total) => {
+      if (!event.sender.isDestroyed()) event.sender.send('search:progress', { searchId: payload.searchId, matches, total });
+    });
+  });
 
   // ── Index ──
 
@@ -326,6 +362,19 @@ export function registerIpcHandlers(container: ServiceContainer): void {
   );
 
   // ── Window ──
+
+  ipcMain.handle('window:readyForClose', (event) => windowSvc.readyForClose(event.sender.id));
+  ipcMain.handle('window:resolveClose', (event, payload) => windowSvc.resolveClose(event.sender.id, payload.allow, payload.requestId));
+  ipcMain.handle('window:closePending', (event, payload) => windowSvc.closePending(event.sender.id, payload.requestId));
+  ipcMain.handle('app:reportError', (_event, payload) => {
+    if (typeof payload?.source !== 'string' || typeof payload?.message !== 'string') return;
+    diagnostics.log(payload.source, `${payload.message.slice(0, 4000)}\n${typeof payload.stack === 'string' ? payload.stack.slice(0, 8000) : ''}`);
+  });
+  ipcMain.handle('app:copyDiagnostics', (_event, payload) => clipboard.writeText(diagnostics.snapshot(payload)));
+  ipcMain.handle('app:openLogs', async () => {
+    const error = await shell.openPath(diagnostics.logDirectory);
+    if (error) throw new Error(error);
+  });
 
   ipcMain.handle('window:toggleLauncher', () => {
     windowSvc.toggleLauncher();
@@ -476,6 +525,9 @@ export function registerIpcHandlers(container: ServiceContainer): void {
 
   // ── App ──
 
+  ipcMain.handle('settings:getAppearance', () => config.getAppearance());
+  ipcMain.handle('settings:saveAppearance', (_event, payload) => config.saveAppearance(payload));
+
   ipcMain.handle('app:getVersion', () => {
     const { app } = require('electron');
     return app.getVersion();
@@ -620,44 +672,4 @@ function userMessageFor(code: IpcErrorCode): string {
 function normalizeFsEvent(event: string): 'add' | 'remove' | 'change' {
   if (event === 'rename') return 'change';
   return event === 'change' ? 'change' : 'change';
-}
-
-async function walkTree(
-  dirPath: string,
-  maxDepth: number | undefined,
-  excludePatterns: Set<string>,
-  isRoot = true,
-): Promise<FileEntry[]> {
-  if (maxDepth !== undefined && maxDepth <= 0) return [];
-  const exclude = new Set(['node_modules', '.git', '$RECYCLE.BIN', 'System Volume Information', ...excludePatterns]);
-  const result: FileEntry[] = [];
-
-  try {
-    const names = await readdir(dirPath);
-    const tasks = names.map(async (name) => {
-      if (exclude.has(name) || name.startsWith('.')) return;
-      const fullPath = join(dirPath, name);
-      try {
-        const st = await stat(fullPath);
-        result.push({
-          name,
-          path: fullPath,
-          isDirectory: st.isDirectory(),
-          isSymlink: st.isSymbolicLink(),
-          size: st.size,
-          modifiedAt: st.mtimeMs,
-        });
-        if (st.isDirectory() && !st.isSymbolicLink()) {
-          const nextDepth = maxDepth === undefined ? undefined : maxDepth - 1;
-          const children = await walkTree(fullPath, nextDepth, excludePatterns, false);
-          result.push(...children);
-        }
-      } catch { /* skip */ }
-    });
-    await Promise.all(tasks);
-  } catch (err) {
-    if (isRoot) throw err;
-  }
-
-  return result;
 }

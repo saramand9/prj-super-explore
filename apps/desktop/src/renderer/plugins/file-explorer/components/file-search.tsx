@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { FileText, Folder, Search, X } from 'lucide-react';
 import type { FileEntry, FulltextMatch } from '@explore/shared';
-import { FileSearchIndex } from './file-search-index';
+import { useFileScan } from './use-file-scan';
+import { TaskWarnings } from '../../../components/task-warnings';
 import { getIpcErrorMessage, ipc } from '../../../framework/bridge/ipc-client';
 import { useLayoutStore } from '../../../framework/store/layout-store';
-import { pluginManager } from '../../../framework/plugin-system';
 import { useFileStore } from '../store';
-import { useViewerStore } from '../../viewer/store';
+import { previewSearchResult, type SearchResultHighlight } from '../../fulltext-search/utils/preview-search-result';
 
 type SearchMode = 'files' | 'content';
 
@@ -19,12 +20,12 @@ function buildPattern(query: string): RegExp {
   return new RegExp(glob, 'gi');
 }
 
-function highlightMatch(text: string, query: string): React.ReactNode {
+function highlightMatch(text: string, query: string, allowWildcard = true): React.ReactNode {
   if (!query) return text;
   const parts: React.ReactNode[] = [];
   let cursor = 0;
 
-  if (hasWildcard(query)) {
+  if (allowWildcard && hasWildcard(query)) {
     const regex = buildPattern(query);
     const matches = [...text.matchAll(regex)];
     for (const match of matches) {
@@ -72,12 +73,6 @@ function parentDir(filePath: string): string {
   return filePath.slice(0, idx);
 }
 
-function fileExt(filePath: string): string {
-  const name = filePath.split(/[/\\]/).pop() ?? filePath;
-  const idx = name.lastIndexOf('.');
-  return idx >= 0 ? name.slice(idx).toLowerCase() : '';
-}
-
 interface FileSearchProps {
   side: 'left' | 'right';
   open: boolean;
@@ -89,16 +84,17 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<FileEntry[]>([]);
   const [selectedIdx, setSelectedIdx] = useState(0);
-  const [building, setBuilding] = useState(false);
-  const [fileError, setFileError] = useState<string | null>(null);
+  const [openError, setOpenError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const indexRef = useRef<FileSearchIndex | null>(null);
-  const indexPathRef = useRef<string | null>(null);
+  const scan = useFileScan(open, side, setResults);
+  const { building, error: fileError } = scan;
 
   // ── Content mode state ──
   const [contentResults, setContentResults] = useState<FulltextMatch[]>([]);
   const [contentSearching, setContentSearching] = useState(false);
   const [contentError, setContentError] = useState<string | null>(null);
+  const [contentWarnings, setContentWarnings] = useState<string[]>([]);
+  const [contentStopped, setContentStopped] = useState(false);
   const contentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const contentSearchIdRef = useRef(`file-search:${side}:${Date.now()}`);
   const contentSearchSeqRef = useRef(0);
@@ -111,44 +107,18 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
     setResults([]);
     setContentResults([]);
     setContentError(null);
-    setFileError(null);
+    setOpenError(null);
+    setContentWarnings([]);
+    setContentStopped(false);
+    scan.search('');
     setSelectedIdx(0);
     setMode('files');
-    setTimeout(() => inputRef.current?.focus(), 50);
-
-    // Files 模式: 构建 Trie 索引
-    const currentPath = useLayoutStore.getState().layout[side].path;
-    if (!currentPath || currentPath === indexPathRef.current) return;
-
-    setBuilding(true);
-    const index = new FileSearchIndex();
-    indexRef.current = index;
-    indexPathRef.current = currentPath;
-
-    ipc
-      .invoke('file:walkTree', { path: currentPath })
-      .then((entries) => {
-        index.build(entries);
-        indexPathRef.current = currentPath;
-      })
-      .catch((err) => {
-        setFileError(getIpcErrorMessage(err, '文件搜索索引建立失败'));
-      })
-      .finally(() => setBuilding(false));
-  }, [open, side]);
+    const timer = setTimeout(() => inputRef.current?.focus(), 50);
+    return () => clearTimeout(timer);
+  }, [open, side, scan.search]);
 
   // ── Files 模式搜索 ──
-  const doFileSearch = useCallback(
-    (q: string) => {
-      if (!indexRef.current?.isReady || !q.trim()) {
-        setResults([]);
-        return;
-      }
-      const matches = indexRef.current.search(q, 50);
-      setResults(matches);
-    },
-    [],
-  );
+  const doFileSearch = scan.search;
 
   // ── Content 模式搜索 (ripgrep) ──
   const doContentSearch = useCallback(
@@ -170,39 +140,66 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
       }
 
       const seq = ++contentSearchSeqRef.current;
+      ipc.invoke('search:cancel', { searchId: contentSearchIdRef.current }).catch(() => {});
+      const searchId = `content:${side}:${crypto.randomUUID()}`;
+      contentSearchIdRef.current = searchId;
       setContentSearching(true);
       setContentError(null);
+      setContentResults([]);
+      setContentWarnings([]);
+      setContentStopped(false);
+      const off = ipc.on('search:progress', (progress) => {
+        if (seq !== contentSearchSeqRef.current || progress.searchId !== searchId) return;
+        setContentResults((entries) => [...entries, ...progress.matches]);
+      });
       try {
-        const matches = await ipc.invoke('search:fulltext', {
+        const result = await ipc.invoke('search:run', {
           dir,
           query: q,
-          searchId: contentSearchIdRef.current,
+          searchId,
           maxResults: 200,
         });
         if (seq !== contentSearchSeqRef.current) return;
-        setContentResults(matches);
+        setContentResults(result.matches);
+        setContentWarnings(result.warnings);
+        setContentStopped(result.cancelled);
       } catch (err: any) {
         if (seq !== contentSearchSeqRef.current) return;
-        setContentResults([]);
         setContentError(err?.message ?? '内容搜索失败');
       } finally {
+        off();
         if (seq === contentSearchSeqRef.current) setContentSearching(false);
       }
     },
     [side],
   );
 
+  const stopContentSearch = useCallback(() => {
+    contentSearchSeqRef.current++;
+    if (contentTimerRef.current) clearTimeout(contentTimerRef.current);
+    contentTimerRef.current = null;
+    void ipc.invoke('search:cancel', { searchId: contentSearchIdRef.current }).catch(() => {});
+    setContentSearching(false);
+    setContentStopped(true);
+  }, []);
+
   // ── 输入处理（含防抖） ──
   const handleInput = useCallback(
     (value: string) => {
       setQuery(value);
+      setOpenError(null);
       setSelectedIdx(0);
 
       if (mode === 'files') {
-        if (!indexRef.current?.isReady) return;
         doFileSearch(value);
       } else {
+        contentSearchSeqRef.current += 1;
+        ipc.invoke('search:cancel', { searchId: contentSearchIdRef.current }).catch(() => {});
+        setContentResults([]);
+        setContentSearching(false);
         setContentError(null);
+        setContentWarnings([]);
+        setContentStopped(false);
         // 300ms 防抖
         if (contentTimerRef.current) clearTimeout(contentTimerRef.current);
         contentTimerRef.current = setTimeout(() => {
@@ -215,6 +212,8 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
 
   // 切换模式时清空结果
   const handleModeSwitch = useCallback((newMode: SearchMode) => {
+    if (contentTimerRef.current) clearTimeout(contentTimerRef.current);
+    contentTimerRef.current = null;
     setMode(newMode);
     setSelectedIdx(0);
     if (newMode === 'files') {
@@ -223,7 +222,7 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
       setContentResults([]);
       setContentError(null);
       setContentSearching(false);
-      if (query && indexRef.current?.isReady) doFileSearch(query);
+      doFileSearch(query);
     } else {
       setResults([]);
       if (query) {
@@ -237,14 +236,16 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
     setTimeout(() => inputRef.current?.focus(), 0);
   }, [query, doFileSearch, doContentSearch]);
 
-  // 清理 timer
+  // Cancel pending work when the popup closes, even though its component stays mounted.
   useEffect(() => {
+    if (!open) setContentSearching(false);
     return () => {
       contentSearchSeqRef.current += 1;
       if (contentTimerRef.current) clearTimeout(contentTimerRef.current);
+      contentTimerRef.current = null;
       ipc.invoke('search:cancel', { searchId: contentSearchIdRef.current }).catch(() => {});
     };
-  }, []);
+  }, [open]);
 
   // ── 内容搜索结果分组 ──
   const contentGroups = useMemo(() => {
@@ -274,40 +275,26 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
   const revealAndOpenFile = useCallback(
     async (
       filePath: string,
-      highlight?: { lineNumber: number; columnStart?: number; columnEnd?: number; text: string },
+      highlight?: SearchResultHighlight,
     ) => {
-      const sourceSide = side;
-      const targetSide = sourceSide === 'left' ? 'right' : 'left';
-      const dir = parentDir(filePath);
-
-      useLayoutStore.getState().setPanelPlugin(sourceSide, 'file-explorer', 'browser');
-      await useFileStore.getState().navigateTo(sourceSide, dir);
-      useLayoutStore.getState().setPanelPath(sourceSide, dir);
-      useLayoutStore.getState().setActivePanel(sourceSide);
-      useFileStore.getState().selectSingle(sourceSide, filePath);
-
-      const handler = pluginManager.getFileHandlerForExtension(fileExt(filePath));
-      if (handler) {
-        useViewerStore.getState().setSearchHighlight(
-          targetSide,
-          highlight
-            ? {
-                filePath,
-                lineNumber: highlight.lineNumber,
-                columnStart: highlight.columnStart,
-                columnEnd: highlight.columnEnd,
-                text: highlight.text,
-              }
-            : null,
-        );
-        useLayoutStore.getState().setPanelPath(targetSide, filePath);
-        useLayoutStore.getState().setPanelPlugin(targetSide, handler.pluginId, handler.panelId);
-      } else {
-        useViewerStore.getState().setSearchHighlight(targetSide, null);
-        ipc.invoke('file:open', { path: filePath });
+      setOpenError(null);
+      try {
+        const dir = parentDir(filePath);
+        await useFileStore.getState().navigateTo(side, dir);
+        const panel = useFileStore.getState()[side];
+        if (panel.path !== dir) return;
+        if (panel.error) throw new Error(panel.error);
+        useLayoutStore.getState().setPanelPlugin(side, 'file-explorer', 'browser');
+        useLayoutStore.getState().setPanelPath(side, dir);
+        useLayoutStore.getState().setActivePanel(side);
+        useFileStore.getState().selectSingle(side, filePath);
+        await previewSearchResult(side, filePath, highlight);
+        onClose();
+      } catch (err) {
+        setOpenError(getIpcErrorMessage(err, '打开搜索结果失败'));
       }
     },
-    [side],
+    [side, onClose],
   );
 
   const openDirectoryResult = useCallback(
@@ -326,7 +313,7 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
     (e: React.KeyboardEvent) => {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setSelectedIdx((i) => Math.min(i + 1, totalItems - 1));
+        setSelectedIdx((i) => Math.max(0, Math.min(i + 1, totalItems - 1)));
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         setSelectedIdx((i) => Math.max(i - 1, 0));
@@ -338,20 +325,18 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
             if (entry.isDirectory) {
               openDirectoryResult(entry.path);
             } else {
-              revealAndOpenFile(entry.path);
-              onClose();
+              void revealAndOpenFile(entry.path);
             }
           }
         } else {
           const match = flatContentResults[selectedIdx];
           if (match) {
-            revealAndOpenFile(match.filePath, {
+            void revealAndOpenFile(match.filePath, {
               lineNumber: match.lineNumber,
               columnStart: match.columnStart,
               columnEnd: match.columnEnd,
               text: match.matchText || query,
             });
-            onClose();
           }
         }
       } else if (e.key === 'Escape') {
@@ -391,39 +376,38 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
         {/* ── 模式切换 tabs ── */}
         <div className="flex border-b border-border/40 px-3 pt-2 gap-1">
           <button
-            className={`px-3 py-1 text-xs rounded-t transition-colors ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-t transition-colors ${
               mode === 'files'
                 ? 'bg-accent/20 text-accent font-medium'
                 : 'text-text-muted hover:text-text-secondary'
             }`}
             onClick={() => handleModeSwitch('files')}
           >
-            📁 文件
+            <Folder className="w-3.5 h-3.5" /> 文件
           </button>
           <button
-            className={`px-3 py-1 text-xs rounded-t transition-colors ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-t transition-colors ${
               mode === 'content'
                 ? 'bg-accent/20 text-accent font-medium'
                 : 'text-text-muted hover:text-text-secondary'
             }`}
             onClick={() => handleModeSwitch('content')}
           >
-            🔎 内容
+            <FileText className="w-3.5 h-3.5" /> 内容
           </button>
         </div>
 
         {/* ── 输入框 ── */}
         <div className="flex items-center gap-2 px-3 py-2">
-          <span className="text-text-muted text-sm">
-            {mode === 'files' ? '🔍' : '🔎'}
-          </span>
+          <Search className="w-4 h-4 text-text-muted flex-shrink-0" />
           <input
             ref={inputRef}
+            aria-label={mode === 'files' ? '搜索文件和文件夹' : '搜索文件内容'}
             className="flex-1 bg-transparent border-none outline-none text-sm text-text-primary placeholder:text-text-muted"
             placeholder={
               mode === 'files'
                 ? building
-                  ? '正在建立索引...'
+                  ? '扫描中，也可以输入名称搜索...'
                   : '搜索文件和文件夹...'
                 : `在 ${searchDir ? searchDir.split(/[/\\]/).pop() : '...'} 中搜索文件内容`
             }
@@ -432,11 +416,15 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
             onKeyDown={handleKeyDown}
           />
           <button
+            aria-label="关闭搜索"
             className="text-text-muted hover:text-accent text-sm"
             onClick={onClose}
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
+        </div>
+        <div className="px-3 pb-2 text-xs text-text-secondary truncate" title={searchDir}>
+          范围：{searchDir || '未选择目录'}（含子文件夹）
         </div>
 
         {/* ── 搜索结果 ── */}
@@ -444,12 +432,25 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
           ref={resultsContainerRef}
           className="max-h-[calc(70vh-104px)] overflow-auto py-1"
         >
-          {/* Files 模式 loading */}
-          {mode === 'files' && building && (
-            <div className="px-3 py-2 text-text-muted text-xs animate-pulse">
-              正在建立索引...
+          {openError && (
+            <div role="alert" className="px-3 py-2 text-red-400 text-xs whitespace-pre-wrap break-words">
+              {openError}
             </div>
           )}
+          {/* Files 模式 loading */}
+          {mode === 'files' && building && (
+            <div data-testid="scan-progress" className="px-3 py-2 text-text-muted text-xs flex items-center justify-between">
+              <span>正在扫描，已索引 {scan.count} 项</span>
+              <button className="text-accent" onClick={scan.stop}>停止扫描</button>
+            </div>
+          )}
+          {mode === 'files' && !building && (
+            <div data-testid="scan-status" className="px-3 py-2 text-text-muted text-xs flex items-center justify-between">
+              <span>{scan.summary?.cancelled ? '已停止扫描，保留已索引内容' : `已索引 ${scan.count} 项`}{scan.summary?.truncated && '，已达扫描上限，请缩小范围'}</span>
+              <button className="text-accent" onClick={scan.retry}>重新扫描</button>
+            </div>
+          )}
+          {mode === 'files' && <TaskWarnings warnings={scan.summary?.warnings ?? []} />}
 
           {mode === 'files' && fileError && (
             <div className="px-3 py-2 text-red-400 text-xs whitespace-pre-wrap break-words">
@@ -459,10 +460,13 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
 
           {/* Content 模式 loading */}
           {mode === 'content' && contentSearching && (
-            <div className="px-3 py-2 text-text-muted text-xs animate-pulse">
-              正在搜索...
+            <div className="px-3 py-2 text-text-muted text-xs flex items-center justify-between">
+              <span>正在搜索，已找到 {contentResults.length} 个匹配</span>
+              <button className="text-accent" onClick={stopContentSearch}>停止搜索</button>
             </div>
           )}
+          {mode === 'content' && <TaskWarnings warnings={contentWarnings} />}
+          {mode === 'content' && contentStopped && <div className="px-3 py-2 text-text-muted text-xs">已停止搜索，保留已找到的结果</div>}
 
           {mode === 'content' && contentError && (
             <div className="px-3 py-2 text-red-400 text-xs break-words">
@@ -471,10 +475,10 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
           )}
 
           {/* 无结果 */}
-          {mode === 'files' && !building && !fileError && query && results.length === 0 && (
+          {mode === 'files' && !building && !fileError && !scan.summary?.cancelled && query && results.length === 0 && (
             <div className="px-3 py-2 text-text-muted text-xs">未找到文件</div>
           )}
-          {mode === 'content' && !contentSearching && !contentError && query && flatContentResults.length === 0 && (
+          {mode === 'content' && !contentSearching && !contentError && !contentStopped && query && flatContentResults.length === 0 && (
             <div className="px-3 py-2 text-text-muted text-xs">未找到内容匹配</div>
           )}
 
@@ -494,14 +498,13 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
                     if (entry.isDirectory) {
                       openDirectoryResult(entry.path);
                     } else {
-                      revealAndOpenFile(entry.path);
-                      onClose();
+                      void revealAndOpenFile(entry.path);
                     }
                   }}
                   onMouseEnter={() => setSelectedIdx(idx)}
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="flex-shrink-0">{entry.isDirectory ? '📁' : '📄'}</span>
+                    {entry.isDirectory ? <Folder className="w-4 h-4 flex-shrink-0" /> : <FileText className="w-4 h-4 flex-shrink-0" />}
                     <span className="truncate min-w-0 font-medium">{highlightMatch(entry.name, query)}</span>
                   </div>
                   <div className="mt-0.5 pl-6 text-text-muted text-xs leading-snug break-all whitespace-normal" title={entry.path}>
@@ -518,12 +521,12 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
                 {/* 文件头 */}
                 <div className="px-3 py-1 text-xs text-text-muted min-w-0">
                   <div className="flex items-center gap-1 min-w-0">
-                    <span className="flex-shrink-0">📄</span>
+                    <FileText className="w-3.5 h-3.5 flex-shrink-0" />
                     <span className="truncate font-medium text-text-secondary" title={group.fileName}>
                       {group.fileName}
                     </span>
                   </div>
-                  <div className="mt-0.5 pl-5 text-text-muted/50 leading-snug break-all whitespace-normal" title={group.filePath}>
+                  <div className="mt-0.5 pl-5 text-text-muted leading-snug break-all whitespace-normal" title={group.filePath}>
                     {group.filePath}
                   </div>
                 </div>
@@ -541,13 +544,12 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
                           : 'text-text-secondary hover:bg-surface-lighter'
                       }`}
                       onClick={() => {
-                        revealAndOpenFile(match.filePath, {
+                        void revealAndOpenFile(match.filePath, {
                           lineNumber: match.lineNumber,
                           columnStart: match.columnStart,
                           columnEnd: match.columnEnd,
                           text: match.matchText || query,
                         });
-                        onClose();
                       }}
                       onMouseEnter={() => setSelectedIdx(flatIdx)}
                     >
@@ -555,7 +557,7 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
                         {match.lineNumber}
                       </span>
                       <span className="truncate">
-                        {highlightMatch(match.lineContent, query)}
+                        {highlightMatch(match.lineContent, query, false)}
                       </span>
                     </div>
                   );
@@ -565,13 +567,15 @@ export function FileSearch({ side, open, onClose }: FileSearchProps) {
         </div>
 
         {/* ── Footer ── */}
-        <div className="px-2 py-1 border-t border-border/40 text-[10px] text-text-muted flex gap-3">
+        <div className="px-3 py-2 border-t border-border/40 text-xs text-text-muted flex flex-wrap gap-x-3 gap-y-1">
           <span>↑↓ 切换</span>
-          <span>↵ 打开</span>
+          <span>{mode === 'content' ? `↵ 定位文件并在${side === 'left' ? '右侧' : '左侧'}预览` : '↵ 打开文件夹 / 定位并打开文件'}</span>
+          <span>Tab 切换搜索方式</span>
           <span>Esc 关闭</span>
           {mode === 'content' && (
             <span className="text-text-muted/50">
               {flatContentResults.length} 个匹配
+              {flatContentResults.length >= 200 && '（已达上限，请缩小搜索范围）'}
             </span>
           )}
         </div>

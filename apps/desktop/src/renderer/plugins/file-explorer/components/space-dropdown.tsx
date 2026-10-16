@@ -1,187 +1,49 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
-import { Wrench, Pencil, X, ChevronDown } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { ChevronDown, Layers } from 'lucide-react';
 import { useSpaceStore } from '../space-store';
+import { getSpaceOverview } from '../utils/space-display';
+import { getWorkspaceDisplayName, WorkspaceSwitcher } from './workspace-switcher';
 
 export function SpaceDropdown() {
-  const spaces = useSpaceStore((s) => s.spaces);
-  const activeSpaceId = useSpaceStore((s) => s.activeSpaceId);
-  const switchSpace = useSpaceStore((s) => s.switchSpace);
-  const addSpace = useSpaceStore((s) => s.addSpace);
-  const removeSpace = useSpaceStore((s) => s.removeSpace);
-  const renameSpace = useSpaceStore((s) => s.renameSpace);
-
   const [open, setOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState('');
-  const [newName, setNewName] = useState('');
-  const [showNewInput, setShowNewInput] = useState(false);
-  const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const editRef = useRef<HTMLInputElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const spaces = useSpaceStore((state) => state.spaces);
+  const activeSpaceId = useSpaceStore((state) => state.activeSpaceId);
+  const activeSpace = spaces.find((space) => space.id === activeSpaceId);
+  const overview = activeSpace ? getSpaceOverview(activeSpace) : null;
 
-  const activeSpace = spaces.find((s) => s.id === activeSpaceId);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (
-        btnRef.current && !btnRef.current.contains(target) &&
-        menuRef.current && !menuRef.current.contains(target)
-      ) {
-        setOpen(false);
-      }
-    };
-    window.addEventListener('mousedown', handler);
-    return () => window.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  useEffect(() => {
-    if (editingId || showNewInput) setTimeout(() => editRef.current?.focus(), 0);
-  }, [editingId, showNewInput]);
-
-  const toggleOpen = useCallback(() => {
-    if (!open && btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect();
-      setMenuPos({ x: rect.left, y: rect.bottom + 2 });
-    }
-    setOpen(!open);
-  }, [open]);
-
-  const handleSwitch = useCallback(
-    (id: string) => {
-      switchSpace(id);
-      setOpen(false);
-    },
-    [switchSpace],
-  );
-
-  const handleAdd = useCallback(() => {
-    if (newName.trim()) {
-      addSpace(newName.trim());
-      setNewName('');
-      setShowNewInput(false);
-    }
-  }, [newName, addSpace]);
-
-  const handleRename = useCallback(
-    (id: string) => {
-      if (editValue.trim()) {
-        renameSpace(id, editValue.trim());
-      }
-      setEditingId(null);
-    },
-    [editValue, renameSpace],
-  );
+  const title = activeSpace
+    ? `工作区：${getWorkspaceDisplayName(activeSpace)}\n左侧：${overview?.leftPath ?? '未打开'}\n右侧：${overview?.rightPath ?? '未打开'}\n搜索工作区 (Ctrl+Shift+W)`
+    : '切换工作区 (Ctrl+Shift+W)';
 
   return (
     <>
       <button
-        ref={btnRef}
-        className="flex items-center gap-1 px-1.5 py-0.5 text-xs rounded text-text-secondary hover:text-text-primary hover:bg-white/5 transition-colors flex-shrink-0 mr-1"
-        onClick={toggleOpen}
-        title="Switch workspace"
+        ref={buttonRef}
+        data-testid="workspace-menu-trigger"
+        className="mr-1 flex h-7 flex-shrink-0 items-center gap-1.5 rounded border border-border bg-surface px-2 text-xs text-text-primary transition-colors hover:border-accent/40 hover:bg-surface-lighter"
+        onClick={() => setOpen((value) => !value)}
+        title={title}
+        aria-expanded={open}
+        aria-label={`切换工作区：${activeSpace ? getWorkspaceDisplayName(activeSpace) : '默认工作区'}`}
+        aria-haspopup="dialog"
       >
-        <Wrench className="w-3 h-3 text-text-muted" />
-        <span className="truncate max-w-[80px]">{activeSpace?.name ?? 'Default'}</span>
-        <ChevronDown className="w-2.5 h-2.5 text-text-muted ml-0.5" />
+        <Layers className="h-3.5 w-3.5 flex-shrink-0 text-accent" />
+        <span className="max-w-[160px] truncate font-medium">{activeSpace ? getWorkspaceDisplayName(activeSpace) : '默认工作区'}</span>
+        {overview && (
+          <span className="hidden rounded-sm bg-surface-lighter px-1 text-[0.6875rem] tabular-nums text-text-secondary lg:inline" aria-label={`${overview.pathCount} 个目录`}>
+            {overview.pathCount}
+          </span>
+        )}
+        <ChevronDown className="h-3 w-3 flex-shrink-0 text-text-muted" />
       </button>
 
-      {open &&
-        createPortal(
-          <div
-            ref={menuRef}
-            className="fixed z-[200] bg-surface-light border border-border/50 rounded-lg shadow-xl py-1 min-w-[180px] text-xs"
-            style={{ left: menuPos.x, top: menuPos.y }}
-          >
-            {spaces.map((s) => (
-              <div
-                key={s.id}
-                className={`flex items-center gap-1 px-2 py-1.5 hover:bg-accent/10 transition-colors ${
-                  s.id === activeSpaceId ? 'text-accent' : 'text-text-secondary'
-                }`}
-              >
-                {editingId === s.id ? (
-                  <input
-                    ref={editRef}
-                    className="flex-1 bg-surface-lighter border border-accent/50 rounded px-1.5 py-0.5 text-xs outline-none min-w-0"
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
-                    onBlur={() => handleRename(s.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleRename(s.id);
-                      if (e.key === 'Escape') setEditingId(null);
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                ) : (
-                  <button
-                    className="flex-1 text-left truncate"
-                    onClick={() => handleSwitch(s.id)}
-                  >
-                    {s.id === activeSpaceId ? '● ' : '○ '}
-                    {s.name}
-                  </button>
-                )}
-                {spaces.length > 1 && (
-                  <>
-                    <button
-                      className="text-text-muted hover:text-text-primary flex-shrink-0 p-0.5 rounded hover:bg-white/5 transition-colors"
-                      title="Rename"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingId(s.id);
-                        setEditValue(s.name);
-                      }}
-                    >
-                      <Pencil className="w-3 h-3" />
-                    </button>
-                    <button
-                      className="text-text-muted hover:text-red-400 flex-shrink-0 p-0.5 rounded hover:bg-white/5 transition-colors"
-                      title="Delete"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeSpace(s.id);
-                      }}
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </>
-                )}
-              </div>
-            ))}
-
-            {showNewInput ? (
-              <div className="flex items-center gap-1 px-2 py-1.5">
-                <input
-                  ref={editRef}
-                  className="flex-1 bg-surface-lighter border border-accent/50 rounded px-1.5 py-0.5 text-xs outline-none"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  onBlur={handleAdd}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleAdd();
-                    if (e.key === 'Escape') {
-                      setShowNewInput(false);
-                      setNewName('');
-                    }
-                  }}
-                  placeholder="Space name"
-                />
-              </div>
-            ) : (
-              <button
-                className="w-full text-left px-3 py-1.5 text-text-muted hover:bg-accent/10 hover:text-text-primary transition-colors"
-                onClick={() => setShowNewInput(true)}
-              >
-                + New Space
-              </button>
-            )}
-          </div>,
-          document.body,
-        )}
+      <WorkspaceSwitcher
+        open={open}
+        onClose={() => setOpen(false)}
+        variant="anchored"
+        anchorRef={buttonRef}
+      />
     </>
   );
 }

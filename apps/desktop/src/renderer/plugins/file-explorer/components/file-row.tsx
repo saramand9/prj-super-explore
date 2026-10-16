@@ -2,6 +2,7 @@ import { memo, useCallback, useMemo } from 'react';
 import type { FileEntry, DirSizeResult } from '@explore/shared';
 import { highlightMatches } from '../store';
 import { getFileTypeLabel } from '../utils/file-entry-type';
+import { getFileDropEffect } from '../utils/file-drag';
 import {
   Folder, File, FileCode, FileJson, FileText, FileImage,
   FileArchive, Cog, Palette, Globe, EyeOff, Lock,
@@ -76,7 +77,7 @@ export const FileRow = memo(function FileRow({
 
   return (
     <div
-      className={`flex h-full items-center py-0.5 px-2 text-sm cursor-pointer select-none outline-none focus-visible:outline-none ${
+      className={`file-table-row file-table-columns h-full items-center py-0.5 px-2 text-sm cursor-pointer select-none outline-none focus-visible:outline-none ${
         isSelected
           ? 'bg-accent/40 text-white'
           : isActive
@@ -93,7 +94,7 @@ export const FileRow = memo(function FileRow({
       onDoubleClick={() => onDoubleClick(entry, index)}
       onContextMenu={(e) => onContextMenu(entry, index, e)}
       onDragStart={handleDragStart}
-      onDragOver={entry.isDirectory ? (e) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; } : undefined}
+      onDragOver={entry.isDirectory ? (e) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = getFileDropEffect(e); } : undefined}
       onDragEnter={entry.isDirectory ? (e) => { e.preventDefault(); e.stopPropagation(); onDragEnterRow?.(entry, index); } : undefined}
       onDragLeave={entry.isDirectory ? (e) => { e.preventDefault(); e.stopPropagation(); onDragLeaveRow?.(); } : undefined}
       onDrop={entry.isDirectory ? (e) => { e.stopPropagation(); e.preventDefault(); onDrop(entry, index, e); } : undefined}
@@ -101,10 +102,10 @@ export const FileRow = memo(function FileRow({
       role="row"
       style={{ contain: 'layout paint style' }}
     >
-      <span className="w-5 text-center flex-shrink-0">
+      <span className="text-center">
         <Icon className={`w-4 h-4 inline-block ${iconColor}`} />
       </span>
-      <span className="flex-1 truncate ml-1" title={entry.name}>
+      <span className="file-table-name min-w-0 truncate" title={entry.name}>
         {segments
           ? segments.map((seg, i) =>
               seg.match ? (
@@ -117,7 +118,7 @@ export const FileRow = memo(function FileRow({
             )
           : entry.name}
       </span>
-      <span className="w-24 truncate text-text-muted flex-shrink-0 ml-2" title={typeLabel}>
+      <span className="file-table-type min-w-0 truncate text-text-secondary" title={typeLabel}>
         {typeSegments
           ? typeSegments.map((seg, i) =>
               seg.match ? (
@@ -130,15 +131,20 @@ export const FileRow = memo(function FileRow({
             )
           : typeLabel}
       </span>
-      <span className="w-20 text-right text-text-muted flex-shrink-0 ml-2 relative">
+      <span className="file-table-size text-right text-text-secondary tabular-nums">
         {entry.isDirectory
           ? (dirSize === undefined
             ? <span className="text-text-muted/40">...</span>
-            : <>{sizeStr}{dirSize.partial && <span className="absolute -right-1.5">+</span>}</>)
+            : (
+              <span title={dirSize.partial ? '目录大小仍在后台统计中' : undefined}>
+                {dirSize.partial ? `~${sizeStr}` : sizeStr}
+              </span>
+            ))
           : sizeStr}
       </span>
-      <span className="w-36 text-right text-text-muted flex-shrink-0 ml-2">
-        {modifiedAt}
+      <span className="file-table-date text-right text-text-secondary tabular-nums" title={modifiedAt}>
+        <span className="file-table-date-full">{modifiedAt}</span>
+        <span className="file-table-date-short">{modifiedAt.slice(0, 10)}</span>
       </span>
     </div>
   );

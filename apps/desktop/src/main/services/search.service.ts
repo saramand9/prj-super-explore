@@ -3,7 +3,8 @@ import { existsSync, type Dirent, type Stats } from 'fs';
 import { readdir, readFile, stat } from 'fs/promises';
 import { dirname, join, relative } from 'path';
 import { createRequire } from 'module';
-import type { FulltextMatch } from '@explore/shared';
+import { StringDecoder } from 'string_decoder';
+import type { FulltextMatch, SearchResult } from '@explore/shared';
 import type { Service, ServiceContainer } from '../service-container';
 
 const require = createRequire(import.meta.url);
@@ -22,6 +23,16 @@ interface PendingSearch {
   proc?: ChildProcess;
   results: FulltextMatch[];
   cancelled: boolean;
+  onCancel?: () => void;
+  warnings: string[];
+  onMatches?: (matches: FulltextMatch[], total: number) => void;
+}
+
+interface SearchOptions {
+  filePattern?: string;
+  excludePatterns?: string[];
+  maxResults?: number;
+  maxFileSize?: string;
 }
 
 export class SearchService implements Service {
@@ -31,8 +42,7 @@ export class SearchService implements Service {
   constructor(private container: ServiceContainer) {}
 
   init(): void {
-    // 尝试查找 ripgrep 路径
-    // 优先使用系统安装的，否则使用打包的
+    // Prefer the bundled executable so installed builds do not depend on the user's PATH.
     this.rgPath = this.findRgPath();
   }
 
@@ -40,23 +50,22 @@ export class SearchService implements Service {
     dir: string,
     query: string,
     searchId: string,
-    opts?: {
-      filePattern?: string;
-      excludePatterns?: string[];
-      maxResults?: number;
-      maxFileSize?: string;
-    },
+    opts?: SearchOptions,
   ): Promise<FulltextMatch[]> {
-    // 取消之前的同名搜索
-    const existing = this.pending.get(searchId);
-    if (existing) {
-      existing.cancelled = true;
-      existing.proc?.kill();
-    }
+    const result = await this.run(dir, query, searchId, opts);
+    return result.cancelled ? [] : result.matches;
+  }
 
-    const maxResults = opts?.maxResults ?? 500;
+  async run(dir: string, query: string, searchId: string, opts?: SearchOptions,
+    onMatches?: (matches: FulltextMatch[], total: number) => void,
+  ): Promise<SearchResult> {
+    this.cancel(searchId);
+    const requestedMax = opts?.maxResults ?? 500;
+    const maxResults = Number.isFinite(requestedMax) ? Math.max(0, Math.floor(requestedMax)) : 500;
+    if (!query || maxResults === 0) return { matches: [], cancelled: false, truncated: false, warnings: [] };
     const args = [
       '--json',
+      '--fixed-strings',
       '--smart-case',
       '--max-count',
       String(maxResults),
@@ -78,17 +87,27 @@ export class SearchService implements Service {
 
     const rgPath = this.rgPath;
     if (!rgPath) {
-      return this.fulltextWithJs(dir, query, searchId, opts, maxResults);
+      return this.fulltextWithJs(dir, query, searchId, opts, maxResults, onMatches);
     }
 
     return new Promise((resolve, reject) => {
       const proc: ChildProcess = spawn(rgPath, args, {
         stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
       });
 
-      const entry: PendingSearch = { proc, results: [], cancelled: false };
+      const entry: PendingSearch = { proc, results: [], cancelled: false, warnings: [], onMatches };
       this.pending.set(searchId, entry);
       let fallbackStarted = false;
+      let settled = false;
+      let emitted = 0;
+      let flushTimer: ReturnType<typeof setTimeout> | undefined;
+      const flush = () => {
+        clearTimeout(flushTimer);
+        flushTimer = undefined;
+        if (entry.results.length > emitted) entry.onMatches?.(entry.results.slice(emitted), entry.results.length);
+        emitted = entry.results.length;
+      };
 
       const deletePending = () => {
         if (this.pending.get(searchId) === entry) {
@@ -96,60 +115,96 @@ export class SearchService implements Service {
         }
       };
 
-      let stdout = '';
+      const finish = (results: FulltextMatch[]) => {
+        if (settled) return;
+        flush();
+        settled = true;
+        deletePending();
+        resolve({ matches: results, cancelled: entry.cancelled, truncated: results.length >= maxResults, warnings: entry.warnings });
+      };
+      const fail = (error: Error) => {
+        if (settled) return;
+        clearTimeout(flushTimer);
+        settled = true;
+        deletePending();
+        reject(error);
+      };
+      entry.onCancel = () => finish(entry.results);
+
+      const decoder = new StringDecoder('utf8');
+      let partialLine = '';
       let stderr = '';
+      const consumeLine = (line: string) => {
+        if (settled) return;
+        const match = this.parseRgLine(line);
+        if (!match) return;
+        entry.results.push(match);
+        if (entry.results.length - emitted >= 25) flush();
+        else if (!flushTimer) flushTimer = setTimeout(flush, 100);
+        if (entry.results.length >= maxResults) {
+          // --max-count applies per file. Enforce the global limit while reading.
+          finish(entry.results);
+          proc.kill();
+        }
+      };
       proc.stdout?.on('data', (chunk: Buffer) => {
-        stdout += chunk.toString();
+        if (settled || fallbackStarted) return;
+        partialLine += decoder.write(chunk);
+        let start = 0;
+        let end: number;
+        while (!settled && (end = partialLine.indexOf('\n', start)) !== -1) {
+          consumeLine(partialLine.slice(start, end));
+          start = end + 1;
+        }
+        partialLine = settled ? '' : partialLine.slice(start);
       });
       proc.stderr?.on('data', (chunk: Buffer) => {
-        stderr += chunk.toString();
+        // Keep diagnostics bounded even when ripgrep encounters many inaccessible files.
+        if (!settled) stderr = (stderr + chunk.toString()).slice(-8192);
       });
 
       proc.on('close', (code: number | null) => {
-        if (fallbackStarted) return;
-        deletePending();
+        if (fallbackStarted || settled) return;
         if (entry.cancelled) {
-          resolve([]);
+          finish([]);
           return;
         }
 
+        consumeLine(partialLine + decoder.end());
+        partialLine = '';
+        if (settled) return;
         if (code !== 0 && code !== 1) {
-          // code 1 = no matches (normal), other codes = error
-          if (code !== 1) {
-            const detail = stderr.trim();
-            const err = new Error(detail ? `ripgrep exited with code ${code}: ${detail}` : `ripgrep exited with code ${code}`);
-            (err as any).code = 'PROCESS_FAILED';
-            reject(err);
+          const detail = stderr.trim();
+          if (code === 2 && entry.results.length > 0) {
+            entry.warnings.push(detail || '部分文件无法读取，已保留可读取文件的搜索结果');
+            finish(entry.results);
             return;
           }
+          const err = new Error(detail ? `ripgrep exited with code ${code}: ${detail}` : `ripgrep exited with code ${code}`);
+          (err as any).code = 'PROCESS_FAILED';
+          fail(err);
+          return;
         }
 
-        const results = this.parseRgOutput(stdout);
-        resolve(results);
+        finish(entry.results);
       });
 
       proc.on('error', (err: Error) => {
+        if (settled || fallbackStarted) return;
         if (entry.cancelled) {
-          deletePending();
-          resolve([]);
+          finish([]);
           return;
         }
         if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
           fallbackStarted = true;
+          entry.onMatches = (matches, total) => { emitted = total; onMatches?.(matches, total); };
+          entry.warnings.push('搜索组件不可用，已使用基础搜索；忽略规则可能与原生搜索不同');
           this.searchWithJs(dir, query, opts, maxResults, entry)
-            .then((results) => {
-              deletePending();
-              resolve(results);
-            })
-            .catch((fallbackErr) => {
-              deletePending();
-              reject(fallbackErr);
-            });
+            .then(finish, fail);
           return;
         }
-        deletePending();
         (err as any).code = 'PROCESS_FAILED';
-        reject(err);
+        fail(err);
       });
     });
   }
@@ -158,17 +213,18 @@ export class SearchService implements Service {
     const entry = this.pending.get(searchId);
     if (entry) {
       entry.cancelled = true;
-      entry.proc?.kill();
       this.pending.delete(searchId);
+      entry.onCancel?.();
+      entry.proc?.kill();
     }
   }
 
   dispose(): void {
-    for (const [, entry] of this.pending) {
-      entry.cancelled = true;
-      entry.proc?.kill();
-    }
-    this.pending.clear();
+    for (const id of this.pending.keys()) this.cancel(id);
+  }
+
+  cancelOwner(owner: number): void {
+    for (const id of this.pending.keys()) if (id.startsWith(`${owner}:`)) this.cancel(id);
   }
 
   // ── private ──
@@ -180,6 +236,14 @@ export class SearchService implements Service {
     const executable = process.platform === 'win32' ? 'rg.exe' : 'rg';
     const candidates: string[] = [];
 
+    // spawn cannot execute an app.asar virtual path, even when the entry is unpacked.
+    if (process.resourcesPath) {
+      candidates.push(
+        join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', '@lvce-editor', 'ripgrep', 'bin', executable),
+        join(process.resourcesPath, 'node_modules', '@lvce-editor', 'ripgrep', 'bin', executable),
+      );
+    }
+
     try {
       const packageJson = require.resolve('@lvce-editor/ripgrep/package.json');
       const packageDir = dirname(packageJson);
@@ -189,13 +253,6 @@ export class SearchService implements Service {
       );
     } catch {
       // The packaged binary is optional in development; fall back below.
-    }
-
-    if (process.resourcesPath) {
-      candidates.push(
-        join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', '@lvce-editor', 'ripgrep', 'bin', executable),
-        join(process.resourcesPath, 'node_modules', '@lvce-editor', 'ripgrep', 'bin', executable),
-      );
     }
 
     candidates.push(join(process.cwd(), 'node_modules', '@lvce-editor', 'ripgrep', 'bin', executable));
@@ -229,16 +286,21 @@ export class SearchService implements Service {
       maxFileSize?: string;
     } | undefined,
     maxResults: number,
-  ): Promise<FulltextMatch[]> {
-    const entry: PendingSearch = { results: [], cancelled: false };
+    onMatches?: (matches: FulltextMatch[], total: number) => void,
+  ): Promise<SearchResult> {
+    const entry: PendingSearch = { results: [], cancelled: false, warnings: ['搜索组件不可用，已使用基础搜索；忽略规则可能与原生搜索不同'], onMatches };
     this.pending.set(searchId, entry);
-    try {
-      return await this.searchWithJs(dir, query, opts, maxResults, entry);
-    } finally {
-      if (this.pending.get(searchId) === entry) {
-        this.pending.delete(searchId);
-      }
-    }
+    return new Promise((resolve, reject) => {
+      const finish = () => {
+        if (this.pending.get(searchId) === entry) this.pending.delete(searchId);
+        resolve({ matches: [...entry.results], cancelled: entry.cancelled, truncated: entry.results.length >= maxResults, warnings: [...entry.warnings] });
+      };
+      entry.onCancel = finish;
+      this.searchWithJs(dir, query, opts, maxResults, entry).then(finish, (error) => {
+        if (this.pending.get(searchId) === entry) this.pending.delete(searchId);
+        reject(error);
+      });
+    });
   }
 
   private async searchWithJs(
@@ -256,16 +318,18 @@ export class SearchService implements Service {
     if (!query) return [];
     const maxBytes = this.parseMaxFileSize(opts?.maxFileSize ?? '10M');
     const patterns = [...DEFAULT_EXCLUDE_PATTERNS, ...(opts?.excludePatterns ?? [])];
-    const caseSensitive = /[A-Z]/.test(query);
+    const caseSensitive = /\p{Lu}/u.test(query);
     const needle = caseSensitive ? query : query.toLowerCase();
-    const results: FulltextMatch[] = [];
+    const results = entry.results;
 
     const walk = async (currentDir: string): Promise<void> => {
       if (entry.cancelled || results.length >= maxResults) return;
       let dirents: Dirent[];
       try {
         dirents = await readdir(currentDir, { withFileTypes: true }) as Dirent[];
-      } catch {
+      } catch (error) {
+        if (currentDir === dir) throw error;
+        if (entry.warnings.length < 20) entry.warnings.push(`${currentDir}: ${(error as Error).message}`);
         return;
       }
 
@@ -288,7 +352,8 @@ export class SearchService implements Service {
         let fileStat: Stats;
         try {
           fileStat = await stat(fullPath);
-        } catch {
+        } catch (error) {
+          if (entry.warnings.length < 20) entry.warnings.push(`${fullPath}: ${(error as Error).message}`);
           continue;
         }
         if (fileStat.size > maxBytes) continue;
@@ -296,10 +361,12 @@ export class SearchService implements Service {
         let content: string;
         try {
           content = await readFile(fullPath, 'utf8');
-        } catch {
+        } catch (error) {
+          if (entry.warnings.length < 20) entry.warnings.push(`${fullPath}: ${(error as Error).message}`);
           continue;
         }
 
+        if (content.includes('\0')) continue;
         const lines = content.split(/\n/);
         for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
           if (entry.cancelled || results.length >= maxResults) return;
@@ -316,12 +383,14 @@ export class SearchService implements Service {
             lineContent,
             matchText: lineContent.slice(idx, idx + query.length),
           });
+          entry.onMatches?.([results[results.length - 1]], results.length);
+          if (results.length % 25 === 0) await new Promise<void>((resolve) => setImmediate(resolve));
         }
       }
     };
 
     await walk(dir);
-    return entry.cancelled ? [] : results;
+    return results;
   }
 
   private parseMaxFileSize(value: string): number {
@@ -376,15 +445,11 @@ export class SearchService implements Service {
     return new RegExp(`^${source}$`, 'i');
   }
 
-  private parseRgOutput(stdout: string): FulltextMatch[] {
-    const results: FulltextMatch[] = [];
-    const lines = stdout.split('\n');
-
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      try {
+  private parseRgLine(line: string): FulltextMatch | null {
+    if (!line.trim()) return null;
+    try {
         const event = JSON.parse(line);
-        if (event.type !== 'match') continue;
+        if (event.type !== 'match') return null;
 
         const data = event.data;
         const filePath = data?.path?.text;
@@ -392,12 +457,14 @@ export class SearchService implements Service {
         const lineContent = data?.lines?.text;
         const submatch = data?.submatches?.[0];
         if (typeof filePath !== 'string' || typeof lineNumber !== 'number' || typeof lineContent !== 'string') {
-          continue;
+          return null;
         }
 
-        const start = typeof submatch?.start === 'number' ? submatch.start + 1 : 1;
-        const end = typeof submatch?.end === 'number' ? submatch.end + 1 : start;
-        results.push({
+        // ripgrep reports UTF-8 byte offsets; the viewer slices JavaScript strings.
+        const bytes = Buffer.from(lineContent, 'utf8');
+        const start = typeof submatch?.start === 'number' ? bytes.subarray(0, submatch.start).toString('utf8').length + 1 : 1;
+        const end = typeof submatch?.end === 'number' ? bytes.subarray(0, submatch.end).toString('utf8').length + 1 : start;
+        return {
           filePath,
           fileName: filePath.split(/[/\\]/).pop() ?? filePath,
           lineNumber,
@@ -405,12 +472,9 @@ export class SearchService implements Service {
           columnEnd: end,
           lineContent: lineContent.replace(/\r?\n$/, ''),
           matchText: submatch?.match?.text ?? '',
-        });
-      } catch {
-        continue;
-      }
+        };
+    } catch {
+      return null;
     }
-
-    return results;
   }
 }

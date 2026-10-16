@@ -7,14 +7,18 @@ import { themes } from './framework/themes';
 import { ErrorBoundary } from './components/error-boundary';
 import { MenuBar } from './components/menu-bar';
 import { ActivityBar } from './components/activity-bar';
+import { Toolbar } from './components/toolbar';
 import { PluginManagerDialog } from './components/plugin-manager-dialog';
 import { Launcher } from './plugins/quick-launcher';
 import { useFileStore, TabBar, AddressBar } from './plugins/file-explorer';
-import { useSpaceStore, restoreState, initAutoSave } from './plugins/file-explorer/space-store';
+import { useSpaceStore } from './plugins/file-explorer/space-store';
+import { WorkspacePersistence } from './components/workspace-persistence';
 import type { Tab } from './plugins/file-explorer/store';
 import { FileSearch } from './plugins/file-explorer/components/file-search';
 import { TabSearch } from './plugins/file-explorer/components/tab-search';
 import { SpaceSearch } from './plugins/file-explorer/components/space-search';
+import { getFileDropEffect } from './plugins/file-explorer/utils/file-drag';
+import { closeExplorerTab } from './plugins/file-explorer/utils/tab-actions';
 import {
   getFileOpToastType,
   resolveCopyConflictStrategyWithChoice,
@@ -590,63 +594,6 @@ function MainApp() {
     if (t.className) document.body.classList.add(t.className);
   }, [theme]);
 
-  // 启动时恢复 Space 标签 / 固定标签
-  useEffect(() => {
-    async function init() {
-      await useFileStore.getState().loadPinnedTabs();
-      await useSpaceStore.getState().loadSpaces();
-
-      const spaceStore = useSpaceStore.getState();
-      const activeSpace = spaceStore.spaces.find((s) => s.id === spaceStore.activeSpaceId);
-
-      // 如果活跃 Space 有标签，优先恢复 Space 中的标签
-      const leftTabs = activeSpace?.left.tabs ?? [];
-      const rightTabs = activeSpace?.right.tabs ?? [];
-
-      if (leftTabs.length > 0) {
-        await restoreState('left', activeSpace!.left);
-      } else {
-        const fileStore = useFileStore.getState();
-        const leftPinned = fileStore.left.tabs.filter((t) => t.pinned);
-        const leftTarget = leftPinned.length > 0 ? leftPinned[leftPinned.length - 1].path : null;
-        if (leftTarget) {
-          fileStore.addTab('left', leftTarget);
-          await fileStore.navigateTo('left', leftTarget, false);
-          useLayoutStore.getState().setPanelPath('left', leftTarget);
-        } else {
-          const homeDir = await ipc.invoke('app:getHomeDir', undefined);
-          fileStore.addTab('left', homeDir);
-          await fileStore.navigateTo('left', homeDir, true);
-          useLayoutStore.getState().setPanelPath('left', homeDir);
-        }
-      }
-
-      if (rightTabs.length > 0) {
-        await restoreState('right', activeSpace!.right);
-      } else {
-        const fileStore = useFileStore.getState();
-        const rightPinned = fileStore.right.tabs.filter((t) => t.pinned);
-        const rightTarget = rightPinned.length > 0 ? rightPinned[rightPinned.length - 1].path : null;
-        if (rightTarget) {
-          fileStore.addTab('right', rightTarget);
-          await fileStore.navigateTo('right', rightTarget, false);
-          useLayoutStore.getState().setPanelPath('right', rightTarget);
-        }
-      }
-    }
-    init();
-    initAutoSave();
-  }, []);
-
-  // 关闭前保存当前 Space
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      useSpaceStore.getState().saveCurrentSpace();
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, []);
-
   const activePanel = layout.id;
   const activePath =
     activePanel === 'left'
@@ -654,7 +601,13 @@ function MainApp() {
       : activePanel === 'right'
         ? layout.right.path
         : null;
-
+  const leftSelectedCount = useFileStore((s) => s.left.selected.size);
+  const rightSelectedCount = useFileStore((s) => s.right.selected.size);
+  const leftEntryCount = useFileStore((s) => s.left.entries.length);
+  const rightEntryCount = useFileStore((s) => s.right.entries.length);
+  const activeSelectedCount = activePanel === 'right' ? rightSelectedCount : leftSelectedCount;
+  const activeEntryCount = activePanel === 'right' ? rightEntryCount : leftEntryCount;
+  const activePanelLabel = activePanel === 'right' ? '右侧' : '左侧';
   const handlePanelClick = useCallback(
     (side: 'left' | 'right') => {
       useLayoutStore.getState().setActivePanel(side);
@@ -664,7 +617,15 @@ function MainApp() {
 
   const handlePluginChange = useCallback(
     (side: 'left' | 'right', pluginId: string, panelId: string) => {
-      useLayoutStore.getState().setPanelPlugin(side, pluginId, panelId);
+      const store = useLayoutStore.getState();
+      const previous = store.layout[side];
+      if (previous.pluginId === 'viewer' && previous.path) {
+        if (pluginId === 'fulltext-search') store.setPanelPath(side, parentDir(previous.path));
+        if (pluginId === 'file-explorer') {
+          store.setPanelPath(side, useFileStore.getState()[side].path ?? parentDir(previous.path));
+        }
+      }
+      store.setPanelPlugin(side, pluginId, panelId);
     },
     [],
   );
@@ -672,6 +633,7 @@ function MainApp() {
   // Ctrl+Shift+F: 在当前活跃面板打开全文搜索
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || document.querySelector('[aria-modal="true"], [data-testid="workspace-search"]')) return;
       if (e.key.toLowerCase() === 'f' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
         e.preventDefault();
         const activeSide = useLayoutStore.getState().layout.id;
@@ -684,10 +646,11 @@ function MainApp() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handlePluginChange]);
 
-  // Ctrl+W: 快速搜索/切换工作区
+  // Ctrl+Shift+W: 快速搜索/切换工作区（Ctrl+W 保留给关闭标签）
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'w' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+      if (e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
+      if (e.key.toLowerCase() === 'w' && (e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey) {
         e.preventDefault();
         setShowSpaceSearch((s) => !s);
       }
@@ -699,8 +662,10 @@ function MainApp() {
   return (
     <div className="h-full flex flex-col bg-surface">
       <MenuBar />
+      <Toolbar />
+      <WorkspacePersistence />
       <div className="flex-1 flex overflow-hidden">
-        <ActivityBar />
+        <ActivityBar onPluginChange={handlePluginChange} />
         <div className="flex-1 flex flex-col overflow-hidden">
         {layout.mode === 'single' ? (
           <PanelSlot
@@ -732,19 +697,20 @@ function MainApp() {
       </div>
 
       {/* Status Bar */}
-      <div className="flex-shrink-0 h-6 flex items-center px-3 bg-surface-light border-t border-border text-xs text-text-muted gap-3">
-        <span className="text-text-primary font-medium truncate max-w-[50%]">
-          {activePath ?? 'No folder open'}
+      <div className="flex h-6 flex-shrink-0 items-center gap-3 border-t border-border bg-surface-light px-3 text-xs text-text-muted">
+        <span className="rounded bg-accent/10 px-1.5 py-px text-[11px] font-medium text-accent">
+          {activePanelLabel}
         </span>
-        <span className="flex-1" />
-        <span>F5 Copy</span>
-        <span>F6 Move</span>
-        <span>F7 New Folder</span>
-        <span>F8 Delete</span>
-        <span>Ctrl+Shift+P Pin</span>
-        <span>Ctrl+Shift+R Re-pin</span>
-        <span>Ctrl+W Workspace</span>
-        <span>Ctrl+Shift+F Search</span>
+        <span className="min-w-0 flex-1 truncate text-text-secondary" title={activePath ?? undefined}>
+          {activePath ?? '未打开文件夹'}
+        </span>
+        <span className="text-text-muted/80">
+          {activeSelectedCount > 0 ? `已选 ${activeSelectedCount} 项` : `${activeEntryCount} 项`}
+        </span>
+        <span className="hidden text-text-muted/70 md:inline">F5 复制</span>
+        <span className="hidden text-text-muted/70 md:inline">F6 移动</span>
+        <span className="hidden text-text-muted/70 lg:inline">Ctrl+F 搜索</span>
+        <span className="hidden text-text-muted/70 lg:inline">Ctrl+Shift+W 工作区</span>
       </div>
 
       {mouseGestureTrail && (() => {
@@ -907,24 +873,11 @@ function PanelSlot({
   const [showFileSearch, setShowFileSearch] = useState(false);
   const viewerDir = pluginId === 'viewer' && panel.path ? parentDir(panel.path) : null;
   const panelDirectoryPath = pluginId === 'viewer' ? viewerDir : panel.path;
+  // A preview is not a destination folder: transfers keep using this pane's browsing directory.
+  const dropDirectoryPath = useFileStore((state) => state[side].path);
   const showExplorerChrome = pluginId === 'file-explorer' || pluginId === 'viewer';
 
-  // Ctrl+T / Ctrl+P 搜索标签
-  useEffect(() => {
-    if (!isActive) return;
-    const handler = (e: KeyboardEvent) => {
-      if ((e.key === 't' || e.key === 'p') && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
-        e.preventDefault();
-        setShowTabSearch((s) => !s);
-      }
-      if (e.key.toLowerCase() === 'f' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
-        e.preventDefault();
-        setShowFileSearch((s) => !s);
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [isActive]);
+  const tabActionPending = useRef(false);
 
   // 当 layout 中该面板的路径变化时，同步到 file-explorer store
   useEffect(() => {
@@ -966,16 +919,16 @@ function PanelSlot({
       }
 
       useLayoutStore.getState().setPanelPlugin(side, 'file-explorer', 'browser');
+      useLayoutStore.getState().setActivePanel(side);
       if (targetDir) {
         if (fileStore[side].tabs.length === 0) {
           fileStore.addTab(side, targetDir);
         }
+        useLayoutStore.getState().setPanelPath(side, targetDir);
         if (fileStore[side].path !== targetDir) {
           await fileStore.navigateTo(side, targetDir, false);
         }
-        useLayoutStore.getState().setPanelPath(side, targetDir);
       }
-      useLayoutStore.getState().setActivePanel(side);
     },
     [side, pluginId],
   );
@@ -994,10 +947,9 @@ function PanelSlot({
     });
     if (result) {
       useFileStore.getState().addTab(side, result);
-      useFileStore.getState().navigateTo(side, result, false);
-      useLayoutStore.getState().setPanelPath(side, result);
+      await switchToFileExplorer(result);
     }
-  }, [side, panelDirectoryPath]);
+  }, [side, panelDirectoryPath, switchToFileExplorer]);
 
   const handleClosePluginPanel = useCallback(async () => {
     const fileStore = useFileStore.getState();
@@ -1006,28 +958,112 @@ function PanelSlot({
     await switchToFileExplorer(previousDir ?? fallbackDir);
   }, [side, pluginId, panel.path, switchToFileExplorer]);
 
+  const handleNewTab = useCallback(async () => {
+    const directory = panelDirectoryPath ?? useFileStore.getState()[side].path;
+    if (!directory) {
+      await handleOpenFolder();
+      return;
+    }
+    const store = useFileStore.getState();
+    const existing = store[side].tabs.find((tab) => tab.path === directory);
+    if (existing) store.forkTab(side, existing.id);
+    else store.addTab(side, directory);
+    setShowTabSearch(false);
+    setShowFileSearch(false);
+    await switchToFileExplorer(directory);
+  }, [side, panelDirectoryPath, handleOpenFolder, switchToFileExplorer]);
+
+  const handleCloseTab = useCallback(async () => {
+    if (showTabSearch || showFileSearch) {
+      setShowTabSearch(false);
+      setShowFileSearch(false);
+      return;
+    }
+    if (pluginId !== 'file-explorer') {
+      await handleClosePluginPanel();
+      return;
+    }
+    const activeTabId = useFileStore.getState()[side].activeTabId;
+    if (activeTabId) await closeExplorerTab(side, activeTabId);
+  }, [side, pluginId, showTabSearch, showFileSearch, handleClosePluginPanel]);
+
+  // 标准标签快捷键；菜单也走同一操作入口。
+  useEffect(() => {
+    if (!isActive) return;
+    const runTabAction = async (action: () => Promise<void>) => {
+      if (tabActionPending.current) return;
+      tabActionPending.current = true;
+      try {
+        await action();
+      } catch (error) {
+        notify(`标签操作失败：${error instanceof Error ? error.message : String(error)}`, 'error');
+      } finally {
+        tabActionPending.current = false;
+      }
+    };
+    const newTab = () => { void runTabAction(handleNewTab); };
+    const closeTab = () => { void runTabAction(handleCloseTab); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || !(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
+      // 弹窗打开时不操作它后面的目录或标签。
+      if (document.querySelector('[aria-modal="true"], [data-testid="workspace-search"]')) return;
+      const key = e.key.toLowerCase();
+      if (!['t', 'w', 'p', 'f'].includes(key)) return;
+      e.preventDefault();
+      if (key === 't') newTab();
+      else if (key === 'w') closeTab();
+      else {
+        void runTabAction(async () => {
+          await switchToFileExplorer(panelDirectoryPath ?? useFileStore.getState()[side].path);
+          if (key === 'p') {
+            setShowFileSearch(false);
+            setShowTabSearch((open) => !open);
+          } else {
+            setShowTabSearch(false);
+            setShowFileSearch((open) => !open);
+          }
+        });
+      }
+    };
+    window.addEventListener('keydown', handler);
+    window.addEventListener('explore:new-tab', newTab);
+    window.addEventListener('explore:close-tab', closeTab);
+    return () => {
+      window.removeEventListener('keydown', handler);
+      window.removeEventListener('explore:new-tab', newTab);
+      window.removeEventListener('explore:close-tab', closeTab);
+    };
+  }, [isActive, side, panelDirectoryPath, handleNewTab, handleCloseTab, switchToFileExplorer, notify]);
+
   // 拖放处理
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    if (!panelDirectoryPath) {
+    if (!dropDirectoryPath) {
       e.dataTransfer.dropEffect = 'none';
       return;
     }
-    e.dataTransfer.dropEffect = e.ctrlKey || e.metaKey ? 'move' : 'copy';
-  }, [panelDirectoryPath]);
+    e.dataTransfer.dropEffect = getFileDropEffect(e);
+  }, [dropDirectoryPath]);
 
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
-    if (!panelDirectoryPath) {
+    if (!dropDirectoryPath) {
       notify('目标面板没有打开文件夹', 'warn');
       return;
     }
     const data = e.dataTransfer.getData('application/x-explore-files');
     if (!data) return;
-    const sources: string[] = JSON.parse(data);
+    let sources: string[];
+    try {
+      const payload: unknown = JSON.parse(data);
+      if (!Array.isArray(payload) || !payload.every((path) => typeof path === 'string')) return;
+      sources = payload;
+    } catch {
+      return;
+    }
     if (sources.length === 0) return;
 
-    const targetDir = panelDirectoryPath;
+    const targetDir = dropDirectoryPath;
 
     // 同一目录忽略
     if (sources.every((s) => {
@@ -1044,7 +1080,7 @@ function PanelSlot({
       return;
     }
 
-    const isMove = e.ctrlKey || e.metaKey;
+    const isMove = getFileDropEffect(e) === 'move';
     try {
       const conflictStrategy = await resolveCopyConflictStrategyWithChoice(
         sources,
@@ -1078,7 +1114,7 @@ function PanelSlot({
     useFileStore.getState().refresh(side);
     const otherSide = side === 'left' ? 'right' : 'left';
     useFileStore.getState().refresh(otherSide);
-  }, [side, panelDirectoryPath, notify]);
+  }, [side, dropDirectoryPath, notify]);
 
   return (
     <div
@@ -1087,7 +1123,7 @@ function PanelSlot({
       onClick={onClick}
     >
       {/* Tab Bar + Panel Header — 统一背景 */}
-      <div className={`flex-shrink-0 ${isActive ? 'bg-surface-lighter' : 'bg-surface'}`}>
+      <div className={`flex-shrink-0 border-t ${isActive ? 'border-accent/40 bg-surface-lighter' : 'border-transparent bg-surface'}`}>
       <ErrorBoundary name={`TabBar-${side}`}>
         {showExplorerChrome ? (
           <TabBar
@@ -1097,9 +1133,9 @@ function PanelSlot({
           />
         ) : (
           <div className="h-8 flex items-center px-3 text-[11px] text-text-muted/50 select-none">
-            {pluginId === 'fulltext-search' && 'Search'}
-            {pluginId === 'viewer' && 'File Viewer'}
-            {pluginId === 'bookmarks' && 'Bookmarks'}
+            {pluginId === 'fulltext-search' && '全文搜索'}
+            {pluginId === 'viewer' && '文件预览'}
+            {pluginId === 'bookmarks' && '收藏夹'}
           </div>
         )}
       </ErrorBoundary>
@@ -1149,7 +1185,7 @@ function PanelSlot({
           </button>
 
           {isActive && (
-            <div className="active-dot" title="Active panel" />
+            <div className="active-dot" title="当前面板" />
           )}
         </div>
       </div>
@@ -1157,6 +1193,7 @@ function PanelSlot({
 
       {/* Panel Content */}
       <div
+        data-testid={`panel-content-${side}`}
         className="flex-1 overflow-hidden bg-surface relative"
         onDragOver={handleDragOver}
         onDrop={handleDrop}
@@ -1175,8 +1212,10 @@ function PanelSlot({
             onClose={() => setShowTabSearch(false)}
           />
         )}
-        {renderPanel()}
-        {!isActive && <div className="absolute inset-0 bg-black/30 pointer-events-none" />}
+        <ErrorBoundary name={`Panel-${side}`} resetKey={`${pluginId}:${panel.panelId}:${panel.path ?? ''}`}>
+          {renderPanel()}
+        </ErrorBoundary>
+        {!isActive && <div className="absolute inset-0 bg-black/10 pointer-events-none" />}
       </div>
     </div>
   );

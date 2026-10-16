@@ -3,7 +3,7 @@ import { Pin, PinOff, X, Pencil, Copy, ChevronRight, ChevronDown, Folder, Refres
 import { useFileStore, type Tab, type TabGroup, computeGroups } from '../store';
 import { useLayoutStore } from '../../../framework/store/layout-store';
 import { ipc } from '../../../framework/bridge/ipc-client';
-import { SpaceDropdown } from './space-dropdown';
+import { closeExplorerTab } from '../utils/tab-actions';
 
 interface TabBarProps {
   side: 'left' | 'right';
@@ -19,7 +19,6 @@ export function TabBar({ side, keepEmpty = false, onTabClick }: TabBarProps) {
   const pinTab = useFileStore((s) => s.pinTab);
   const unpinTab = useFileStore((s) => s.unpinTab);
   const repinTab = useFileStore((s) => s.repinTab);
-  const closeTab = useFileStore((s) => s.closeTab);
   const forkTab = useFileStore((s) => s.forkTab);
   const renameTab = useFileStore((s) => s.renameTab);
   const persistPinnedTabs = useFileStore((s) => s.persistPinnedTabs);
@@ -94,27 +93,9 @@ export function TabBar({ side, keepEmpty = false, onTabClick }: TabBarProps) {
 
   const handleClose = useCallback(async () => {
     if (!contextMenu) return;
-    const tab = contextMenu.tab;
-    if (tab.pinned) {
-      const confirmed = await ipc.invoke('dialog:confirm', {
-        message: `确定要关闭固定标签“${tab.label}”吗？\n\n该标签会先取消固定，然后关闭。`,
-      });
-      if (!confirmed) { setContextMenu(null); return; }
-      unpinTab(side, tab.id);
-    }
-    const wasActive = tab.id === activeTabId;
-    closeTab(side, tab.id);
-    persistPinnedTabs(side);
-    if (wasActive) {
-      const remaining = useFileStore.getState()[side].tabs;
-      const next = remaining[remaining.length - 1];
-      if (next) {
-        navigateTo(side, next.path);
-        useLayoutStore.getState().setPanelPath(side, next.path);
-      }
-    }
+    await closeExplorerTab(side, contextMenu.tab.id);
     setContextMenu(null);
-  }, [contextMenu, side, activeTabId, closeTab, unpinTab, navigateTo, persistPinnedTabs]);
+  }, [contextMenu, side]);
 
   const handleFork = useCallback(async () => {
     if (!contextMenu) return;
@@ -180,20 +161,11 @@ export function TabBar({ side, keepEmpty = false, onTabClick }: TabBarProps) {
     return items;
   }, [tabs, collapsedGroups]);
 
-  if (tabs.length === 0 && side !== 'left') {
+  if (tabs.length === 0) {
     if (keepEmpty) {
       return <div className="flex items-center px-1 flex-shrink-0 h-8" />;
     }
     return null;
-  }
-
-  if (tabs.length === 0 && side === 'left') {
-    return (
-      <div className="flex items-center px-1 flex-shrink-0 h-8">
-        <SpaceDropdown />
-        <span className="flex-1" />
-      </div>
-    );
   }
 
   const renderTab = (tab: Tab, indented = false) => {
@@ -251,19 +223,9 @@ export function TabBar({ side, keepEmpty = false, onTabClick }: TabBarProps) {
             className="opacity-0 group-hover:opacity-60 hover:opacity-100 hover:text-text-primary cursor-pointer flex-shrink-0 rounded-sm hover:bg-white/5 transition-all p-0.5"
             onClick={(e) => {
               e.stopPropagation();
-              const wasActive = tab.id === activeTabId;
-              closeTab(side, tab.id);
-              persistPinnedTabs(side);
-              if (wasActive) {
-                const remaining = useFileStore.getState()[side].tabs;
-                const next = remaining[remaining.length - 1];
-                if (next) {
-                  navigateTo(side, next.path);
-                  useLayoutStore.getState().setPanelPath(side, next.path);
-                }
-              }
+              void closeExplorerTab(side, tab.id);
             }}
-            title="Close"
+            title="关闭标签 (Ctrl+W)"
           >
             <X className="w-3 h-3" />
           </span>
@@ -292,7 +254,7 @@ export function TabBar({ side, keepEmpty = false, onTabClick }: TabBarProps) {
             : 'text-text-secondary bg-surface-lighter/50 hover:text-text-primary'
         }`}
         onClick={() => toggleGroupCollapse(group.path)}
-        title={`${group.path} (${group.tabIds.length} tabs)`}
+        title={`${group.path} (${group.tabIds.length} 个标签)`}
       >
         {isCollapsed ? <ChevronRight className="w-3 h-3 flex-shrink-0" /> : <ChevronDown className="w-3 h-3 flex-shrink-0" />}
         <Folder className="w-3 h-3 flex-shrink-0 text-accent/60" />
@@ -304,7 +266,6 @@ export function TabBar({ side, keepEmpty = false, onTabClick }: TabBarProps) {
 
   return (
     <div ref={containerRef} className="flex items-center overflow-x-auto scrollbar-none px-1 flex-shrink-0 gap-0.5 h-8">
-      {side === 'left' && <SpaceDropdown />}
       {layout.map((item) => {
         if (item.kind === 'group') return renderGroupHeader(item.group);
         return renderTab(item.tab, item.grouped);

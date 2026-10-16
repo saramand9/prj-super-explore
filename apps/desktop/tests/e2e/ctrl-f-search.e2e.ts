@@ -1,10 +1,8 @@
-import { test, expect, _electron as electron, type ElectronApplication, type Page } from '@playwright/test';
-import { mkdir, rm, writeFile } from 'fs/promises';
-import { join, resolve, dirname } from 'path';
+import { test, expect, type ElectronApplication, type Page } from '@playwright/test';
+import { launchTestApp, removeTestFixture } from '../helpers/electron-app';
+import { mkdir, writeFile } from 'fs/promises';
+import { join } from 'path';
 import { tmpdir } from 'os';
-import { fileURLToPath } from 'url';
-
-const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 test.describe('Ctrl+F file search', () => {
   let fixtureRoot: string;
@@ -15,18 +13,7 @@ test.describe('Ctrl+F file search', () => {
     fixtureRoot = join(tmpdir(), `explore-e2e-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     await createFixture(fixtureRoot);
 
-    electronApp = await electron.launch({
-      args: [appRoot],
-      cwd: appRoot,
-      env: {
-        ...process.env,
-        HOME: fixtureRoot,
-        USERPROFILE: fixtureRoot,
-        APPDATA: join(fixtureRoot, 'AppData', 'Roaming'),
-        LOCALAPPDATA: join(fixtureRoot, 'AppData', 'Local'),
-        ELECTRON_DISABLE_SECURITY_WARNINGS: 'true',
-      },
-    });
+    electronApp = await launchTestApp(fixtureRoot);
     page = await electronApp.firstWindow();
     await page.waitForLoadState('domcontentloaded');
     await navigateLeftPanelToFixture(page, fixtureRoot);
@@ -34,7 +21,7 @@ test.describe('Ctrl+F file search', () => {
 
   test.afterEach(async () => {
     await electronApp?.close();
-    await rm(fixtureRoot, { recursive: true, force: true });
+    await removeTestFixture(fixtureRoot);
   });
 
   test('opens search, finds Chinese and space paths, and excludes node_modules', async () => {
@@ -58,10 +45,24 @@ test.describe('Ctrl+F file search', () => {
     await expect(page.getByText('未找到文件')).toBeVisible();
     await expect(page.getByText('excluded.txt', { exact: true })).toHaveCount(0);
   });
+
+  test('sanitizes raw HTML in Markdown preview', async () => {
+    await page.evaluate(() => {
+      (window as Window & { __exploreMarkdownExecuted?: boolean }).__exploreMarkdownExecuted = false;
+    });
+
+    await page.getByText('unsafe-preview.md', { exact: true }).dblclick();
+    const preview = page.locator('.markdown-body');
+    await expect(preview).toContainText('Safe heading');
+    await expect(preview.locator('script, form, [onerror], [onfocus], [autofocus], [formaction], [style]')).toHaveCount(0);
+    await expect.poll(() => page.evaluate(
+      () => (window as Window & { __exploreMarkdownExecuted?: boolean }).__exploreMarkdownExecuted,
+    )).toBe(false);
+  });
 });
 
 async function navigateLeftPanelToFixture(page: Page, targetPath: string): Promise<void> {
-  await page.locator('[title="Click to edit path"]').first().click();
+  await page.getByTestId('edit-path-left').click();
   const pathInput = page.locator('input[spellcheck="false"]').first();
   await expect(pathInput).toBeVisible();
   await pathInput.fill(targetPath);
@@ -78,6 +79,17 @@ async function createFixture(root: string): Promise<void> {
   await mkdir(join(root, 'level-1', 'level-2', 'level-3', 'level-4', 'level-5', 'level-6'), { recursive: true });
 
   await writeFile(join(root, '中文 文件.txt'), 'hello 中文', 'utf8');
+  await writeFile(
+    join(root, 'unsafe-preview.md'),
+    [
+      '# Safe heading',
+      '<img src="missing://image" onerror="window.__exploreMarkdownExecuted = true">',
+      '<script>window.__exploreMarkdownExecuted = true</script>',
+      '<form><input autofocus onfocus="window.__exploreMarkdownExecuted = true"></form>',
+      '<div style="position: fixed; inset: 0">Styled content</div>',
+    ].join('\n'),
+    'utf8',
+  );
   await writeFile(join(root, 'space dir', 'target file.txt'), 'target', 'utf8');
   await writeFile(join(root, 'level-1', 'level-2', 'level-3', 'level-4', 'level-5', 'level-6', 'deep-target.txt'), 'deep', 'utf8');
   await writeFile(join(root, 'node_modules', 'pkg', 'excluded.txt'), 'excluded', 'utf8');

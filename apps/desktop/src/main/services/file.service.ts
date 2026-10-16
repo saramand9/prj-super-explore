@@ -1,6 +1,6 @@
-import { readdir, stat, copyFile, rename, unlink, rm, mkdir, access, writeFile } from 'fs/promises';
+import { readdir, stat, lstat, realpath, readlink, symlink, copyFile, rename, unlink, rm, mkdir, access, writeFile } from 'fs/promises';
 import { constants, watch } from 'fs';
-import { join, basename, extname, parse, resolve, relative, isAbsolute } from 'path';
+import { join, dirname, basename, extname, parse, resolve, relative, isAbsolute, sep } from 'path';
 import { shell } from 'electron';
 import type {
   FileConflictStrategy,
@@ -97,17 +97,19 @@ export class FileService {
           }
           try {
             const fullPath = join(d, name);
-            const st = await stat(fullPath);
+            const st = await lstat(fullPath);
             fileCount++;
+            if (st.isSymbolicLink()) continue;
             if (st.isDirectory() && !st.isSymbolicLink()) {
               total += await walk(fullPath, depth + 1);
             } else {
               total += st.size;
             }
-          } catch { /* skip */ }
+          } catch { partial = true; }
         }
         return total;
       } catch {
+        partial = true;
         return 0;
       }
     }
@@ -135,22 +137,25 @@ export class FileService {
     const names = await readdir(dirPath);
     const entries: FileEntry[] = [];
 
-    for (const name of names) {
-      if (!showHidden && name.startsWith('.')) continue;
-      try {
-        const fullPath = join(dirPath, name);
-        const st = await stat(fullPath);
-        entries.push({
-          name,
-          path: fullPath,
-          isDirectory: st.isDirectory(),
-          isSymlink: st.isSymbolicLink(),
-          size: st.size,
-          modifiedAt: st.mtimeMs,
-        });
-      } catch {
-        // 跳过无权限的文件
-      }
+    for (let offset = 0; offset < names.length; offset += 16) {
+      await Promise.all(names.slice(offset, offset + 16).map(async (name) => {
+        if (!showHidden && name.startsWith('.')) return;
+        try {
+          const fullPath = join(dirPath, name);
+          const info = await lstat(fullPath);
+          const st = info.isSymbolicLink() ? await stat(fullPath).catch(() => info) : info;
+          entries.push({
+            name,
+            path: fullPath,
+            isDirectory: st.isDirectory(),
+            isSymlink: info.isSymbolicLink(),
+            size: st.size,
+            modifiedAt: st.mtimeMs,
+          });
+        } catch {
+          // 跳过无权限的文件
+        }
+      }));
     }
 
     if (sort) {
@@ -161,13 +166,14 @@ export class FileService {
 
   async getStat(filePath: string): Promise<FileStat | null> {
     try {
-      const st = await stat(filePath);
+      const info = await lstat(filePath);
+      const st = info.isSymbolicLink() ? await stat(filePath).catch(() => info) : info;
       const mode = st.mode.toString(8).slice(-3);
       return {
         path: filePath,
         size: st.size,
         isDirectory: st.isDirectory(),
-        isSymlink: st.isSymbolicLink(),
+        isSymlink: info.isSymbolicLink(),
         createdAt: st.birthtimeMs,
         modifiedAt: st.mtimeMs,
         accessedAt: st.atimeMs,
@@ -197,8 +203,8 @@ export class FileService {
         const src = sources[i];
         if (this.markCancelledIfNeeded(result, operationId, sources.slice(i))) break;
         try {
-          const st = await stat(src);
-          if (st.isDirectory() && this.isSameOrChild(destDir, src)) {
+          const st = await lstat(src);
+          if (st.isDirectory() && this.isSameOrChild(await realpath(destDir), await realpath(src))) {
             this.addFailure(result, src, destDir, '不能把文件夹复制到它自己里面');
             continue;
           }
@@ -206,12 +212,7 @@ export class FileService {
           const target = await this.resolveDestination(src, destDir, conflictStrategy, result);
           if (!target) continue;
 
-          if (st.isDirectory()) {
-            await this.copyDir(src, target.dest, operationId);
-          } else {
-            this.throwIfCancelled(operationId);
-            await copyFile(src, target.dest, constants.COPYFILE_EXCL);
-          }
+          await this.copyEntry(src, target.dest, operationId);
           result.completed.push({ path: src, dest: target.dest, action: 'copied' });
         } catch (e: any) {
           if (this.handleCancellation(result, e, sources.slice(i))) break;
@@ -244,8 +245,8 @@ export class FileService {
         const src = sources[i];
         if (this.markCancelledIfNeeded(result, operationId, sources.slice(i))) break;
         try {
-          const st = await stat(src);
-          if (st.isDirectory() && this.isSameOrChild(destDir, src)) {
+          const st = await lstat(src);
+          if (st.isDirectory() && this.isSameOrChild(await realpath(destDir), await realpath(src))) {
             this.addFailure(result, src, destDir, '不能把文件夹移动到它自己里面');
             continue;
           }
@@ -258,14 +259,11 @@ export class FileService {
             await rename(src, target.dest);
           } catch (e: any) {
             if (e.code !== 'EXDEV') throw e;
+            await this.copyEntry(src, target.dest, operationId);
+            this.throwIfCancelled(operationId);
             if (st.isDirectory()) {
-              await this.copyDir(src, target.dest, operationId);
-              this.throwIfCancelled(operationId);
               await rm(src, { recursive: true, force: true });
             } else {
-              this.throwIfCancelled(operationId);
-              await copyFile(src, target.dest, constants.COPYFILE_EXCL);
-              this.throwIfCancelled(operationId);
               await unlink(src);
             }
           }
@@ -316,6 +314,7 @@ export class FileService {
 
   async createDir(parentPath: string, name: string) {
     try {
+      this.validateName(name);
       const fullPath = join(parentPath, name);
       await mkdir(fullPath);
       return { success: true, path: fullPath };
@@ -326,6 +325,7 @@ export class FileService {
 
   async createFile(parentPath: string, name: string) {
     try {
+      this.validateName(name);
       const fullPath = join(parentPath, name);
       await writeFile(fullPath, '', { flag: 'wx' });
       return { success: true, path: fullPath };
@@ -336,8 +336,22 @@ export class FileService {
 
   async renameFile(filePath: string, newName: string) {
     try {
+      this.validateName(newName);
       const dir = join(filePath, '..');
       const newPath = join(dir, newName);
+      const source = await lstat(filePath);
+      if (resolve(filePath) === resolve(newPath)) return { success: true, newPath };
+      const target = await lstat(newPath).catch((err: NodeJS.ErrnoException) => {
+        if (err.code === 'ENOENT') return null;
+        throw err;
+      });
+      // Windows allows changing only the case of the existing item's name.
+      const caseOnly = process.platform === 'win32'
+        && resolve(filePath).toLowerCase() === resolve(newPath).toLowerCase()
+        && target?.dev === source.dev && target?.ino === source.ino;
+      if (target && !caseOnly) {
+        return { success: false, error: '目标名称已存在，请使用其他名称' };
+      }
       await rename(filePath, newPath);
       return { success: true, newPath };
     } catch (e: any) {
@@ -347,15 +361,17 @@ export class FileService {
 
   async exists(filePath: string): Promise<boolean> {
     try {
-      await access(filePath, constants.F_OK);
+      await lstat(filePath);
       return true;
-    } catch {
-      return false;
+    } catch (error) {
+      if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) return false;
+      throw error;
     }
   }
 
   async open(filePath: string): Promise<void> {
-    await shell.openPath(filePath);
+    const error = await shell.openPath(filePath);
+    if (error) throw new Error(error);
   }
 
   // ── File watching (tail -f) ──
@@ -435,6 +451,15 @@ export class FileService {
 
   // ── private ──
 
+  private validateName(name: string): void {
+    if (typeof name !== 'string' || !name.trim() || name === '.' || name === '..'
+      || /[\\/\0]/.test(name)
+      || (process.platform === 'win32' && (/[<>:"|?*\x01-\x1f]/.test(name)
+        || /[. ]$/.test(name) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name)))) {
+      throw new Error('请输入有效的文件名称，不能包含路径或系统保留字符');
+    }
+  }
+
   private createOpResult(): Required<Pick<FileOpResult, 'skipped' | 'completed' | 'failures' | 'renamed' | 'replaced'>> & Pick<FileOpResult, 'cancelled'> {
     return {
       skipped: [],
@@ -496,7 +521,7 @@ export class FileService {
 
   private isSameOrChild(targetPath: string, parentPath: string): boolean {
     const rel = relative(resolve(parentPath), resolve(targetPath));
-    return rel === '' || (!!rel && !rel.startsWith('..') && !isAbsolute(rel));
+    return rel === '' || (!!rel && rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
   }
 
   private async resolveDestination(
@@ -548,18 +573,28 @@ export class FileService {
 
   private async copyDir(src: string, dest: string, operationId?: string): Promise<void> {
     this.throwIfCancelled(operationId);
-    await mkdir(dest, { recursive: true });
+    await mkdir(dest);
     const entries = await readdir(src);
     for (const name of entries) {
       this.throwIfCancelled(operationId);
       const srcPath = join(src, name);
       const destPath = join(dest, name);
-      const st = await stat(srcPath);
-      if (st.isDirectory()) {
-        await this.copyDir(srcPath, destPath, operationId);
-      } else {
-        await copyFile(srcPath, destPath, constants.COPYFILE_EXCL);
-      }
+      await this.copyEntry(srcPath, destPath, operationId);
+    }
+  }
+
+  private async copyEntry(src: string, dest: string, operationId?: string): Promise<void> {
+    this.throwIfCancelled(operationId);
+    const info = await lstat(src);
+    if (info.isSymbolicLink()) {
+      const target = await readlink(src);
+      const directory = await stat(src).then((value) => value.isDirectory()).catch(() => false);
+      const junction = directory && process.platform === 'win32';
+      await symlink(junction ? resolve(dirname(src), target) : target, dest, directory ? (junction ? 'junction' : 'dir') : 'file');
+    } else if (info.isDirectory()) {
+      await this.copyDir(src, dest, operationId);
+    } else {
+      await copyFile(src, dest, constants.COPYFILE_EXCL);
     }
   }
 
