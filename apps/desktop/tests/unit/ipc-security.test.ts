@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { validateRequest } from '../../src/main/ipc/request-validation';
 import { isTrustedRendererUrl } from '../../src/main/security/renderer-policy';
 
@@ -45,7 +49,13 @@ describe('renderer URL trust policy', () => {
   const file = 'file:///C:/Explore/out/renderer/index.html';
   it('trusts only the exact application page, allowing its hash router', () => {
     expect(isTrustedRendererUrl(file + '#/launcher', file)).toBe(true);
-    for (const url of ['file:///C:/secret.html', file + '?other=1', 'https://example.com', 'about:blank']) {
+    for (const url of [
+      'file:///C:/secret.html',
+      'file://untrusted.example/share/index.html',
+      file + '?other=1',
+      'https://example.com',
+      'about:blank',
+    ]) {
       expect(isTrustedRendererUrl(url, file)).toBe(false);
     }
   });
@@ -55,5 +65,26 @@ describe('renderer URL trust policy', () => {
     expect(isTrustedRendererUrl(dev + 'evil.html', dev)).toBe(false);
     expect(isTrustedRendererUrl('http://localhost.evil:5173/', dev)).toBe(false);
     expect(isTrustedRendererUrl('http://user@localhost:5173/', dev)).toBe(false);
+  });
+  it('accepts canonical installation aliases without trusting sibling files', () => {
+    const root = mkdtempSync(join(tmpdir(), 'explore-url-policy-'));
+    try {
+      const directory = join(root, 'actual');
+      const alias = join(root, 'alias');
+      mkdirSync(directory);
+      writeFileSync(join(directory, 'index.html'), 'trusted');
+      writeFileSync(join(directory, 'other.html'), 'not trusted');
+      symlinkSync(directory, alias, 'junction');
+      const entry = pathToFileURL(join(directory, 'index.html')).href;
+      expect(isTrustedRendererUrl(pathToFileURL(join(alias, 'index.html')).href + '#/launcher', entry)).toBe(
+        true,
+      );
+      expect(isTrustedRendererUrl(pathToFileURL(join(alias, 'other.html')).href, entry)).toBe(false);
+      expect(isTrustedRendererUrl(pathToFileURL(join(alias, 'index.html')).href + '?other=1', entry)).toBe(
+        false,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

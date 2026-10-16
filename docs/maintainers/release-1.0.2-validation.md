@@ -68,6 +68,12 @@ it; it is not a universal installation or security certificate.
 The application no longer selects a search executable through RG_PATH, PATH or
 the working directory. It runs its own bundled binary or falls back to JS.
 
+Installer acceptance exposed a Windows 8.3/long-path alias mismatch in renderer
+URL trust checks. This is covered by a packaged regression that copies the app
+to temporary installation paths. File URLs must resolve to the same canonical
+file, with matching hosts and query strings; foreign shares and sibling pages
+remain rejected. The owner-window/main-frame restrictions remain unchanged.
+
 Two non-application findings were manually reviewed: the commit-policy CLI
 intentionally reads the filename supplied by its local invoker (there is no
 remote request handler or privilege boundary), and the installer acceptance test

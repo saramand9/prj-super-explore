@@ -17,6 +17,8 @@ No changes yet.
 - Validate plugin IDs and canonical paths; require confirmation before installation.
 - Execute only the application-owned search binary; ignore RG_PATH, working-directory
   and PATH executable overrides and use basic search if the bundled binary is missing.
+- Recognize the same canonical renderer file across Windows installation path
+  aliases, preserving IPC/workspace restoration without trusting sibling files or remote shares.
 
 ### Development and releases
 
