@@ -27,6 +27,7 @@
   "build": {
     "appId": "com.explore.app",
     "productName": "Explore",
+    "artifactName": "Explore-Setup-${version}-windows-${arch}.${ext}",
     "npmRebuild": false,
     "electronDist": "node_modules/electron/dist",
     "extraResources": [

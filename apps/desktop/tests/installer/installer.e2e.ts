@@ -91,7 +91,7 @@ test('installs 1.0.1, upgrades with data preserved, launches securely and uninst
     throw new Error('Installer acceptance is restricted to a disposable Windows GitHub runner');
   }
   const version = JSON.parse(await readFile(join(appRoot, 'package.json'), 'utf8')).version as string;
-  const installer = join(appRoot, 'dist-electron', `Explore Setup ${version}.exe`);
+  const installer = join(appRoot, 'dist-electron', `Explore-Setup-${version}-windows-x64.exe`);
   const root = await mkdtemp(join(tmpdir(), 'explore-installer-'));
   const directory = join(root, 'installed');
   const executable = join(directory, 'Explore.exe');

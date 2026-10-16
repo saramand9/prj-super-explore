@@ -47,7 +47,7 @@ The Windows x64 release prepared by this source is **1.0.2**, dated **October 17
 Compare the checksum file with a downloaded installer in PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 '.\Explore Setup 1.0.2.exe'
+Get-FileHash -Algorithm SHA256 '.\Explore-Setup-1.0.2-windows-x64.exe'
 ```
 
 Installers are currently unsigned. A checksum is useful for integrity checking
