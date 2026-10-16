@@ -17,8 +17,9 @@ async function downloadBaseline(): Promise<Buffer> {
   const size = 85572961;
   const chunkSize = 1024 * 1024;
   const output = Buffer.alloc(size);
-  const deadline = AbortSignal.timeout(150000);
+  const deadline = AbortSignal.timeout(360000);
   let next = 0;
+  let completed = 0;
   // The original host serves large single responses slowly. Bounded ranges
   // retain HTTPS, exact Content-Range checks and the full-file SHA-256 pin.
   console.log('Downloading pinned 1.0.1 baseline with at most 8 concurrent ranges');
@@ -44,6 +45,10 @@ async function downloadBaseline(): Promise<Buffer> {
             const chunk = Buffer.from(await response.arrayBuffer());
             if (chunk.length !== end - start + 1) throw new Error('Truncated baseline range');
             chunk.copy(output, start);
+            completed += chunk.length;
+            if (completed % (20 * chunkSize) === 0 || completed === size) {
+              console.log(`Baseline download: ${completed}/${size} bytes verified by range`);
+            }
             break;
           } catch (error) {
             if (deadline.aborted || attempt === 2) throw error;
