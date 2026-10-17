@@ -683,8 +683,10 @@ function MainApp() {
 
   return (
     <div className="h-full flex flex-col bg-surface">
-      <MenuBar />
-      <Toolbar />
+      <div data-testid="application-chrome" className="application-chrome">
+        <MenuBar />
+        <Toolbar />
+      </div>
       <WorkspacePersistence />
       <div className="flex-1 flex overflow-hidden">
         <ActivityBar onPluginChange={handlePluginChange} />

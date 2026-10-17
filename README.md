@@ -3,7 +3,7 @@
 A Windows file manager for finding, previewing and organizing files without
 losing your place.
 
-[Download for Windows](https://github.com/saramand9/prj-super-explore/releases/tag/v1.0.3)
+[Download for Windows](https://github.com/saramand9/prj-super-explore/releases/tag/v1.0.4)
  | [Getting started](#getting-started)
  | [Contributing](CONTRIBUTING.md)
  | [Security](SECURITY.md)
@@ -39,15 +39,15 @@ trusted local code, not sandboxed extensions.
 
 ## Download
 
-The Windows x64 release prepared by this source is **1.0.3**, dated **October 17, 2026**.
+The Windows x64 release prepared by this source is **1.0.4**, dated **October 17, 2026**.
 
-- [Release notes and Windows installer](https://github.com/saramand9/prj-super-explore/releases/tag/v1.0.3)
-- [SHA-256 checksum file](https://github.com/saramand9/prj-super-explore/releases/download/v1.0.3/SHA256SUMS.txt)
+- [Release notes and Windows installer](https://github.com/saramand9/prj-super-explore/releases/tag/v1.0.4)
+- [SHA-256 checksum file](https://github.com/saramand9/prj-super-explore/releases/download/v1.0.4/SHA256SUMS.txt)
 
 Compare the checksum file with a downloaded installer in PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 '.\Explore-Setup-1.0.3-windows-x64.exe'
+Get-FileHash -Algorithm SHA256 '.\Explore-Setup-1.0.4-windows-x64.exe'
 ```
 
 Installers are currently unsigned. A checksum is useful for integrity checking

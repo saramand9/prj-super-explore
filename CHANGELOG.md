@@ -2,7 +2,23 @@
 
 ## Unreleased
 
-No changes yet.
+## 1.0.4 - 2026-10-17
+
+### Changed
+
+- Redesign the desktop menu/command bars with grouped commands, consistent icons,
+  aligned shortcuts, contextual disabled states, keyboard navigation and responsive sizing.
+- Share file actions between menus and toolbar buttons, preserving copy conflicts
+  and two-step permanent deletion confirmation.
+- Separate up-to-date results from expandable installation/security notes.
+
+### Fixed
+
+- Prevent the hidden update dialog from blocking global keyboard shortcuts.
+
+Installers remain unsigned. Update transport and save safeguards are covered by
+loopback tests; installer acceptance uses a direct NSIS upgrade from 1.0.2,
+not a live GitHub-triggered automatic installation.
 
 ## 1.0.3 - 2026-10-17
 

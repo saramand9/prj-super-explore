@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { CheckCircle2, CircleAlert, Download, Info, Loader2 } from 'lucide-react';
 import { UPDATE_CHANNELS, type UpdateStatus } from '@explore/shared';
 import { ipc } from '../framework/bridge/ipc-client';
 import { connectUpdates, isPreparingUpdate, useUpdateStore } from '../framework/store/update-store';
@@ -79,7 +80,8 @@ function UpdateDialog() {
     <dialog
       ref={dialog}
       aria-labelledby="update-title"
-      className="m-auto w-[460px] max-w-[90vw] rounded-xl border border-border bg-surface-light p-6 text-text-primary shadow-2xl backdrop:bg-black/60"
+      className="update-dialog m-auto w-[460px] max-w-[90vw] rounded-xl border border-border bg-surface-light p-6 text-text-primary shadow-2xl backdrop:bg-black/60"
+      aria-modal={open ? true : undefined}
       onCancel={(event) => {
         if (busy) event.preventDefault();
         else setOpen(false);
@@ -92,10 +94,16 @@ function UpdateDialog() {
       </h2>
       <p className="mt-1 text-xs text-text-secondary">GitHub Releases · 正式版本 · 手动确认安装</p>
       <UpdateDetails />
-      <p className="text-xs leading-5 text-text-secondary">
-        安装包目前未签名。下载会校验完整性，但不等于发布者签名验证。
-        点击“重启并安装”会先保存工作空间和设置；文件操作未完成时不会重启。 关闭应用不会自动安装更新。
-      </p>
+      <details className="update-dialog__notes">
+        <summary>
+          安装与安全说明 <span>安装包未签名</span>
+        </summary>
+        <ul>
+          <li>下载会校验完整性，但不等于发布者签名验证。</li>
+          <li>安装前先保存工作空间和设置；文件操作未完成时不会重启。</li>
+          <li>关闭应用不会自动安装更新，安装始终由你确认。</li>
+        </ul>
+      </details>
       <div className="mt-5 flex justify-end gap-2 text-sm">
         <button
           autoFocus
@@ -127,17 +135,35 @@ function UpdateDialog() {
 
 function UpdateDetails() {
   const { state, error } = useUpdateStore();
+  const current = state?.status === 'idle' && !!state.checkedAt;
+  const Icon =
+    error || state?.status === 'error'
+      ? CircleAlert
+      : current
+        ? CheckCircle2
+        : state?.status === 'checking' || state?.status === 'preparing'
+          ? Loader2
+          : state?.availableVersion
+            ? Download
+            : Info;
+  const label = state
+    ? current
+      ? `已是最新版本 ${state.currentVersion}`
+      : state.status === 'idle'
+        ? '尚未检查更新'
+        : LABELS[state.status]
+    : '正在读取更新状态…';
   return (
-    <div className="my-5 rounded-lg border border-border bg-surface p-4 text-sm" aria-live="polite">
+    <div
+      className={`update-dialog__status${current ? ' update-dialog__status--current' : ''}`}
+      aria-live="polite"
+    >
+      <div className="update-dialog__result">
+        <Icon size={24} strokeWidth={1.6} aria-hidden="true" />
+        <p>{label}</p>
+      </div>
       <p>当前版本：{state?.currentVersion ?? '读取中…'}</p>
       {state?.availableVersion && <p className="mt-1">可用版本：{state.availableVersion}</p>}
-      <p className="mt-3 font-medium">
-        {state
-          ? state.status === 'idle' && !state.checkedAt
-            ? '尚未检查更新'
-            : LABELS[state.status]
-          : '正在读取更新状态…'}
-      </p>
       {state?.status === 'downloading' && (
         <>
           <progress
