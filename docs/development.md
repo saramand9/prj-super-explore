@@ -59,8 +59,11 @@ The separate [release workflow](releasing.md) builds a draft on a version tag;
 it never publishes automatically.
 Production distribution still needs clean-machine installation, upgrade,
 uninstallation, search without development tools, read-only directories,
-disconnected shares and large-directory checks. Current packaging does not
-configure code signing or automatic update publication.
+disconnected shares and large-directory checks. Current packaging configures
+GitHub update metadata, but not code signing or automatic release publication.
+See [updater architecture and isolated tests](updates.md). Production downloads
+never accept renderer-supplied feed URLs; loopback injection exists only in test
+bootstrap code outside the packaged application.
 
 On Windows, the resource-editing/signing helper can fail while extracting
 symlinks if the account lacks the required permissions. Repeated GitHub helper

@@ -64,6 +64,8 @@ jobs:
           retention-days: 14
           path: |
             apps/desktop/dist-electron/*.exe
+            apps/desktop/dist-electron/latest.yml
+            apps/desktop/dist-electron/*.blockmap
             apps/desktop/dist-electron/SHA256SUMS.txt
             LICENSE
             THIRD_PARTY_NOTICES.md

@@ -4,6 +4,25 @@
 
 No changes yet.
 
+## 1.0.3 - 2026-10-17
+
+### Added
+
+- Add GitHub Releases updates for Windows NSIS installations.
+- Check stable releases after startup and every six hours, with a manual Help menu entry.
+- Require separate download and restart/install actions; show progress and verify SHA-512.
+- Save workspaces and appearance settings before installation; cancel on save failure,
+  timeout or renderer loss, and block installation while file mutations are active.
+- Keep automatic installation on ordinary quit disabled; preserve signature verification.
+- Include and validate latest.yml and installer blockmaps in draft releases.
+- Pin js-yaml 4.x to 4.3.2 to address known YAML parsing denial-of-service advisories.
+- Add real updater transport/corruption/save-failure tests using isolated loopback fixtures.
+- Advance disposable-runner installer acceptance to the hash-pinned GitHub 1.0.2 baseline.
+
+Existing 1.0.2 installations need one manual installation of this updater-enabled
+version. Installers remain unsigned. Loopback tests verify download/integrity and
+save behavior; they do not certify a live GitHub-to-NSIS automatic upgrade.
+
 ## 1.0.2 - 2026-10-17
 
 ### Security

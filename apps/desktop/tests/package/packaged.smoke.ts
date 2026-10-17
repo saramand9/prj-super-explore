@@ -48,6 +48,9 @@ test('packaged Windows app launches, searches without development tools, and sav
     const page = await application.firstWindow();
     await page.waitForLoadState('domcontentloaded');
     expect(await application.evaluate(({ app }) => app.isPackaged)).toBe(true);
+    const updateState = await page.evaluate(() => window.explore.requests['update:getState'](undefined));
+    expect(updateState.currentVersion).toBe(await application.evaluate(({ app }) => app.getVersion()));
+    expect(updateState.status).not.toBe('disabled');
     expect(await application.evaluate(({ app }) => app.getPath('userData'))).toBe(profile);
     await expect(page.getByTestId('workspace-menu-trigger')).toContainText('安装包验证');
     await expect(page.getByText('match.txt', { exact: true })).toBeVisible();

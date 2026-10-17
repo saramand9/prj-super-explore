@@ -13,6 +13,8 @@ import {
   summarizeFileOpToast,
 } from '../plugins/file-explorer/utils/file-op-result';
 import type { FileOpResult } from '@explore/shared';
+import { UpdateCenter } from './update-center';
+import { useUpdateStore } from '../framework/store/update-store';
 
 interface MenuItem {
   label?: string;
@@ -319,6 +321,7 @@ export function MenuBar() {
     {
       label: '帮助',
       items: [
+        { label: '检查更新...', action: () => useUpdateStore.getState().setOpen(true) },
         {
           label: '快捷键与操作说明',
           action: () =>
@@ -400,6 +403,7 @@ export function MenuBar() {
           </div>
         ))}
         <span className="flex-1" />
+        <UpdateCenter />
         <ThemeDropdown />
         <span className="w-1" />
         <FontScaleDropdown />

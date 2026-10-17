@@ -262,6 +262,15 @@ export class WindowService implements Service {
     if (this.closeGuard?.window.webContents.id === senderId) this.closeGuard.ready = true;
   }
 
+  isReadyForUpdate(): boolean {
+    const guard = this.closeGuard;
+    return !!guard && guard.ready && !guard.window.isDestroyed() && !guard.window.webContents.isCrashed();
+  }
+
+  permitUpdateQuit(allow: boolean): void {
+    if (this.closeGuard) this.closeGuard.coordinator.confirmed = allow;
+  }
+
   closePending(senderId: number, requestId: number): void {
     if (this.closeGuard?.window.webContents.id === senderId)
       this.closeGuard.coordinator.userIsDeciding(requestId);

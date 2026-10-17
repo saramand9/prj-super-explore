@@ -50,3 +50,5 @@ export type {
 } from './types/config';
 export { REQUEST_CHANNELS, EVENT_CHANNELS } from './bridge';
 export type { ExploreApi } from './bridge';
+export { UPDATE_CHANNELS } from './types/update';
+export type { UpdateState, UpdateStatus } from './types/update';

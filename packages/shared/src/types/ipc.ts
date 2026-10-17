@@ -9,6 +9,7 @@ import type { FileConflictStrategy, FileEntry, FileOpResult, FileStat, SortConfi
 import type { Bookmark } from './config';
 import type { Space } from './config';
 import type { PluginInfo, PluginManifest } from './plugin';
+import type { UpdateState } from './update';
 
 export type IpcErrorCode =
   | 'FILE_NOT_FOUND'
@@ -44,6 +45,11 @@ export interface FileReadResult {
 // ── 请求-响应 channels ──────────────────────────
 
 export interface IpcChannels {
+  'update:getState': { req: void; res: UpdateState };
+  'update:check': { req: void; res: UpdateState };
+  'update:download': { req: void; res: UpdateState };
+  'update:install': { req: void; res: UpdateState };
+  'update:resolveSave': { req: { requestId: number; allow: boolean }; res: void };
   // File operations
   'file:readDir': {
     req: { path: string; sort?: SortConfig; showHidden?: boolean };
@@ -328,6 +334,8 @@ export interface IpcChannels {
 // ── 事件推送 channels (main → renderer) ─────────
 
 export interface IpcEvents {
+  'update:stateChanged': UpdateState;
+  'update:beforeInstall': { requestId: number };
   'window:beforeClose': { requestId: number };
   'window:closeCancelled': { requestId: number };
   'file:scanProgress': ScanSummary & { scanId: string; entries: FileEntry[] };

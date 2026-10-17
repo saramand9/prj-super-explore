@@ -1,7 +1,13 @@
 import type { IpcChannels, IpcEvents } from './types/ipc';
+import { UPDATE_CHANNELS } from './types/update';
 
 // Exhaustive fixed capabilities, not caller-supplied IPC channel names.
 export const REQUEST_CHANNELS = Object.freeze({
+  [UPDATE_CHANNELS.getState]: true,
+  [UPDATE_CHANNELS.check]: true,
+  [UPDATE_CHANNELS.download]: true,
+  [UPDATE_CHANNELS.install]: true,
+  [UPDATE_CHANNELS.resolveSave]: true,
   'file:readDir': true,
   'file:stat': true,
   'file:copy': true,
@@ -61,6 +67,8 @@ export const REQUEST_CHANNELS = Object.freeze({
 } satisfies Record<keyof IpcChannels, true>);
 
 export const EVENT_CHANNELS = Object.freeze({
+  [UPDATE_CHANNELS.stateChanged]: true,
+  [UPDATE_CHANNELS.beforeInstall]: true,
   'window:beforeClose': true,
   'window:closeCancelled': true,
   'file:scanProgress': true,

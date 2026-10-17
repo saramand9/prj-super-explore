@@ -12,6 +12,9 @@ import type { ScanService } from '../services/scan.service';
 import type { DiagnosticsService } from '../services/diagnostics.service';
 import { createIpcRegistrar } from './ipc-registrar';
 import { registerPluginHandlers } from './plugin-handlers';
+import { registerUpdateHandlers } from './update-handlers';
+import type { UpdateService } from '../services/update.service';
+import type { OperationGuard } from '../updates/operation-guard';
 
 import { readTextFile } from './text-preview';
 import { toIpcError, toIpcErrorInfo } from './ipc-errors';
@@ -25,6 +28,7 @@ export function registerIpcHandlers(container: ServiceContainer): void {
   const watcher = container.get<WatcherService>('watcher');
   const scan = container.get<ScanService>('scan');
   const diagnostics = container.get<DiagnosticsService>('diagnostics');
+  const updates = container.get<UpdateService>('updates');
   const owners = new Set<number>();
   const trackOwner = (sender: Electron.WebContents) => {
     if (owners.has(sender.id)) return;
@@ -42,7 +46,9 @@ export function registerIpcHandlers(container: ServiceContainer): void {
   const ipcMain = createIpcRegistrar(
     (event) => windowSvc.isTrustedSender(event),
     (source, error) => diagnostics.log(source, error),
+    container.get<OperationGuard>('operations'),
   );
+  registerUpdateHandlers(ipcMain, updates, windowSvc);
 
   // ── File ──
 
