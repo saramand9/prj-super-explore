@@ -12,6 +12,11 @@ Upstream texts are bundled under `resources/licenses/components`, with the
 project MIT license and inventory under `resources/licenses`. Electron/Chromium
 notices remain beside the executable. Review notices when dependencies change.
 
+Retained native component texts:
+
+- [ripgrep 15.0.0 MIT](https://github.com/BurntSushi/ripgrep/blob/15.0.0/LICENSE-MIT).
+- [PCRE2 10.45 license](https://github.com/PCRE2Project/pcre2/blob/pcre2-10.45/LICENCE.md).
+
 The lazy-val package omits its upstream license text. The documented fallback
 records its MIT declaration and standard text without inventing a copyright year
 or claiming a verbatim upstream notice. This remains a provenance follow-up.
