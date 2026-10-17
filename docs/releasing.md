@@ -10,24 +10,27 @@ Publishing remains a deliberate maintainer action.
 1. Complete the [readiness checks](maintainers/open-source-readiness.md), including
    asset rights, dependency triage and complete notices for distributed components.
 2. Update all three package versions together. The current source is prepared
-   as 1.0.4; never reuse or replace already published release assets.
+   as 1.0.0; never reuse or replace already published release assets.
 3. Move the relevant Unreleased entries in `CHANGELOG.md` into a dated version.
 4. Run `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test:unit`,
    `pnpm test:e2e`, `pnpm test:commit-policy`, `pnpm test:release` and
    `pnpm test:package`. Review both full and production dependency audits.
 5. Merge the release preparation through a PR with the required checks passing.
    Never bypass branch protection or rewrite master for a routine release.
+6. Before the first version after 1.0.0, record the verified public 1.0.0
+   installer size/SHA-256 in `tests/helpers/installer-baseline.ts` and update
+   its policy tests. Later versions fail closed until this upgrade baseline is pinned.
 
 ## Tag and build
 
 From an up-to-date, clean master, create an annotated tag matching every package
 version and push only that tag. For example, after deliberately setting all
-three versions to `1.0.4`:
+three versions to `1.0.0`:
 
 ```powershell
-node scripts/verify-release.mjs v1.0.4
-git tag -a v1.0.4 -m "Release Explore 1.0.4"
-git push origin v1.0.4
+node scripts/verify-release.mjs v1.0.0
+git tag -a v1.0.0 -m "Release Explore 1.0.0"
+git push origin v1.0.0
 ```
 
 This is a maintainer procedure, not a command executed by documentation updates.
@@ -49,16 +52,18 @@ The workflow does not overwrite an existing release or publish a draft.
   Electron/Chromium notices are next to the executable. Review new dependencies
   when adding runtime code or changing renderer build inputs.
 - The workflow runs `pnpm --filter @explore/desktop test:installer` on its
-  disposable Windows runner. It verifies the pinned GitHub 1.0.2 installer hash,
-  installs it, upgrades with isolated sample workspaces/settings preserved,
-  verifies hardened startup and notices, and uninstalls. It refuses to run on
+  disposable Windows runner. The initial 1.0.0 release installs the built binary,
+  reinstalls it with isolated sample workspaces/settings preserved, verifies
+  hardened startup and notices, and uninstalls. Later versions must pin the
+  retained public 1.0.0 installer to validate a cross-version upgrade. The test refuses to run on
   the maintainer's ordinary account. Repeat manual acceptance on supported
   Windows versions as appropriate; one Windows runner is not all hardware/OSes.
 - Exercise copy/move/rename conflicts, locked files, close/save recovery, network
   shares, filename/full-text search, worker loading and trusted plugin behavior.
 - Confirm the release notes distinguish known limitations and fixes from the
-  preceding binary. Current builds remain unsigned. 1.0.3 adds the updater;
-  published 1.0.2 users must install it manually once.
+  preceding binary. Current builds remain unsigned. The public line starts at
+  1.0.0; higher-numbered retired trial builds need manual installation because
+  the updater keeps downgrade protection enabled.
 - Verify all updater assets are attached to the same stable release. A draft is
   invisible to installed clients; publishing it deliberately activates update
   availability. Do not publish partial assets or overwrite an existing version.

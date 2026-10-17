@@ -7,22 +7,19 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { closeTestApp, removeTestFixture } from '../helpers/electron-app';
+import { selectInstallerBaseline } from '../helpers/installer-baseline';
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const baselineUrl =
-  'https://github.com/saramand9/prj-super-explore/releases/download/v1.0.2/Explore-Setup-1.0.2-windows-x64.exe';
-const baselineHash = '329edcc84bbdfe1593dec18bf4a34f7fc741323bd5f925c79cdbab10d320c81c';
-
-async function downloadBaseline(): Promise<Buffer> {
-  const size = 115581856;
+async function downloadBaseline(version: string, installer: string): Promise<Buffer> {
+  const baseline = selectInstallerBaseline(version);
+  if (baseline.mode === 'reinstall') return readFile(installer);
+  const { size } = baseline;
   const chunkSize = 1024 * 1024;
   const output = Buffer.alloc(size);
   const deadline = AbortSignal.timeout(360000);
   let next = 0;
   let completed = 0;
-  // Use the latest accepted installer, not the obsolete 1.0.1 baseline which
-  // crashes on some fresh runners. Retain HTTPS, exact ranges and SHA-256 pinning.
-  console.log('Downloading pinned 1.0.2 baseline with at most 8 concurrent ranges');
+  console.log(`Downloading pinned ${baseline.version} baseline with at most 8 concurrent ranges`);
   await Promise.all(
     Array.from({ length: 8 }, async () => {
       for (;;) {
@@ -32,7 +29,7 @@ async function downloadBaseline(): Promise<Buffer> {
         const end = Math.min(start + chunkSize, size) - 1;
         for (let attempt = 0; attempt < 3; attempt++) {
           try {
-            const response = await fetch(baselineUrl, {
+            const response = await fetch(baseline.url, {
               headers: { Range: `bytes=${start}-${end}` },
               signal: AbortSignal.any([deadline, AbortSignal.timeout(30000)]),
             });
@@ -58,7 +55,7 @@ async function downloadBaseline(): Promise<Buffer> {
       }
     }),
   );
-  expect(createHash('sha256').update(output).digest('hex')).toBe(baselineHash);
+  expect(createHash('sha256').update(output).digest('hex')).toBe(baseline.sha256);
   console.log('Baseline SHA-256 verified');
   return output;
 }
@@ -85,12 +82,13 @@ async function launchInstalled(executable: string, profile: string): Promise<Ele
   return application;
 }
 
-test('installs 1.0.2, upgrades with data preserved, launches securely and uninstalls', async () => {
+test('installs, replaces with data preserved, launches securely and uninstalls', async () => {
   // Never register/unregister a test installation in a maintainer's real account.
   if (process.env.GITHUB_ACTIONS !== 'true' || process.env.RUNNER_OS !== 'Windows') {
     throw new Error('Installer acceptance is restricted to a disposable Windows GitHub runner');
   }
   const version = JSON.parse(await readFile(join(appRoot, 'package.json'), 'utf8')).version as string;
+  const baselineInfo = selectInstallerBaseline(version);
   const installer = join(appRoot, 'dist-electron', `Explore-Setup-${version}-windows-x64.exe`);
   const root = await mkdtemp(join(tmpdir(), 'explore-installer-'));
   const directory = join(root, 'installed');
@@ -101,8 +99,8 @@ test('installs 1.0.2, upgrades with data preserved, launches securely and uninst
   const config = join(profile, 'config');
   let application: ElectronApplication | undefined;
   try {
-    const baseline = await downloadBaseline();
-    const oldInstaller = join(root, 'baseline-1.0.2.exe');
+    const baseline = await downloadBaseline(version, installer);
+    const oldInstaller = join(root, `baseline-${baselineInfo.version}.exe`);
     await writeFile(oldInstaller, baseline);
     await mkdir(config, { recursive: true });
     await mkdir(content);
@@ -120,18 +118,18 @@ test('installs 1.0.2, upgrades with data preserved, launches securely and uninst
       ]),
     );
 
-    console.log('Installing baseline 1.0.2 in the disposable profile');
+    console.log(`Installing baseline ${baselineInfo.version} in the disposable profile`);
     await runInstaller(oldInstaller, ['/S', `/D=${directory}`]);
     await expect.poll(() => existsSync(executable), { timeout: 30000 }).toBe(true);
     application = await launchInstalled(executable, profile);
-    expect(await application.evaluate(({ app }) => app.getVersion())).toBe('1.0.2');
+    expect(await application.evaluate(({ app }) => app.getVersion())).toBe(baselineInfo.version);
     await expect((await application.firstWindow()).getByTestId('workspace-menu-trigger')).toContainText(
       'Release fixture',
     );
     await closeTestApp(application);
     application = undefined;
 
-    console.log(`Upgrading to ${version}`);
+    console.log(`${baselineInfo.mode === 'reinstall' ? 'Reinstalling' : 'Upgrading to'} ${version}`);
     await runInstaller(installer, ['/S', `/D=${directory}`]);
     application = await launchInstalled(executable, profile);
     expect(await application.evaluate(({ app }) => app.getVersion())).toBe(version);

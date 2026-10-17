@@ -1,81 +1,56 @@
 # Changelog
 
+Notable changes to the public release line are documented here.
+
 ## Unreleased
 
-## 1.0.4 - 2026-10-17
+## 1.0.0 - 2026-10-17
 
-### Changed
+Initial public release baseline. This consolidates the current application and
+retires the earlier trial Release listings; it does not rewrite Git history.
 
-- Redesign the desktop menu/command bars with grouped commands, consistent icons,
-  aligned shortcuts, contextual disabled states, keyboard navigation and responsive sizing.
-- Share file actions between menus and toolbar buttons, preserving copy conflicts
-  and two-step permanent deletion confirmation.
-- Separate up-to-date results from expandable installation/security notes.
+### File management
 
-### Fixed
+- Dual-pane browsing, including two independent views of the same directory.
+- Named workspaces with persistent folders, tabs, pinned items and appearance settings.
+- Filename search with Chinese pinyin/initials and literal full-text search.
+- File previews for code, Markdown, CSV and logs, with opposite-pane navigation.
+- Copy/move conflict handling, safe folder creation, recycling and confirmed permanent deletion.
 
-- Prevent the hidden update dialog from blocking global keyboard shortcuts.
+### Interface
 
-Installers remain unsigned. Update transport and save safeguards are covered by
-loopback tests; installer acceptance uses a direct NSIS upgrade from 1.0.2,
-not a live GitHub-triggered automatic installation.
+- Grouped menu and command bars with consistent icons, aligned shortcuts,
+  contextual disabled states, keyboard navigation and responsive sizing.
+- Ten themes, adjustable text scale and single/dual-pane layouts.
+- Clear update results separated from expandable installation/security notes.
+- Global shortcuts remain available when the update dialog is hidden.
 
-## 1.0.3 - 2026-10-17
+### Updates and safety
 
-### Added
+- User-confirmed Windows NSIS updates from the public GitHub repository.
+- Stable release checks after startup and every six hours, with a manual Help entry.
+- Separate download/install consent, SHA-512 integrity checks and progress display.
+- Workspace/settings save barrier and active-file-operation guard before installation.
+- Automatic installation on ordinary quit, prereleases and downgrades disabled.
+- Sandboxed renderers, context isolation, fixed preload capabilities, validated IPC,
+  production CSP and blocked foreign navigation, popups and permission requests.
+- Bundled application-owned search binary and validated trusted-plugin installation.
 
-- Add GitHub Releases updates for Windows NSIS installations.
-- Check stable releases after startup and every six hours, with a manual Help menu entry.
-- Require separate download and restart/install actions; show progress and verify SHA-512.
-- Save workspaces and appearance settings before installation; cancel on save failure,
-  timeout or renderer loss, and block installation while file mutations are active.
-- Keep automatic installation on ordinary quit disabled; preserve signature verification.
-- Include and validate latest.yml and installer blockmaps in draft releases.
-- Pin js-yaml 4.x to 4.3.2 to address known YAML parsing denial-of-service advisories.
-- Add real updater transport/corruption/save-failure tests using isolated loopback fixtures.
-- Advance disposable-runner installer acceptance to the hash-pinned GitHub 1.0.2 baseline.
+### Open source and validation
 
-Existing 1.0.2 installations need one manual installation of this updater-enabled
-version. Installers remain unsigned. Loopback tests verify download/integrity and
-save behavior; they do not certify a live GitHub-to-NSIS automatic upgrade.
+- MIT project license, English contributor documentation and bundled third-party notices.
+- Protected PR checks, English Conventional Commits, lint/format/strict type checks,
+  unit tests, Electron UI regression and packaged startup tests.
+- Tagged draft releases with installer, updater metadata, blockmap and checksums.
+- Initial-release Windows acceptance covers clean installation, same-version
+  reinstallation with data preserved, secure startup and uninstall.
 
-## 1.0.2 - 2026-10-17
+### Compatibility and known limitations
 
-### Security
-
-- Upgrade Electron to 44.8.0 and DOMPurify to 3.4.17.
-- Enable renderer sandboxing, context isolation and web security; disable Node integration.
-- Replace the generic preload IPC bridge with fixed request and event capabilities.
-- Validate all request payloads and restrict IPC to owned windows and trusted main frames.
-- Block foreign navigation, popups, embedded frames, webviews and permission requests.
-- Add production CSP while preserving explicitly trusted local plugin Blob modules.
-- Validate plugin IDs and canonical paths; require confirmation before installation.
-- Execute only the application-owned search binary; ignore RG_PATH, working-directory
-  and PATH executable overrides and use basic search if the bundled binary is missing.
-- Recognize the same canonical renderer file across Windows installation path
-  aliases, preserving IPC/workspace restoration without trusting sibling files or remote shares.
-
-### Development and releases
-
-- Add pinned Biome lint/format tooling and a one-time formatting baseline.
-- Include preload, tests and tool configurations in strict type checks.
-- Add negative security regression tests and release-version validation.
-- Add a tag-triggered, tested Windows installer workflow that creates drafts only.
-- Fix Windows packaging to run the desktop build script, not pnpm's source-tarball command.
-- Bundle the project license and third-party inventory with the application.
-- Collect complete installed npm license/notice texts and retain ripgrep/PCRE2 notices.
-- Gate release drafts on installing 1.0.1, upgrading while preserving sample data,
-  launching the hardened build and uninstalling on a disposable Windows runner.
-- Synchronize public-repository, private-reporting and protected-branch documentation.
-
-Windows x64 installers remain unsigned. External plugins remain trusted code,
-not isolated extensions. Dependency audit findings are scoped in the readiness
-review; this release is not a claim of zero vulnerabilities.
-
-## 1.0.1 - 2026-10-16
-
-- Existing unsigned Windows x64 installer distributed from the maintainer's download host.
-- Includes dual-pane browsing, workspaces, pinyin filename search, previews and full-text search.
-
-The existing binary predates the Unreleased changes. This entry does not imply
-that a GitHub Release or a new installer has been published retroactively.
+- Higher-numbered trial installations require manual installation of 1.0.0;
+  back up workspace/settings first. Downgrade protection remains enabled.
+- Windows x64 installers are unsigned. Hash checks are not publisher authentication.
+- External plugins are trusted code, not isolated extensions.
+- Existing dependency advisories and provenance follow-ups remain documented in
+  the maintainer readiness review; this is not a zero-vulnerability claim.
+- Loopback updater tests do not certify a live GitHub-triggered NSIS replacement.

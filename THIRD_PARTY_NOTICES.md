@@ -39,7 +39,7 @@ upstream notice gap before public distribution; it is not hidden by the collecto
 Electron's `LICENSE.electron.txt` and `LICENSES.chromium.html` are preserved next
 to the executable. Ripgrep 15.0.0 and its PCRE2 10.45 license texts are retained;
 the source URLs and release-risk assessment are recorded in
-[1.0.2 validation](docs/maintainers/release-1.0.2-validation.md).
+[release validation](docs/maintainers/release-validation.md).
 
 Use the actual lockfile and packaged artifacts for that work:
 

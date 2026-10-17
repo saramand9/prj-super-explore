@@ -1,6 +1,6 @@
 # Windows updates
 
-This describes 1.0.3 and later. The 1.0.2 binary has no built-in updater.
+This describes the public release line starting at 1.0.0.
 
 ## User behavior
 
@@ -15,7 +15,8 @@ This describes 1.0.3 and later. The 1.0.2 binary has no built-in updater.
 - Edits are temporarily blocked during save/handoff. Cancellation restores file
   operations. No update flow offers to discard unsaved workspace changes.
 - This is an NSIS full-installer upgrade with a restart, not JS hot replacement.
-  The first updater-enabled release must be installed manually by 1.0.2 users.
+  Higher-numbered retired trial builds cannot automatically downgrade to 1.0.0.
+  Their users must back up workspaces/settings and manually install 1.0.0.
 - A network, download or verification error leaves the existing application
   intact. Retry after checking connectivity, or download from GitHub manually.
 
@@ -65,9 +66,12 @@ no GitHub fixture release is published and synthetic bytes are never executed.
 2. Run `pnpm pack:win`. Its validator checks generated metadata against the exact
    installer and packaged public GitHub configuration. Never hand-edit production
    hashes or upload artifacts from a different build.
-3. Run installer upgrade/uninstall acceptance only on the disposable Windows
-   runner. Its baseline is the accepted 1.0.2 GitHub installer with pinned size
-   and SHA-256; obsolete 1.0.1 crashed on some new runner images.
+3. Run installer acceptance only on the disposable Windows runner. Version 1.0.0
+   validates clean installation, same-version reinstallation with data retained,
+   secure startup and uninstall, without depending on retired trial downloads.
+   Before a later release, pin the published 1.0.0 installer size and SHA-256 in
+   `tests/helpers/installer-baseline.ts`; the guard rejects later versions until
+   those values are recorded, then validates an upgrade from that retained release.
 4. Review upstream license notices, including the documented lazy-val gap, and
    code-signing limitations before publication. The package collector does not
    turn metadata declarations into an upstream copyright notice.
