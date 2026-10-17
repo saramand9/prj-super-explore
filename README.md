@@ -3,7 +3,7 @@
 A Windows file manager for finding, previewing and organizing files without
 losing your place.
 
-[Download for Windows](https://github.com/saramand9/prj-super-explore/releases/tag/v1.0.4)
+[Download for Windows](https://github.com/saramand9/prj-super-explore/releases/tag/v1.0.0)
  | [Getting started](#getting-started)
  | [Contributing](CONTRIBUTING.md)
  | [Security](SECURITY.md)
@@ -15,7 +15,7 @@ The current interface is primarily Chinese; this README and contributor-facing
 guides are in English.*
 
 > Explore's original code and documentation are licensed under the MIT License.
-> This source repository is public. Release 1.0.2 includes the Electron security
+> This source repository is public. Release 1.0.0 includes the Electron security
 > hardening described below. See [License](#license) and the
 > [maintainer readiness review](docs/maintainers/open-source-readiness.md).
 
@@ -39,15 +39,15 @@ trusted local code, not sandboxed extensions.
 
 ## Download
 
-The Windows x64 release prepared by this source is **1.0.4**, dated **October 17, 2026**.
+The Windows x64 release prepared by this source is **1.0.0**, dated **October 17, 2026**.
 
-- [Release notes and Windows installer](https://github.com/saramand9/prj-super-explore/releases/tag/v1.0.4)
-- [SHA-256 checksum file](https://github.com/saramand9/prj-super-explore/releases/download/v1.0.4/SHA256SUMS.txt)
+- [Release notes and Windows installer](https://github.com/saramand9/prj-super-explore/releases/tag/v1.0.0)
+- [SHA-256 checksum file](https://github.com/saramand9/prj-super-explore/releases/download/v1.0.0/SHA256SUMS.txt)
 
 Compare the checksum file with a downloaded installer in PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 '.\Explore-Setup-1.0.4-windows-x64.exe'
+Get-FileHash -Algorithm SHA256 '.\Explore-Setup-1.0.0-windows-x64.exe'
 ```
 
 Installers are currently unsigned. A checksum is useful for integrity checking
@@ -55,7 +55,7 @@ but is not an independent publisher signature. A release link becomes available
 only when its draft passes acceptance and is explicitly published. Rebuilding a
 branch or tagging it does not itself publish a new binary.
 
-### Updates (1.0.3 and later)
+### Updates
 
 The Windows build checks this repository's public GitHub Releases ten
 seconds after startup and every six hours. Use **帮助 → 检查更新...** to open the
@@ -63,8 +63,10 @@ update panel. Download and restart/install each require your action. Closing the
 application does not install an update. Workspace/settings save failures and
 active file operations prevent installation; failed downloads are not executed.
 
-The published 1.0.2 binary has no updater. Install the first updater-enabled
-release manually once; later releases can use the built-in update panel.
+The public release line starts at 1.0.0. Earlier trial releases were retired.
+If you installed a higher-numbered trial build, manually install 1.0.0;
+the updater deliberately refuses downgrades. Back up your workspace and settings
+before switching release lines. Future higher versions can use the update panel.
 This is a full installer update with a restart, not live replacement of running
 JavaScript. GitHub connectivity is required; no account or token is needed.
 See [update behavior and release acceptance](docs/updates.md).

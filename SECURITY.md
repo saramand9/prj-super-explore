@@ -47,8 +47,8 @@ match is not itself proof that a specific Explore workflow is exploitable.
 
 ## Release integrity
 
-Published 1.0.2 installers are not code-signed and have no updater. Version 1.0.3
-adds user-confirmed Windows NSIS updates from the fixed public
+Release 1.0.0 installers are not code-signed. They include user-confirmed Windows
+NSIS updates from the fixed public
 `saramand9/prj-super-explore` GitHub repository. Checks contact GitHub after
 startup and every six hours; this is not telemetry collection. Downloads and
 restart/install require separate user actions. No client GitHub token is needed
