@@ -9,8 +9,8 @@ Publishing remains a deliberate maintainer action.
 
 1. Complete the [readiness checks](maintainers/open-source-readiness.md), including
    asset rights, dependency triage and complete notices for distributed components.
-2. Update all three package versions together. The updater-enabled source is
-   prepared as 1.0.3; never reuse or replace the already published 1.0.2 assets.
+2. Update all three package versions together. The current source is prepared
+   as 1.0.4; never reuse or replace already published release assets.
 3. Move the relevant Unreleased entries in `CHANGELOG.md` into a dated version.
 4. Run `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test:unit`,
    `pnpm test:e2e`, `pnpm test:commit-policy`, `pnpm test:release` and
@@ -22,12 +22,12 @@ Publishing remains a deliberate maintainer action.
 
 From an up-to-date, clean master, create an annotated tag matching every package
 version and push only that tag. For example, after deliberately setting all
-three versions to `1.0.3`:
+three versions to `1.0.4`:
 
 ```powershell
-node scripts/verify-release.mjs v1.0.3
-git tag -a v1.0.3 -m "Release Explore 1.0.3"
-git push origin v1.0.3
+node scripts/verify-release.mjs v1.0.4
+git tag -a v1.0.4 -m "Release Explore 1.0.4"
+git push origin v1.0.4
 ```
 
 This is a maintainer procedure, not a command executed by documentation updates.

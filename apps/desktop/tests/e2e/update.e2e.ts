@@ -13,11 +13,13 @@ test.describe('real NSIS updater transport and application UI', () => {
   let root: string, application: ElectronApplication, page: Page, server: Server;
   let corrupt = false;
   let downloads = 0;
+  let latestVersion = '1.0.3';
 
   test.beforeEach(async () => {
     root = await mkdtemp(join(tmpdir(), 'explore-update-'));
     corrupt = false;
     downloads = 0;
+    latestVersion = '1.0.3';
     // Synthetic bytes are never executed. Only quitAndInstall is replaced; actual check,
     // download, cache and SHA-512 verification run through electron-updater/Electron HTTP.
     const payload = Buffer.alloc(2 * 1024 * 1024, 65);
@@ -31,7 +33,7 @@ test.describe('real NSIS updater transport and application UI', () => {
     };
     server = createServer((request, response) => {
       if (request.url?.startsWith('/latest.yml')) {
-        response.end(JSON.stringify(metadata));
+        response.end(JSON.stringify({ ...metadata, version: latestVersion }));
       } else if (request.url?.startsWith('/fixture.exe')) {
         downloads++;
         response.setHeader('Content-Length', payload.length);
@@ -59,8 +61,8 @@ test.describe('real NSIS updater transport and application UI', () => {
     ]);
     page = await application.firstWindow();
     await expect(page.getByTestId('workspace-menu-trigger')).toBeVisible();
-    await page.getByRole('button', { name: '帮助', exact: true }).click();
-    await page.getByRole('button', { name: '检查更新...', exact: true }).click();
+    await page.getByRole('menubar').getByRole('menuitem', { name: '帮助', exact: true }).click();
+    await page.getByRole('menuitem', { name: '检查更新...', exact: true }).click();
     await expect(page.getByRole('dialog', { name: 'Explore 更新' })).toBeVisible();
   });
 
@@ -95,6 +97,18 @@ test.describe('real NSIS updater transport and application UI', () => {
     ).toBeGreaterThan(0);
   });
 
+  test('shows a successful up-to-date result separately from collapsed security notes', async () => {
+    latestVersion = '1.0.2';
+    const dialog = page.getByRole('dialog', { name: 'Explore 更新' });
+    await dialog.getByRole('button', { name: '检查更新', exact: true }).click();
+    await expect(dialog.getByText('已是最新版本 1.0.2', { exact: true })).toBeVisible();
+    await expect(dialog.getByRole('alert')).toHaveCount(0);
+    await expect(dialog.locator('details')).not.toHaveAttribute('open');
+    await dialog.locator('summary').click();
+    await expect(
+      dialog.getByText('下载会校验完整性，但不等于发布者签名验证。', { exact: true }),
+    ).toBeVisible();
+  });
   test('rejects corrupted bytes and never exposes an install action', async () => {
     corrupt = true;
     const dialog = page.getByRole('dialog', { name: 'Explore 更新' });
