@@ -57,7 +57,7 @@ jobs:
           if ($installers.Count -ne 1) { throw 'Expected exactly one Windows installer' }
           $hash = (Get-FileHash -LiteralPath $installers[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  $($installers[0].Name)" | Set-Content -LiteralPath apps/desktop/dist-electron/SHA256SUMS.txt -Encoding utf8NoBOM
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-release
           if-no-files-found: error
