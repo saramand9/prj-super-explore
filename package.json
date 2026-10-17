@@ -1,7 +1,7 @@
 {
   "name": "explore",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.0.3",
   "license": "MIT",
   "description": "A Windows file manager with dual-pane browsing, workspaces, pinyin search and previews.",
   "repository": {
@@ -29,7 +29,7 @@
     "verify:search": "pnpm --filter @explore/desktop verify:search",
     "check:commits": "node scripts/check-commit-messages.mjs --ref HEAD",
     "test:commit-policy": "node --test scripts/tests/check-commit-messages.test.mjs",
-    "test:release": "node --test scripts/tests/verify-release.test.mjs",
+    "test:release": "node --test scripts/tests/verify-release.test.mjs scripts/tests/verify-update-assets.test.mjs",
     "hooks:install": "git config --local core.hooksPath .githooks",
     "pack:dir": "pnpm --filter @explore/desktop pack:dir",
     "pack:win": "pnpm --filter @explore/desktop run pack"
@@ -39,6 +39,9 @@
     "pnpm": ">=10.0.0"
   },
   "pnpm": {
+    "overrides": {
+      "js-yaml@^4.0.0": "4.3.2"
+    },
     "onlyBuiltDependencies": [
       "@lvce-editor/ripgrep",
       "electron",

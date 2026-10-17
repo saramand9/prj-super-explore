@@ -47,7 +47,12 @@ function collect(name, parent) {
     (file) =>
       /^(licen[sc]e|copying|notice|thirdparty)/i.test(file) && statSync(join(directory, file)).isFile(),
   );
-  const fallback = pkg.name === 'type-fest' ? 'type-fest-MIT.txt' : null;
+  const fallback =
+    pkg.name === 'type-fest'
+      ? 'type-fest-MIT.txt'
+      : pkg.name === 'lazy-val' && pkg.version === '1.0.5' && pkg.license === 'MIT'
+        ? 'lazy-val-1.0.5-NOTICE.txt'
+        : null;
   if (!licenses.length && !fallback)
     throw new Error(`Missing upstream license text for ${pkg.name}@${pkg.version}`);
   const key = `${pkg.name.replaceAll('/', '__')}@${pkg.version}`;
@@ -82,5 +87,5 @@ writeFileSync(
   )}\n`,
 );
 console.log(
-  `Collected upstream texts for ${visited.size} npm components, ripgrep and PCRE2; Electron notices are bundled by electron-builder.`,
+  `Collected license/notice texts for ${visited.size} npm components, ripgrep and PCRE2; Electron notices are bundled by electron-builder.`,
 );

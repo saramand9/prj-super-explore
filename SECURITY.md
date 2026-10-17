@@ -47,7 +47,20 @@ match is not itself proof that a specific Explore workflow is exploitable.
 
 ## Release integrity
 
-Current installers are not code-signed and do not implement an automatic update
-publication flow. Download from a maintainer-controlled location and compare
-the SHA-256 checksum. A checksum distributed through the same channel detects
-accidental corruption; it is not an independent publisher signature.
+Published 1.0.2 installers are not code-signed and have no updater. Version 1.0.3
+adds user-confirmed Windows NSIS updates from the fixed public
+`saramand9/prj-super-explore` GitHub repository. Checks contact GitHub after
+startup and every six hours; this is not telemetry collection. Downloads and
+restart/install require separate user actions. No client GitHub token is needed
+or embedded. Drafts, prereleases and downgrades are excluded.
+
+Updater SHA-512 checks detect corrupted downloads, not a compromised publishing
+account. Publisher signature verification is not overridden; unsigned builds
+still lack independent publisher authentication. The UI explicitly states this.
+Code signing remains a separate release-hardening task. A checksum distributed
+through the same channel is not a substitute for a publisher signature.
+
+Update IPC exposes fixed actions, not executable paths or feed URLs. Workspaces
+and settings must save successfully before installer handoff; active file
+mutations block installation. Ordinary application quit never auto-installs.
+Production renderer CSP remains unchanged: updater networking runs in main.

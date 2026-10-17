@@ -10,19 +10,19 @@ import { closeTestApp, removeTestFixture } from '../helpers/electron-app';
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const baselineUrl =
-  'https://dl.10yyds.cloud/explore/releases/1.0.1/windows-x64/Explore-Setup-1.0.1-windows-x64.exe';
-const baselineHash = '18b358ecbe9e52d14b54258b67caef345e04e441782d78a6c5df66def8258e49';
+  'https://github.com/saramand9/prj-super-explore/releases/download/v1.0.2/Explore-Setup-1.0.2-windows-x64.exe';
+const baselineHash = '329edcc84bbdfe1593dec18bf4a34f7fc741323bd5f925c79cdbab10d320c81c';
 
 async function downloadBaseline(): Promise<Buffer> {
-  const size = 85572961;
+  const size = 115581856;
   const chunkSize = 1024 * 1024;
   const output = Buffer.alloc(size);
   const deadline = AbortSignal.timeout(360000);
   let next = 0;
   let completed = 0;
-  // The original host serves large single responses slowly. Bounded ranges
-  // retain HTTPS, exact Content-Range checks and the full-file SHA-256 pin.
-  console.log('Downloading pinned 1.0.1 baseline with at most 8 concurrent ranges');
+  // Use the latest accepted installer, not the obsolete 1.0.1 baseline which
+  // crashes on some fresh runners. Retain HTTPS, exact ranges and SHA-256 pinning.
+  console.log('Downloading pinned 1.0.2 baseline with at most 8 concurrent ranges');
   await Promise.all(
     Array.from({ length: 8 }, async () => {
       for (;;) {
@@ -85,7 +85,7 @@ async function launchInstalled(executable: string, profile: string): Promise<Ele
   return application;
 }
 
-test('installs 1.0.1, upgrades with data preserved, launches securely and uninstalls', async () => {
+test('installs 1.0.2, upgrades with data preserved, launches securely and uninstalls', async () => {
   // Never register/unregister a test installation in a maintainer's real account.
   if (process.env.GITHUB_ACTIONS !== 'true' || process.env.RUNNER_OS !== 'Windows') {
     throw new Error('Installer acceptance is restricted to a disposable Windows GitHub runner');
@@ -102,7 +102,7 @@ test('installs 1.0.1, upgrades with data preserved, launches securely and uninst
   let application: ElectronApplication | undefined;
   try {
     const baseline = await downloadBaseline();
-    const oldInstaller = join(root, 'baseline-1.0.1.exe');
+    const oldInstaller = join(root, 'baseline-1.0.2.exe');
     await writeFile(oldInstaller, baseline);
     await mkdir(config, { recursive: true });
     await mkdir(content);
@@ -120,11 +120,11 @@ test('installs 1.0.1, upgrades with data preserved, launches securely and uninst
       ]),
     );
 
-    console.log('Installing baseline 1.0.1 in the disposable profile');
+    console.log('Installing baseline 1.0.2 in the disposable profile');
     await runInstaller(oldInstaller, ['/S', `/D=${directory}`]);
     await expect.poll(() => existsSync(executable), { timeout: 30000 }).toBe(true);
     application = await launchInstalled(executable, profile);
-    expect(await application.evaluate(({ app }) => app.getVersion())).toBe('1.0.1');
+    expect(await application.evaluate(({ app }) => app.getVersion())).toBe('1.0.2');
     await expect((await application.firstWindow()).getByTestId('workspace-menu-trigger')).toContainText(
       'Release fixture',
     );

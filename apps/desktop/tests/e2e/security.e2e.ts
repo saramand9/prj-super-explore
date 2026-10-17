@@ -70,6 +70,22 @@ test.describe('Electron security boundary', () => {
     }, preloadPath);
     expect(decodeError(denied).code).toBe('PERMISSION_DENIED');
   });
+  test('does not let the launcher authorize or control updates', async () => {
+    const created = application.waitForEvent('window');
+    await page.evaluate(() => window.explore.requests['window:toggleLauncher'](undefined));
+    const launcher = await created;
+    await launcher.waitForURL((url) => url.hash === '#/launcher');
+    await launcher.waitForLoadState('domcontentloaded');
+    const denied = await launcher.evaluate(async () => {
+      try {
+        await window.explore.requests['update:resolveSave']({ requestId: 1, allow: true });
+        return '';
+      } catch (error) {
+        return String(error);
+      }
+    });
+    expect(decodeError(denied).code).toBe('PERMISSION_DENIED');
+  });
   test('blocks inline script injection, new windows and remote navigation', async () => {
     const before = page.url();
     expect(

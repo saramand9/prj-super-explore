@@ -9,8 +9,8 @@ Publishing remains a deliberate maintainer action.
 
 1. Complete the [readiness checks](maintainers/open-source-readiness.md), including
    asset rights, dependency triage and complete notices for distributed components.
-2. Update all three package versions together. Do not reuse `1.0.1` for the
-   hardened build: the already distributed installer predates these changes.
+2. Update all three package versions together. The updater-enabled source is
+   prepared as 1.0.3; never reuse or replace the already published 1.0.2 assets.
 3. Move the relevant Unreleased entries in `CHANGELOG.md` into a dated version.
 4. Run `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test:unit`,
    `pnpm test:e2e`, `pnpm test:commit-policy`, `pnpm test:release` and
@@ -22,19 +22,22 @@ Publishing remains a deliberate maintainer action.
 
 From an up-to-date, clean master, create an annotated tag matching every package
 version and push only that tag. For example, after deliberately setting all
-three versions to `1.0.2`:
+three versions to `1.0.3`:
 
 ```powershell
-node scripts/verify-release.mjs v1.0.2
-git tag -a v1.0.2 -m "Release Explore 1.0.2"
-git push origin v1.0.2
+node scripts/verify-release.mjs v1.0.3
+git tag -a v1.0.3 -m "Release Explore 1.0.3"
+git push origin v1.0.3
 ```
 
 This is a maintainer procedure, not a command executed by documentation updates.
 The workflow rejects mismatched versions and commits not reachable from master.
 The Windows build job has read-only repository permissions. A separate job,
 without package installation or source execution, receives write permission to
-create the draft and attach the installer, SHA256SUMS and repository notices.
+create the draft and attach the installer, `latest.yml`, installer `.blockmap`,
+SHA256SUMS and repository notices. Packaging uses `--publish never` and verifies
+the public GitHub configuration, metadata version, installer filename/size and
+SHA-512 before the draft job runs.
 The workflow does not overwrite an existing release or publish a draft.
 
 ## Review the draft
@@ -46,7 +49,7 @@ The workflow does not overwrite an existing release or publish a draft.
   Electron/Chromium notices are next to the executable. Review new dependencies
   when adding runtime code or changing renderer build inputs.
 - The workflow runs `pnpm --filter @explore/desktop test:installer` on its
-  disposable Windows runner. It verifies the pinned 1.0.1 installer hash,
+  disposable Windows runner. It verifies the pinned GitHub 1.0.2 installer hash,
   installs it, upgrades with isolated sample workspaces/settings preserved,
   verifies hardened startup and notices, and uninstalls. It refuses to run on
   the maintainer's ordinary account. Repeat manual acceptance on supported
@@ -54,7 +57,14 @@ The workflow does not overwrite an existing release or publish a draft.
 - Exercise copy/move/rename conflicts, locked files, close/save recovery, network
   shares, filename/full-text search, worker loading and trusted plugin behavior.
 - Confirm the release notes distinguish known limitations and fixes from the
-  preceding binary. Current builds are unsigned and have no automatic updater.
+  preceding binary. Current builds remain unsigned. 1.0.3 adds the updater;
+  published 1.0.2 users must install it manually once.
+- Verify all updater assets are attached to the same stable release. A draft is
+  invisible to installed clients; publishing it deliberately activates update
+  availability. Do not publish partial assets or overwrite an existing version.
+- Complete [update acceptance](updates.md#release-acceptance). Loopback tests
+  verify transport and integrity, not live GitHub connectivity or an actual
+  updater-triggered NSIS replacement on every supported Windows version.
 
 Publish the draft only after these checks. Creating the workflow, pushing source,
 or passing an unpacked-app smoke test is not an installer acceptance certificate.

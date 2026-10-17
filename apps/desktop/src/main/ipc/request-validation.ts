@@ -1,5 +1,6 @@
 import { isAbsolute, win32 } from 'node:path';
 import type { IpcChannels } from '@explore/shared';
+import { UPDATE_CHANNELS } from '@explore/shared';
 
 type Guard = (value: unknown) => boolean;
 const text =
@@ -110,6 +111,11 @@ const voidRequest: Guard = (value) => value === undefined;
 
 // Exhaustiveness makes adding an IPC capability without a runtime schema a type error.
 const schemas = {
+  [UPDATE_CHANNELS.getState]: voidRequest,
+  [UPDATE_CHANNELS.check]: voidRequest,
+  [UPDATE_CHANNELS.download]: voidRequest,
+  [UPDATE_CHANNELS.install]: voidRequest,
+  [UPDATE_CHANNELS.resolveSave]: shape({ requestId: integer(1), allow: bool }),
   'file:readDir': shape({ path: filePath, sort: optional(sort), showHidden: optional(bool) }),
   'file:stat': shape({ path: filePath }),
   'file:copy': operation,

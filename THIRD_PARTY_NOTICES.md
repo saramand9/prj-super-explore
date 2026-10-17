@@ -11,6 +11,8 @@ The installed dependency metadata reviewed on October 17, 2026 identifies:
 
 - `@lvce-editor/ripgrep` 4.1.0: MIT; a wrapper that downloads and bundles ripgrep.
 - `dompurify` 3.4.17: MPL-2.0 OR Apache-2.0.
+- `electron-updater` 6.8.10: MIT; Windows NSIS update transport and verification.
+  Its js-yaml 4.x dependency is pinned to the compatible security fix 4.3.2 (MIT).
 - `highlight.js` 11.11.1: BSD-3-Clause.
 - `marked` 18.0.4: MIT.
 - `pinyin-pro` 3.28.1: MIT.
@@ -28,6 +30,12 @@ for the production dependency graph and renderer runtime roots into
 `resources/licenses/components/`, with a path-free `components.json` inventory.
 It fails when a selected package has no license text. This includes install-time
 dependencies as a conservative superset, not a claim they all execute in Explore.
+An explicitly version-pinned exception is `lazy-val` 1.0.5: its npm/source
+metadata declares MIT and names Vladimir Krivosheev, but neither distribution
+contains a separate license text or copyright year. The bundled
+`lazy-val-1.0.5-NOTICE.txt` preserves that provenance and standard MIT terms
+without inventing a year or claiming a verbatim upstream notice. Review this
+upstream notice gap before public distribution; it is not hidden by the collector.
 Electron's `LICENSE.electron.txt` and `LICENSES.chromium.html` are preserved next
 to the executable. Ripgrep 15.0.0 and its PCRE2 10.45 license texts are retained;
 the source URLs and release-risk assessment are recorded in

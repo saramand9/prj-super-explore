@@ -14,7 +14,7 @@ function assertFixture(root: string): void {
 }
 
 /** Explicit Electron paths prevent tests from reading or replacing the real user's workspaces. */
-export async function launchTestApp(root: string): Promise<ElectronApplication> {
+export async function launchTestApp(root: string, beforeImport: string[] = []): Promise<ElectronApplication> {
   assertFixture(root);
   const userData = join(root, '.profile');
   await mkdir(userData, { recursive: true });
@@ -28,6 +28,7 @@ export async function launchTestApp(root: string): Promise<ElectronApplication> 
         (key) =>
           `app.setPath(${JSON.stringify(key)}, ${JSON.stringify(key === 'sessionData' ? userData : root)});`,
       ),
+      ...beforeImport,
       `await import(${JSON.stringify(pathToFileURL(join(appRoot, 'out/main/index.js')).href)});`,
     ].join('\n'),
     'utf8',

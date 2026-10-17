@@ -10,6 +10,8 @@ import { ScanService } from './services/scan.service';
 import { DiagnosticsService } from './services/diagnostics.service';
 import { HotkeyService } from './services/hotkey.service';
 import { WindowService } from './services/window.service';
+import { UpdateService } from './services/update.service';
+import { OperationGuard } from './updates/operation-guard';
 import { registerIpcHandlers } from './ipc/handlers';
 import { mkdirSync } from 'fs';
 import { resolve } from 'path';
@@ -65,6 +67,12 @@ if (primaryInstance) {
       container.register('search', (ctx) => new SearchService(ctx));
       container.register('index', (ctx) => new IndexService(ctx));
       container.register('window', () => new WindowService(diagnostics));
+      const operations = new OperationGuard();
+      container.register('operations', () => operations);
+      container.register(
+        'updates',
+        (ctx) => new UpdateService(ctx.get<WindowService>('window'), diagnostics, operations),
+      );
       container.register('hotkey', (ctx) => new HotkeyService(ctx));
 
       await container.initAll();
@@ -75,6 +83,7 @@ if (primaryInstance) {
       // 创建主窗口
       const windowSvc = container.get<WindowService>('window');
       windowSvc.createMainWindow();
+      container.get<UpdateService>('updates').start();
 
       app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
