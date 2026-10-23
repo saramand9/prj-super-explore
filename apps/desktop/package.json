@@ -81,7 +81,7 @@
   },
   "devDependencies": {
     "@electron-toolkit/preload": "^3.0.0",
-    "@electron-toolkit/utils": "^3.0.0",
+    "@electron-toolkit/utils": "^4.0.0",
     "@explore/shared": "workspace:*",
     "@playwright/test": "^1.60.0",
     "@tanstack/react-virtual": "^3.10.0",
